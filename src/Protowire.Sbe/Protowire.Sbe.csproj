@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Authors>Trendvidia</Authors>
+    <Description>C# port of the Protowire library for high-performance Protobuf text and binary serialization.</Description>
+    <PackageProjectUrl>https://github.com/trendvidia/protowire-csharp</PackageProjectUrl>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="3.34.1" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,396 @@
+using System.Text;
+
+namespace Protowire.Pxf;
+
+internal class Lexer
+{
+    private readonly string _input;
+    private int _pos;
+    private int _line = 1;
+    private int _col = 1;
+
+    public Lexer(string input)
+    {
+        _input = input;
+    }
+
+    private char Peek() => _pos >= _input.Length ? '\0' : _input[_pos];
+
+    private char PeekAt(int offset)
+    {
+        int i = _pos + offset;
+        return i >= _input.Length ? '\0' : _input[i];
+    }
+
+    private char Advance()
+    {
+        if (_pos >= _input.Length) return '\0';
+        char ch = _input[_pos++];
+        if (ch == '\n')
+        {
+            _line++;
+            _col = 1;
+        }
+        else
+        {
+            _col++;
+        }
+        return ch;
+    }
+
+    private Position CurrentPos => new(_line, _col, _pos);
+
+    private void SkipSpaces()
+    {
+        while (_pos < _input.Length)
+        {
+            char ch = _input[_pos];
+            if (ch == ' ' || ch == '\t' || ch == '\r')
+            {
+                Advance();
+            }
+            else
+            {
+                break;
+            }
+        }
+    }
+
+    public Token Next()
+    {
+        SkipSpaces();
+        if (_pos >= _input.Length)
+        {
+            return new Token(TokenKind.EOF, string.Empty, CurrentPos);
+        }
+
+        var pos = CurrentPos;
+        char ch = Peek();
+
+        switch (ch)
+        {
+            case '\n':
+                Advance();
+                return new Token(TokenKind.NEWLINE, "\n", pos);
+
+            case '#':
+                return LexLineComment(pos);
+            case '/' when PeekAt(1) == '/':
+                return LexLineComment(pos);
+            case '/' when PeekAt(1) == '*':
+                return LexBlockComment(pos);
+
+            case '"':
+                if (PeekAt(1) == '"' && PeekAt(2) == '"')
+                {
+                    return LexTripleString(pos);
+                }
+                return LexString(pos);
+            case 'b' when PeekAt(1) == '"':
+                return LexBytes(pos);
+
+            case '{':
+                Advance();
+                return new Token(TokenKind.LBRACE, "{", pos);
+            case '}':
+                Advance();
+                return new Token(TokenKind.RBRACE, "}", pos);
+            case '[':
+                Advance();
+                return new Token(TokenKind.LBRACKET, "[", pos);
+            case ']':
+                Advance();
+                return new Token(TokenKind.RBRACKET, "]", pos);
+            case '=':
+                Advance();
+                return new Token(TokenKind.EQUALS, "=", pos);
+            case ':':
+                Advance();
+                return new Token(TokenKind.COLON, ":", pos);
+            case ',':
+                Advance();
+                return new Token(TokenKind.COMMA, ",", pos);
+            case '@':
+                return LexDirective(pos);
+
+            case '-':
+            case var _ when char.IsDigit(ch):
+                return LexNumber(pos);
+
+            case var _ when IsIdentStart(ch):
+                return LexIdent(pos);
+
+            default:
+                Advance();
+                return new Token(TokenKind.ILLEGAL, ch.ToString(), pos);
+        }
+    }
+
+    private Token LexLineComment(Position pos)
+    {
+        int start = _pos;
+        while (_pos < _input.Length && _input[_pos] != '\n')
+        {
+            Advance();
+        }
+        return new Token(TokenKind.COMMENT, _input[start.._pos], pos);
+    }
+
+    private Token LexBlockComment(Position pos)
+    {
+        int start = _pos;
+        Advance(); // /
+        Advance(); // *
+        while (_pos + 1 < _input.Length)
+        {
+            if (_input[_pos] == '*' && _input[_pos + 1] == '/')
+            {
+                Advance(); // *
+                Advance(); // /
+                return new Token(TokenKind.COMMENT, _input[start.._pos], pos);
+            }
+            Advance();
+        }
+        return new Token(TokenKind.ILLEGAL, "unterminated block comment", pos);
+    }
+
+    private Token LexString(Position pos)
+    {
+        Advance(); // opening "
+        var sb = new StringBuilder();
+        while (_pos < _input.Length)
+        {
+            char ch = Advance();
+            if (ch == '"')
+            {
+                return new Token(TokenKind.STRING, sb.ToString(), pos);
+            }
+            if (ch == '\\')
+            {
+                if (_pos >= _input.Length)
+                {
+                    return new Token(TokenKind.ILLEGAL, "unterminated escape sequence", pos);
+                }
+                char esc = Advance();
+                switch (esc)
+                {
+                    case '"': sb.Append('"'); break;
+                    case '\\': sb.Append('\\'); break;
+                    case 'n': sb.Append('\n'); break;
+                    case 't': sb.Append('\t'); break;
+                    case 'r': sb.Append('\r'); break;
+                    default:
+                        sb.Append('\\');
+                        sb.Append(esc);
+                        break;
+                }
+                continue;
+            }
+            sb.Append(ch);
+        }
+        return new Token(TokenKind.ILLEGAL, "unterminated string", pos);
+    }
+
+    private Token LexTripleString(Position pos)
+    {
+        Advance(); // "
+        Advance(); // "
+        Advance(); // "
+        int start = _pos;
+        while (_pos + 2 < _input.Length)
+        {
+            if (_input[_pos] == '"' && _input[_pos + 1] == '"' && _input[_pos + 2] == '"')
+            {
+                string raw = _input[start.._pos];
+                Advance(); // "
+                Advance(); // "
+                Advance(); // "
+                return new Token(TokenKind.STRING, Dedent(raw), pos);
+            }
+            Advance();
+        }
+        return new Token(TokenKind.ILLEGAL, "unterminated triple-quoted string", pos);
+    }
+
+    private static string Dedent(string s)
+    {
+        if (s.Length > 0 && s[0] == '\n')
+        {
+            s = s[1..];
+        }
+        var lines = s.Split('\n');
+        if (lines.Length == 0) return string.Empty;
+
+        string last = lines[^1];
+        if (string.IsNullOrWhiteSpace(last))
+        {
+            string indent = last;
+            var resultLines = lines[..^1];
+            for (int i = 0; i < resultLines.Length; i++)
+            {
+                if (resultLines[i].StartsWith(indent))
+                {
+                    resultLines[i] = resultLines[i][indent.Length..];
+                }
+            }
+            return string.Join("\n", resultLines);
+        }
+        return string.Join("\n", lines);
+    }
+
+    private Token LexBytes(Position pos)
+    {
+        Advance(); // b
+        var tok = LexString(pos);
+        if (tok.Kind != TokenKind.STRING) return tok;
+        try
+        {
+            Convert.FromBase64String(tok.Value);
+        }
+        catch
+        {
+            return new Token(TokenKind.ILLEGAL, "invalid base64 in bytes literal", pos);
+        }
+        return new Token(TokenKind.BYTES, tok.Value, pos);
+    }
+
+    private Token LexDirective(Position pos)
+    {
+        Advance(); // @
+        int start = _pos;
+        while (_pos < _input.Length && IsIdentPart(_input[_pos]))
+        {
+            Advance();
+        }
+        string name = _input[start.._pos];
+        if (name == "type")
+        {
+            return new Token(TokenKind.AT_TYPE, "@type", pos);
+        }
+        return new Token(TokenKind.ILLEGAL, "@" + name, pos);
+    }
+
+    private Token LexNumber(Position pos)
+    {
+        int start = _pos;
+        bool neg = false;
+        if (Peek() == '-')
+        {
+            neg = true;
+            Advance();
+            if (_pos >= _input.Length || !char.IsDigit(Peek()))
+            {
+                return new Token(TokenKind.ILLEGAL, "-", pos);
+            }
+        }
+
+        int digitStart = _pos;
+        while (_pos < _input.Length && char.IsDigit(Peek()))
+        {
+            Advance();
+        }
+        int digitCount = _pos - digitStart;
+
+        // Timestamp: exactly 4 digits followed by '-', only non-negative
+        if (!neg && digitCount == 4 && _pos < _input.Length && Peek() == '-')
+        {
+            return LexTimestamp(pos, start);
+        }
+        // Float: '.' or 'e'/'E'
+        if (_pos < _input.Length && (Peek() == '.' || Peek() == 'e' || Peek() == 'E'))
+        {
+            return LexFloat(pos, start);
+        }
+        // Duration: digits followed by a time unit letter
+        if (_pos < _input.Length && IsDurationUnit(Peek()))
+        {
+            return LexDuration(pos, start);
+        }
+
+        return new Token(TokenKind.INT, _input[start.._pos], pos);
+    }
+
+    private Token LexFloat(Position pos, int start)
+    {
+        if (Peek() == '.')
+        {
+            Advance();
+            while (_pos < _input.Length && char.IsDigit(Peek()))
+            {
+                Advance();
+            }
+        }
+        if (_pos < _input.Length && (Peek() == 'e' || Peek() == 'E'))
+        {
+            Advance();
+            if (_pos < _input.Length && (Peek() == '+' || Peek() == '-'))
+            {
+                Advance();
+            }
+            while (_pos < _input.Length && char.IsDigit(Peek()))
+            {
+                Advance();
+            }
+        }
+        return new Token(TokenKind.FLOAT, _input[start.._pos], pos);
+    }
+
+    private Token LexTimestamp(Position pos, int start)
+    {
+        while (_pos < _input.Length)
+        {
+            char ch = Peek();
+            if (char.IsWhiteSpace(ch) || ch == ',' || ch == ']' || ch == '}' || ch == '#')
+            {
+                break;
+            }
+            if (ch == '/' && (PeekAt(1) == '/' || PeekAt(1) == '*'))
+            {
+                break;
+            }
+            Advance();
+        }
+        string raw = _input[start.._pos];
+        if (!DateTime.TryParse(raw, out _))
+        {
+             return new Token(TokenKind.ILLEGAL, "invalid timestamp: " + raw, pos);
+        }
+        return new Token(TokenKind.TIMESTAMP, raw, pos);
+    }
+
+    private Token LexDuration(Position pos, int start)
+    {
+        while (_pos < _input.Length && (char.IsDigit(Peek()) || (Peek() >= 'a' && Peek() <= 'z')))
+        {
+            Advance();
+        }
+        string raw = _input[start.._pos];
+        // In Go, time.ParseDuration is quite specific.
+        // For C#, we might need a custom parser or just keep the raw string for now.
+        // I'll skip strict validation for now.
+        return new Token(TokenKind.DURATION, raw, pos);
+    }
+
+    private Token LexIdent(Position pos)
+    {
+        int start = _pos;
+        while (_pos < _input.Length && IsIdentPart(_input[_pos]))
+        {
+            Advance();
+        }
+        string val = _input[start.._pos];
+        if (val == "true" || val == "false")
+        {
+            return new Token(TokenKind.BOOL, val, pos);
+        }
+        if (val == "null")
+        {
+            return new Token(TokenKind.NULL, val, pos);
+        }
+        return new Token(TokenKind.IDENT, val, pos);
+    }
+
+    private static bool IsIdentStart(char ch) => char.IsLetter(ch) || ch == '_';
+    private static bool IsIdentPart(char ch) => IsIdentStart(ch) || char.IsDigit(ch) || ch == '.' || ch == '/';
+    private static bool IsDurationUnit(char ch) => ch == 'h' || ch == 'm' || ch == 's' || ch == 'n' || ch == 'u' || ch == 'µ';
+}

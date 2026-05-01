@@ -1,0 +1,38 @@
+// Canonical SBE benchmark fixture, shared across all language ports.
+//
+// Matches the `Order` message used by each port's existing SBE tests
+// (10 scalar fields including a string and an enum, plus a 2-entry
+// repeating group). 94-byte SBE wire size:
+//   header(8) + root(42) + group_header(4) + 2*fill(20) = 94
+syntax = "proto3";
+package bench.v1;
+
+import "sbe/annotations.proto";
+
+option (sbe.schema_id) = 1;
+option (sbe.version) = 0;
+
+enum Side {
+  SIDE_BUY = 0;
+  SIDE_SELL = 1;
+}
+
+message Order {
+  option (sbe.template_id) = 1;
+
+  uint64 order_id = 1;
+  string symbol   = 2 [(sbe.length) = 8];
+  int64  price    = 3;
+  uint32 quantity = 4;
+  Side   side     = 5;
+  bool   active   = 6;
+  double weight   = 7;
+  float  score    = 8;
+
+  message Fill {
+    int64  fill_price = 1;
+    uint32 fill_qty   = 2;
+    uint64 fill_id    = 3;
+  }
+  repeated Fill fills = 9;
+}

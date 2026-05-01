@@ -1,0 +1,14 @@
+syntax = "proto3";
+package bench.v1;
+
+import "sbe/annotations.proto";
+
+option (sbe.schema_id) = 1;
+option (sbe.version) = 0;
+
+message SbeExtra {
+  option (sbe.template_id) = 2;
+  uint64 id = 1;
+  repeated int32 tags = 2;
+  map<string, string> metadata = 3 [(sbe.length) = 16];
+}
