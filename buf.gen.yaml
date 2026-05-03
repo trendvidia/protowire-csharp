@@ -26,6 +26,9 @@ managed:
     - file_option: csharp_namespace
       value: Protowire.Pxf.Tests.Bench
       path: bench-test.proto
+    - file_option: csharp_namespace
+      value: Protowire.Pxf.Tests.Presence
+      path: pxf-presence-test.proto
 plugins:
   - remote: buf.build/protocolbuffers/csharp:v29.3
     out: src

@@ -1,5 +1,6 @@
-using System.Reflection;
 using System.Collections;
+using System.Globalization;
+using System.Reflection;
 using Google.Protobuf;
 using Google.Protobuf.Reflection;
 
@@ -12,6 +13,10 @@ public class Decoder
 {
     private Lexer _lex = null!;
     private Token _current = null!;
+    private Result? _result;
+    private string _pathPrefix = "";
+    private IMessage? _rootMsg;
+    private FieldDescriptor? _nullMaskFd;
     public TypeRegistry Registry { get; set; } = TypeRegistry.Empty;
 
     /// <summary>
@@ -20,6 +25,47 @@ public class Decoder
     /// <param name="data">The PXF-formatted string.</param>
     /// <param name="obj">The object to unmarshal into.</param>
     public void Unmarshal(string data, object obj)
+    {
+        ResetState();
+        ParseInto(data, obj);
+        // POCO path: validate (pxf.required) / apply (pxf.default) read from C# attributes.
+        // For IMessage, the descriptor-driven equivalent runs only in UnmarshalFull,
+        // matching the Go reference (`Unmarshal` does no validation; `UnmarshalFull` does).
+        if (obj is not IMessage)
+        {
+            ApplyDefaultsAndValidatePoco(obj);
+        }
+    }
+
+    /// <summary>
+    /// Unmarshals a PXF-formatted string into <paramref name="msg"/> and returns
+    /// per-field presence metadata. Validates <c>(pxf.required)</c>, applies
+    /// <c>(pxf.default)</c>, and writes null paths into the message's <c>_null</c>
+    /// FieldMask (if present).
+    /// </summary>
+    /// <param name="data">The PXF-formatted string.</param>
+    /// <param name="msg">The protobuf message to unmarshal into.</param>
+    /// <returns>A <see cref="Result"/> with set/null/absent path information.</returns>
+    public Result UnmarshalFull(string data, IMessage msg)
+    {
+        ResetState();
+        _result = new Result();
+        _rootMsg = msg;
+        _nullMaskFd = AnnotationsRuntime.FindNullMaskField(msg.Descriptor);
+        ParseInto(data, msg);
+        PostDecode(msg, "");
+        return _result;
+    }
+
+    private void ResetState()
+    {
+        _result = null;
+        _pathPrefix = "";
+        _rootMsg = null;
+        _nullMaskFd = null;
+    }
+
+    private void ParseInto(string data, object obj)
     {
         _lex = new Lexer(data);
         Advance();
@@ -35,7 +81,6 @@ public class Decoder
         }
 
         DecodeFields(obj, false);
-        ApplyDefaultsAndValidate(obj);
     }
 
     private void Advance()
@@ -154,8 +199,21 @@ public class Decoder
                     Advance();
                     if (_current.Kind == TokenKind.NULL)
                     {
+                        if (_result != null && fd != null)
+                        {
+                            var path = _pathPrefix + fd.Name;
+                            _result.MarkNull(path);
+                            if (_nullMaskFd != null && _rootMsg != null)
+                            {
+                                AnnotationsRuntime.AppendNullPath(_rootMsg, _nullMaskFd, path);
+                            }
+                        }
                         Advance();
                         continue;
+                    }
+                    if (_result != null && fd != null)
+                    {
+                        _result.MarkPresent(_pathPrefix + fd.Name);
                     }
                     var currentVal = prop?.GetValue(obj) ?? field?.GetValue(obj);
                     var val = DecodeValue(memberType, fd, currentVal);
@@ -172,7 +230,24 @@ public class Decoder
                         if (prop != null && prop.CanWrite) prop.SetValue(obj, subObj);
                         else if (field != null) field.SetValue(obj, subObj);
                     }
-                    DecodeFields(subObj!, true);
+                    if (_result != null && fd != null)
+                    {
+                        _result.MarkPresent(_pathPrefix + fd.Name);
+                        var saved = _pathPrefix;
+                        _pathPrefix = _pathPrefix + fd.Name + ".";
+                        try
+                        {
+                            DecodeFields(subObj!, true);
+                        }
+                        finally
+                        {
+                            _pathPrefix = saved;
+                        }
+                    }
+                    else
+                    {
+                        DecodeFields(subObj!, true);
+                    }
                     break;
 
                 default:
@@ -478,7 +553,7 @@ public class Decoder
         return map;
     }
 
-    private void ApplyDefaultsAndValidate(object obj)
+    private void ApplyDefaultsAndValidatePoco(object obj)
     {
         var type = obj.GetType();
         foreach (var prop in type.GetProperties())
@@ -500,6 +575,216 @@ public class Decoder
                 throw new PxfException(Position.Empty, $"required field \"{prop.Name}\" is absent");
             }
         }
+    }
+
+    /// <summary>
+    /// Descriptor-driven counterpart of <see cref="ApplyDefaultsAndValidatePoco"/>:
+    /// validates <c>(pxf.required)</c>, applies <c>(pxf.default)</c>, and recurses
+    /// into present, non-null singular message fields. Skips the <c>_null</c>
+    /// FieldMask field at the root.
+    ///
+    /// <para>Mirrors <c>postDecode</c> in <c>protowire-go/encoding/pxf/decode_fast.go</c>.</para>
+    /// </summary>
+    private void PostDecode(IMessage msg, string pathPrefix)
+    {
+        var desc = msg.Descriptor;
+        foreach (var fd in desc.Fields.InDeclarationOrder())
+        {
+            if (pathPrefix == "" && _nullMaskFd != null && fd.FieldNumber == _nullMaskFd.FieldNumber)
+            {
+                continue;
+            }
+            string path = pathPrefix + fd.Name;
+            bool present = _result!.Has(path);
+            if (!present)
+            {
+                if (AnnotationsRuntime.IsRequired(fd))
+                {
+                    throw new PxfException(Position.Empty, $"required field \"{path}\" is absent");
+                }
+                var def = AnnotationsRuntime.GetDefault(fd);
+                if (def != null)
+                {
+                    ApplyDefault(msg, fd, def);
+                }
+            }
+            else if ((fd.FieldType == FieldType.Message || fd.FieldType == FieldType.Group)
+                     && !fd.IsRepeated && !fd.IsMap && !_result.IsNull(path))
+            {
+                if (fd.Accessor.GetValue(msg) is IMessage sub)
+                {
+                    PostDecode(sub, path + ".");
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Sets <paramref name="fd"/> on <paramref name="msg"/> from the PXF default
+    /// literal <paramref name="def"/>. Handles scalars, enums, bytes (base64),
+    /// and the WKT message types (Timestamp, Duration, wrappers, BigInt, Decimal,
+    /// BigFloat).
+    ///
+    /// <para>Mirrors <c>applyDefault</c> in <c>protowire-go/encoding/pxf/decode_fast.go</c>.</para>
+    /// </summary>
+    private static void ApplyDefault(IMessage msg, FieldDescriptor fd, string def)
+    {
+        switch (fd.FieldType)
+        {
+            case FieldType.String:
+                fd.Accessor.SetValue(msg, def);
+                return;
+            case FieldType.Bool:
+                fd.Accessor.SetValue(msg, def == "true");
+                return;
+            case FieldType.Int32:
+            case FieldType.SInt32:
+            case FieldType.SFixed32:
+                fd.Accessor.SetValue(msg, int.Parse(def, CultureInfo.InvariantCulture));
+                return;
+            case FieldType.Int64:
+            case FieldType.SInt64:
+            case FieldType.SFixed64:
+                fd.Accessor.SetValue(msg, long.Parse(def, CultureInfo.InvariantCulture));
+                return;
+            case FieldType.UInt32:
+            case FieldType.Fixed32:
+                fd.Accessor.SetValue(msg, uint.Parse(def, CultureInfo.InvariantCulture));
+                return;
+            case FieldType.UInt64:
+            case FieldType.Fixed64:
+                fd.Accessor.SetValue(msg, ulong.Parse(def, CultureInfo.InvariantCulture));
+                return;
+            case FieldType.Float:
+                fd.Accessor.SetValue(msg, float.Parse(def, CultureInfo.InvariantCulture));
+                return;
+            case FieldType.Double:
+                fd.Accessor.SetValue(msg, double.Parse(def, CultureInfo.InvariantCulture));
+                return;
+            case FieldType.Bytes:
+                fd.Accessor.SetValue(msg, ByteString.CopyFrom(Convert.FromBase64String(def)));
+                return;
+            case FieldType.Enum:
+            {
+                var ev = fd.EnumType.FindValueByName(def);
+                int n = ev != null ? ev.Number : int.Parse(def, CultureInfo.InvariantCulture);
+                fd.Accessor.SetValue(msg, n);
+                return;
+            }
+            case FieldType.Message:
+            case FieldType.Group:
+                ApplyMessageDefault(msg, fd, def);
+                return;
+            default:
+                throw new PxfException(Position.Empty,
+                    $"default values not supported for kind {fd.FieldType} (field \"{fd.Name}\")");
+        }
+    }
+
+    /// <summary>
+    /// Applies a default literal to a singular WKT message field. Recognized:
+    /// Timestamp (RFC 3339), Duration (Go-style), the nine wrapper types,
+    /// pxf.BigInt, pxf.Decimal, pxf.BigFloat.
+    ///
+    /// <para>Mirrors <c>applyMessageDefault</c> in <c>decode_fast.go</c>.</para>
+    /// </summary>
+    private static void ApplyMessageDefault(IMessage msg, FieldDescriptor fd, string def)
+    {
+        var mdesc = fd.MessageType;
+
+        // Google.Protobuf C# maps the nine wrapper types to nullable scalars
+        // on the parent message (e.g. Int32Value → int?), so the accessor
+        // expects the boxed inner scalar directly — not an inner message.
+        if (WellKnown.WrapperTypes.TryGetValue(mdesc.FullName, out var innerKind))
+        {
+            fd.Accessor.SetValue(msg, ParseScalarDefault(innerKind, def, fd));
+            return;
+        }
+
+        var clrType = mdesc.ClrType
+            ?? throw new PxfException(Position.Empty,
+                $"default values not supported for message type {mdesc.FullName} (no CLR type)");
+        var sub = (IMessage)Activator.CreateInstance(clrType)!;
+
+        if (WellKnown.IsTimestamp(mdesc))
+        {
+            var dt = DateTime.Parse(def, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+            WellKnown.SetTimestamp(sub, dt);
+        }
+        else if (WellKnown.IsDuration(mdesc))
+        {
+            WellKnown.SetDuration(sub, DurationParser.Parse(def));
+        }
+        else if (WellKnown.IsBigInt(mdesc))
+        {
+            WellKnown.SetBigInt(sub, System.Numerics.BigInteger.Parse(def, CultureInfo.InvariantCulture));
+        }
+        else if (WellKnown.IsDecimal(mdesc))
+        {
+            WellKnown.SetDecimal(sub, ParseDecimalLiteral(def));
+        }
+        else if (WellKnown.IsBigFloat(mdesc))
+        {
+            WellKnown.SetBigFloat(sub, ParseBigFloatLiteral(def));
+        }
+        else
+        {
+            throw new PxfException(Position.Empty,
+                $"default values not supported for message type {mdesc.FullName} (field \"{fd.Name}\")");
+        }
+        fd.Accessor.SetValue(msg, sub);
+    }
+
+    private static object ParseScalarDefault(FieldType kind, string def, FieldDescriptor fd) => kind switch
+    {
+        FieldType.String => def,
+        FieldType.Bool => def == "true",
+        FieldType.Int32 or FieldType.SInt32 or FieldType.SFixed32 =>
+            int.Parse(def, CultureInfo.InvariantCulture),
+        FieldType.Int64 or FieldType.SInt64 or FieldType.SFixed64 =>
+            long.Parse(def, CultureInfo.InvariantCulture),
+        FieldType.UInt32 or FieldType.Fixed32 =>
+            uint.Parse(def, CultureInfo.InvariantCulture),
+        FieldType.UInt64 or FieldType.Fixed64 =>
+            ulong.Parse(def, CultureInfo.InvariantCulture),
+        FieldType.Float => float.Parse(def, CultureInfo.InvariantCulture),
+        FieldType.Double => double.Parse(def, CultureInfo.InvariantCulture),
+        FieldType.Bytes => (object)ByteString.CopyFrom(Convert.FromBase64String(def)),
+        _ => throw new PxfException(Position.Empty,
+            $"unsupported default kind {kind} for field \"{fd.Name}\""),
+    };
+
+    private static Protowire.Pb.Decimal ParseDecimalLiteral(string s)
+    {
+        bool negative = s.StartsWith('-');
+        if (negative) s = s[1..];
+        int dot = s.IndexOf('.');
+        int scale = 0;
+        if (dot >= 0)
+        {
+            scale = s.Length - dot - 1;
+            s = s.Remove(dot, 1);
+        }
+        if (s.Length == 0) s = "0";
+        return new Protowire.Pb.Decimal(
+            System.Numerics.BigInteger.Parse(s, CultureInfo.InvariantCulture), scale, negative);
+    }
+
+    private static Protowire.Pb.BigFloat ParseBigFloatLiteral(string s)
+    {
+        bool negative = s.StartsWith('-');
+        if (negative) s = s[1..];
+        int dot = s.IndexOf('.');
+        int scale = 0;
+        if (dot >= 0)
+        {
+            scale = s.Length - dot - 1;
+            s = s.Remove(dot, 1);
+        }
+        if (s.Length == 0) s = "0";
+        return new Protowire.Pb.BigFloat(
+            System.Numerics.BigInteger.Parse(s, CultureInfo.InvariantCulture),
+            -scale, (uint)s.Length, negative);
     }
 
     private bool IsDefaultValue(Type type, object? val)

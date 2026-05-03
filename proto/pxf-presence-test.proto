@@ -1,0 +1,48 @@
+// Annotated test messages for PR4: presence + (pxf.required) / (pxf.default)
+// + _null FieldMask round-trip. Loaded by Protowire.Pxf.Tests.Presence.* tests.
+syntax = "proto3";
+package presence.v1;
+
+import "pxf/annotations.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+
+message User {
+  string name = 1 [(pxf.required) = true];
+  string role = 2 [(pxf.default) = "viewer"];
+  int32 priority = 3 [(pxf.default) = "5"];
+  bool admin = 4;
+  google.protobuf.FieldMask _null = 99;
+}
+
+message Defaults {
+  string s = 1 [(pxf.default) = "hello"];
+  bool b = 2 [(pxf.default) = "true"];
+  int32 i32 = 3 [(pxf.default) = "-7"];
+  int64 i64 = 4 [(pxf.default) = "9000000000"];
+  uint32 u32 = 5 [(pxf.default) = "42"];
+  uint64 u64 = 6 [(pxf.default) = "18000000000"];
+  float f32 = 7 [(pxf.default) = "0.5"];
+  double f64 = 8 [(pxf.default) = "2.5"];
+  bytes by = 9 [(pxf.default) = "AQID"];
+  Color color = 10 [(pxf.default) = "RED"];
+  google.protobuf.Timestamp ts = 11 [(pxf.default) = "2024-01-02T03:04:05Z"];
+  google.protobuf.Duration dur = 12 [(pxf.default) = "1h30m"];
+  google.protobuf.Int32Value wrapped = 13 [(pxf.default) = "99"];
+}
+
+enum Color {
+  COLOR_UNSPECIFIED = 0;
+  RED = 1;
+  GREEN = 2;
+}
+
+message Nested {
+  Inner inner = 1;
+}
+
+message Inner {
+  string label = 1 [(pxf.required) = true];
+}
