@@ -21,7 +21,7 @@ internal static class DurationParser
         {
             int start = i;
             while (i < s.Length && (char.IsDigit(s[i]) || s[i] == '.')) i++;
-            if (start == i) throw new Exception($"Invalid duration: {s}");
+            if (start == i) throw new FormatException($"Invalid duration: {s}");
             
             double val = double.Parse(s[start..i], CultureInfo.InvariantCulture);
 
@@ -37,7 +37,7 @@ internal static class DurationParser
                 "ms" => val * 1_000_000.0,
                 "us" or "µs" => val * 1_000.0,
                 "ns" => val,
-                _ => throw new Exception($"Unknown duration unit: {unit}")
+                _ => throw new FormatException($"Unknown duration unit: {unit}")
             };
         }
 

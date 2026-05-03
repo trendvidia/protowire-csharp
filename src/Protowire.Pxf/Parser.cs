@@ -9,15 +9,19 @@ public class PxfException : Exception
     }
 }
 
-public class Parser
+public sealed class Parser
 {
     private readonly Lexer _lex;
-    private Token _current = null!;
-    private List<Comment> _comments = new();
+    private Token _current;
+    private List<Comment> _comments = [];
 
     private Parser(string input)
     {
         _lex = new Lexer(input);
+        // Prime _current with an EOF sentinel so the nullable-reference-types
+        // analysis is satisfied without `null!`; the very next Advance() call
+        // overwrites it with the real first token.
+        _current = new Token(TokenKind.EOF, string.Empty, Position.Empty);
         Advance();
     }
 
@@ -48,8 +52,8 @@ public class Parser
 
     private Document ParseDocument()
     {
-        var doc = new Document();
-        doc.LeadingComments = FlushComments();
+        var leadingComments = FlushComments();
+        string typeUrl = string.Empty;
 
         if (_current.Kind == TokenKind.AT_TYPE)
         {
@@ -58,15 +62,21 @@ public class Parser
             {
                 throw new PxfException(_current.Pos, $"expected type name after @type, got {_current.Kind}");
             }
-            doc.TypeURL = _current.Value;
+            typeUrl = _current.Value;
             Advance();
         }
 
+        var entries = new List<IEntry>();
         while (_current.Kind != TokenKind.EOF)
         {
-            doc.Entries.Add(ParseEntry());
+            entries.Add(ParseEntry());
         }
-        return doc;
+        return new Document
+        {
+            TypeURL = typeUrl,
+            LeadingComments = leadingComments,
+            Entries = entries,
+        };
     }
 
     private IEntry ParseEntry()

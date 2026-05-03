@@ -73,7 +73,7 @@ public static class Pb
         foreach (var field in info.Fields.OrderBy(f => f.Tag))
         {
             var val = field.GetValue(v);
-            if (IsZero(val)) continue;
+            if (val is null || IsZero(val)) continue;
 
             if (!string.IsNullOrEmpty(field.Oneof))
             {

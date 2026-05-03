@@ -9,11 +9,11 @@ public record Position(int Line, int Column, int Offset)
 
 public record Comment(Position Pos, string Text);
 
-public class Document
+public sealed record Document
 {
-    public string TypeURL { get; set; } = string.Empty;
-    public List<IEntry> Entries { get; set; } = new();
-    public List<Comment> LeadingComments { get; set; } = new();
+    public string TypeURL { get; init; } = string.Empty;
+    public List<IEntry> Entries { get; init; } = [];
+    public List<Comment> LeadingComments { get; init; } = [];
 }
 
 public interface INode
@@ -25,95 +25,95 @@ public interface IEntry : INode { }
 
 public interface IValue : INode { }
 
-public class Assignment : IEntry
+public sealed record Assignment : IEntry
 {
-    public Position Pos { get; init; }
-    public string Key { get; set; } = string.Empty;
-    public IValue Value { get; set; } = null!;
-    public List<Comment> LeadingComments { get; set; } = new();
-    public string TrailingComment { get; set; } = string.Empty;
+    public required Position Pos { get; init; }
+    public string Key { get; init; } = string.Empty;
+    public required IValue Value { get; init; }
+    public List<Comment> LeadingComments { get; init; } = [];
+    public string TrailingComment { get; init; } = string.Empty;
 }
 
-public class MapEntry : IEntry
+public sealed record MapEntry : IEntry
 {
-    public Position Pos { get; init; }
-    public string Key { get; set; } = string.Empty;
-    public IValue Value { get; set; } = null!;
-    public List<Comment> LeadingComments { get; set; } = new();
-    public string TrailingComment { get; set; } = string.Empty;
+    public required Position Pos { get; init; }
+    public string Key { get; init; } = string.Empty;
+    public required IValue Value { get; init; }
+    public List<Comment> LeadingComments { get; init; } = [];
+    public string TrailingComment { get; init; } = string.Empty;
 }
 
-public class Block : IEntry
+public sealed record Block : IEntry
 {
-    public Position Pos { get; init; }
-    public string Name { get; set; } = string.Empty;
-    public List<IEntry> Entries { get; set; } = new();
-    public List<Comment> LeadingComments { get; set; } = new();
+    public required Position Pos { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public List<IEntry> Entries { get; init; } = [];
+    public List<Comment> LeadingComments { get; init; } = [];
 }
 
-public class StringVal : IValue
+public sealed record StringVal : IValue
 {
-    public Position Pos { get; init; }
-    public string Value { get; set; } = string.Empty;
+    public required Position Pos { get; init; }
+    public string Value { get; init; } = string.Empty;
 }
 
-public class IntVal : IValue
+public sealed record IntVal : IValue
 {
-    public Position Pos { get; init; }
-    public string Raw { get; set; } = string.Empty;
+    public required Position Pos { get; init; }
+    public string Raw { get; init; } = string.Empty;
 }
 
-public class FloatVal : IValue
+public sealed record FloatVal : IValue
 {
-    public Position Pos { get; init; }
-    public string Raw { get; set; } = string.Empty;
+    public required Position Pos { get; init; }
+    public string Raw { get; init; } = string.Empty;
 }
 
-public class BoolVal : IValue
+public sealed record BoolVal : IValue
 {
-    public Position Pos { get; init; }
-    public bool Value { get; set; }
+    public required Position Pos { get; init; }
+    public bool Value { get; init; }
 }
 
-public class BytesVal : IValue
+public sealed record BytesVal : IValue
 {
-    public Position Pos { get; init; }
-    public byte[] Value { get; set; } = Array.Empty<byte>();
+    public required Position Pos { get; init; }
+    public byte[] Value { get; init; } = [];
 }
 
-public class NullVal : IValue
+public sealed record NullVal : IValue
 {
-    public Position Pos { get; init; }
+    public required Position Pos { get; init; }
 }
 
-public class IdentVal : IValue
+public sealed record IdentVal : IValue
 {
-    public Position Pos { get; init; }
-    public string Name { get; set; } = string.Empty;
+    public required Position Pos { get; init; }
+    public string Name { get; init; } = string.Empty;
 }
 
-public class TimestampVal : IValue
+public sealed record TimestampVal : IValue
 {
-    public Position Pos { get; init; }
-    public DateTime Value { get; set; }
-    public string Raw { get; set; } = string.Empty;
+    public required Position Pos { get; init; }
+    public DateTime Value { get; init; }
+    public string Raw { get; init; } = string.Empty;
 }
 
-public class DurationVal : IValue
+public sealed record DurationVal : IValue
 {
-    public Position Pos { get; init; }
-    public TimeSpan Value { get; set; }
-    public string Raw { get; set; } = string.Empty;
+    public required Position Pos { get; init; }
+    public TimeSpan Value { get; init; }
+    public string Raw { get; init; } = string.Empty;
 }
 
-public class ListVal : IValue
+public sealed record ListVal : IValue
 {
-    public Position Pos { get; init; }
-    public List<IValue> Elements { get; set; } = new();
+    public required Position Pos { get; init; }
+    public List<IValue> Elements { get; init; } = [];
 }
 
-public class BlockVal : IValue
+public sealed record BlockVal : IValue
 {
-    public Position Pos { get; init; }
-    public List<IEntry> Entries { get; set; } = new();
+    public required Position Pos { get; init; }
+    public List<IEntry> Entries { get; init; } = [];
 }
