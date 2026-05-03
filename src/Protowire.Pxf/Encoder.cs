@@ -280,7 +280,7 @@ public class Encoder
         }
         if (val is string s)
         {
-            _sb.Append('"').Append(s.Replace("\"", "\\\"")).Append('"');
+            WriteQuotedString(_sb, s);
         }
         else if (val is bool b)
         {
@@ -317,5 +317,39 @@ public class Encoder
             }
         }
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// Emits a quoted PXF string literal: the simple escape mnemonics for
+    /// `"` `\` `\n` `\r` `\t`, plus `\xHH` for any other code unit under
+    /// 0x20. Code units &gt;= 0x20 pass through literally so valid UTF-8
+    /// stays UTF-8. Mirrors protowire-go/encoding/pxf/encode.go:writeQuotedString.
+    /// </summary>
+    internal static void WriteQuotedString(StringBuilder sb, string s)
+    {
+        const string Hex = "0123456789abcdef";
+        sb.Append('"');
+        foreach (char ch in s)
+        {
+            switch (ch)
+            {
+                case '"': sb.Append("\\\""); break;
+                case '\\': sb.Append("\\\\"); break;
+                case '\n': sb.Append("\\n"); break;
+                case '\r': sb.Append("\\r"); break;
+                case '\t': sb.Append("\\t"); break;
+                default:
+                    if (ch < 0x20)
+                    {
+                        sb.Append("\\x").Append(Hex[(ch >> 4) & 0xF]).Append(Hex[ch & 0xF]);
+                    }
+                    else
+                    {
+                        sb.Append(ch);
+                    }
+                    break;
+            }
+        }
+        sb.Append('"');
     }
 }

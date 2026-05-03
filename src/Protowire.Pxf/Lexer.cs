@@ -165,31 +165,122 @@ internal class Lexer
             {
                 return new Token(TokenKind.STRING, sb.ToString(), pos);
             }
-            if (ch == '\\')
+            if (ch != '\\')
             {
-                if (_pos >= _input.Length)
-                {
-                    return new Token(TokenKind.ILLEGAL, "unterminated escape sequence", pos);
-                }
-                char esc = Advance();
-                switch (esc)
-                {
-                    case '"': sb.Append('"'); break;
-                    case '\\': sb.Append('\\'); break;
-                    case 'n': sb.Append('\n'); break;
-                    case 't': sb.Append('\t'); break;
-                    case 'r': sb.Append('\r'); break;
-                    default:
-                        sb.Append('\\');
-                        sb.Append(esc);
-                        break;
-                }
+                sb.Append(ch);
                 continue;
             }
-            sb.Append(ch);
+            if (_pos >= _input.Length)
+            {
+                return new Token(TokenKind.ILLEGAL, "unterminated escape sequence", pos);
+            }
+            char esc = Advance();
+            switch (esc)
+            {
+                case '"' or '\\' or '\'' or '?':
+                    sb.Append(esc); break;
+                case 'a': sb.Append(''); break;
+                case 'b': sb.Append(''); break;
+                case 'f': sb.Append(''); break;
+                case 'n': sb.Append('\n'); break;
+                case 'r': sb.Append('\r'); break;
+                case 't': sb.Append('\t'); break;
+                case 'v': sb.Append(''); break;
+                case 'x':
+                {
+                    if (ReadHexByte() is not int b)
+                    {
+                        return new Token(TokenKind.ILLEGAL, "invalid \\x escape: expected 2 hex digits", pos);
+                    }
+                    sb.Append((char)b);
+                    break;
+                }
+                case >= '0' and <= '3':
+                {
+                    if (ReadOctRest(esc) is not int b)
+                    {
+                        return new Token(TokenKind.ILLEGAL, "invalid octal escape: expected 3 octal digits", pos);
+                    }
+                    sb.Append((char)b);
+                    break;
+                }
+                case 'u':
+                {
+                    if (ReadHexRune(4) is not int r || !IsValidRune(r))
+                    {
+                        return new Token(TokenKind.ILLEGAL,
+                            "invalid \\u escape: expected 4 hex digits forming a valid codepoint", pos);
+                    }
+                    sb.Append(char.ConvertFromUtf32(r));
+                    break;
+                }
+                case 'U':
+                {
+                    if (ReadHexRune(8) is not int r || !IsValidRune(r))
+                    {
+                        return new Token(TokenKind.ILLEGAL,
+                            "invalid \\U escape: expected 8 hex digits forming a valid codepoint", pos);
+                    }
+                    sb.Append(char.ConvertFromUtf32(r));
+                    break;
+                }
+                default:
+                    return new Token(TokenKind.ILLEGAL, $"unknown escape sequence \\{esc}", pos);
+            }
         }
         return new Token(TokenKind.ILLEGAL, "unterminated string", pos);
     }
+
+    /// <summary>Reads exactly 2 hex digits and returns the assembled byte, or null on error.</summary>
+    private int? ReadHexByte()
+    {
+        if (_pos + 1 >= _input.Length) return null;
+        if (HexVal(_input[_pos]) is not int hi) return null;
+        if (HexVal(_input[_pos + 1]) is not int lo) return null;
+        Advance(); Advance();
+        return (hi << 4) | lo;
+    }
+
+    /// <summary>Reads exactly N hex digits and returns the assembled codepoint, or null on error.</summary>
+    private int? ReadHexRune(int n)
+    {
+        if (_pos + n > _input.Length) return null;
+        int r = 0;
+        for (int i = 0; i < n; i++)
+        {
+            if (HexVal(_input[_pos]) is not int v) return null;
+            r = (r << 4) | v;
+            Advance();
+        }
+        return r;
+    }
+
+    /// <summary>
+    /// Reads two more octal digits after the leading one already consumed
+    /// (\nnn — exactly 3 octal digits total). The caller has restricted
+    /// `first` to '0'-'3' so the value fits in a byte.
+    /// </summary>
+    private int? ReadOctRest(char first)
+    {
+        if (_pos + 1 >= _input.Length) return null;
+        if (OctVal(_input[_pos]) is not int d1) return null;
+        if (OctVal(_input[_pos + 1]) is not int d2) return null;
+        Advance(); Advance();
+        return ((first - '0') << 6) | (d1 << 3) | d2;
+    }
+
+    private static int? HexVal(char ch) => ch switch
+    {
+        >= '0' and <= '9' => ch - '0',
+        >= 'a' and <= 'f' => ch - 'a' + 10,
+        >= 'A' and <= 'F' => ch - 'A' + 10,
+        _ => null,
+    };
+
+    private static int? OctVal(char ch) => ch is >= '0' and <= '7' ? ch - '0' : null;
+
+    /// <summary>Mirrors Go's utf8.ValidRune: rejects > U+10FFFF and the surrogate range.</summary>
+    private static bool IsValidRune(int r) => r is >= 0 and <= 0x10FFFF and (< 0xD800 or > 0xDFFF);
 
     private Token LexTripleString(Position pos)
     {
@@ -241,17 +332,36 @@ internal class Lexer
     private Token LexBytes(Position pos)
     {
         Advance(); // b
-        var tok = LexString(pos);
-        if (tok.Kind != TokenKind.STRING) return tok;
-        try
+        if (_pos >= _input.Length || _input[_pos] != '"')
         {
-            Convert.FromBase64String(tok.Value);
+            return new Token(TokenKind.ILLEGAL, "expected '\"' after b", pos);
         }
-        catch
+        Advance(); // opening "
+        int start = _pos;
+        while (_pos < _input.Length)
         {
-            return new Token(TokenKind.ILLEGAL, "invalid base64 in bytes literal", pos);
+            char ch = _input[_pos];
+            if (ch == '"')
+            {
+                string raw = _input[start.._pos];
+                Advance(); // closing "
+                try
+                {
+                    Convert.FromBase64String(raw);
+                }
+                catch (FormatException)
+                {
+                    return new Token(TokenKind.ILLEGAL, "invalid base64 in bytes literal", pos);
+                }
+                return new Token(TokenKind.BYTES, raw, pos);
+            }
+            if (ch == '\n')
+            {
+                return new Token(TokenKind.ILLEGAL, "unterminated bytes literal", pos);
+            }
+            Advance();
         }
-        return new Token(TokenKind.BYTES, tok.Value, pos);
+        return new Token(TokenKind.ILLEGAL, "unterminated bytes literal", pos);
     }
 
     private Token LexDirective(Position pos)

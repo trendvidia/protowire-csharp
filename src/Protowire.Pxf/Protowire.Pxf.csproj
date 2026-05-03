@@ -8,4 +8,8 @@
     <ProjectReference Include="..\Protowire.Pb\Protowire.Pb.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Protowire.Pxf.Tests" />
+  </ItemGroup>
+
 </Project>
