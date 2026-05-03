@@ -13,7 +13,7 @@
     <Authors>Trendvidia</Authors>
     <Description>C# port of the Protowire library for high-performance Protobuf text and binary serialization.</Description>
     <PackageProjectUrl>https://github.com/trendvidia/protowire-csharp</PackageProjectUrl>
-    <Version>0.1.0</Version>
+    <Version>0.70.0</Version>
   </PropertyGroup>
 
 </Project>
