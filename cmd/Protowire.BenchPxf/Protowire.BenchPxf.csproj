@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Protowire.BenchPxf</RootNamespace>
+    <AssemblyName>bench-pxf</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Protowire.Pxf\Protowire.Pxf.csproj" />
+  </ItemGroup>
+
+  <!-- Share the bench-test.proto codegen with the test project rather than
+       regenerating; the buf.gen.yaml override puts the C# namespace at
+       Protowire.Pxf.Tests.Bench. Future cleanup: rename the namespace to
+       something neutral and regenerate. -->
+  <ItemGroup>
+    <Compile Include="..\..\tests\Protowire.Pxf.Tests\Generated\BenchTest.cs"
+             Link="Generated\BenchTest.cs" />
+  </ItemGroup>
+
+</Project>

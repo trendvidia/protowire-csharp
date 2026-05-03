@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Protowire.BenchSbe</RootNamespace>
+    <AssemblyName>bench-sbe</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Protowire.Sbe\Protowire.Sbe.csproj" />
+  </ItemGroup>
+
+  <!-- Share the sbe-bench.proto codegen with the test project. Future
+       cleanup: rename the namespace away from `*.Tests.*` and regenerate. -->
+  <ItemGroup>
+    <Compile Include="..\..\tests\Protowire.Sbe.Tests\Generated\SbeBench.cs"
+             Link="Generated\SbeBench.cs" />
+  </ItemGroup>
+
+</Project>
