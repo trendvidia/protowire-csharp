@@ -129,3 +129,21 @@ Generated files are placed in the `Generated/` folders of each project (e.g., `s
 - `src/Protowire.Sbe`: FIX SBE implementation.
 - `proto/`: Shared Protobuf schemas.
 - `tests/`: XUnit test suites for each component.
+- `cmd/{Protowire.BenchPxf, Protowire.BenchSbe, Protowire.DumpEnvelope}`: Cross-port test harnesses.
+
+## Limitations & open gaps
+
+Built on `Google.Protobuf` reflection (`MessageDescriptor`, `IFieldAccessor`) — the descriptor-driven design means the same codec works for any compiled-in message type. A few items fall out of that or are deferred:
+
+- **`net10.0` minimum.** The build leans on C# 13 features (collection expressions, file-scoped types). Targeting `net8.0` or earlier would require backporting and is not currently planned.
+- **`Google.Protobuf` doesn't expose extension fields as readable named fields on `FieldOptions` for arbitrary `.proto` files.** The `(pxf.required)` / `(pxf.default)` reader works because the `AnnotationsExtensions` class is shipped in this repo; downstream `.proto` files that bring their own extensions need their generated `*Extensions` class on the runtime classpath.
+- **No async API on the codec surface.** All decode / encode is synchronous in-memory. For very large PXF documents an async streaming surface would be welcome.
+- **The CLI lives in [trendvidia/protowire/cmd/protowire](https://github.com/trendvidia/protowire/tree/main/cmd/protowire), not here.** This repo ships only the library + cross-port harnesses.
+
+## Contributing & governance
+
+This repository is part of the `protowire-*` family and is governed by [**Steward**](https://github.com/trendvidia/steward) — the meritocratic, AI-driven governance engine that runs all of the ports. Voting weight is per-directory expertise, the constitution is public in [`governance.pxf`](https://github.com/trendvidia/steward/blob/main/governance.pxf), and Steward routes draft / first-time PRs through a [private mentorship pipeline](https://github.com/trendvidia/steward#-private-mentorship-mode) so initial contributions get private feedback rather than public-review friction.
+
+If any of the items above sound interesting, pull requests are welcome. New contributors start at zero trust and accumulate influence by shipping merged PRs in the directories they actually work on — the [escrow pipeline](https://github.com/trendvidia/steward#%EF%B8%8F-the-escrow-pipeline-zero-trust-onboarding) auto-routes large first-time PRs through 2–3 sandbox issues before unlocking them for community review.
+
+See the [Steward README](https://github.com/trendvidia/steward) for a longer walkthrough of vector reputation, escrow, and the immune system.
