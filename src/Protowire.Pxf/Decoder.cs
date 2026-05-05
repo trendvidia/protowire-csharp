@@ -11,12 +11,17 @@ namespace Protowire.Pxf;
 /// </summary>
 public class Decoder
 {
+    // HARDENING.md § Mandatory limits — bounds native call-stack growth on
+    // attacker input. Matches the cross-port default.
+    private const int MaxNestingDepth = 100;
+
     private Lexer _lex = null!;
     private Token _current = null!;
     private Result? _result;
     private string _pathPrefix = "";
     private IMessage? _rootMsg;
     private FieldDescriptor? _nullMaskFd;
+    private int _depth;
     public TypeRegistry Registry { get; set; } = TypeRegistry.Empty;
 
     /// <summary>
@@ -63,6 +68,7 @@ public class Decoder
         _pathPrefix = "";
         _rootMsg = null;
         _nullMaskFd = null;
+        _depth = 0;
     }
 
     private void ParseInto(string data, object obj)
@@ -88,6 +94,10 @@ public class Decoder
         while (true)
         {
             _current = _lex.Next();
+            if (_current.Kind == TokenKind.ILLEGAL)
+            {
+                throw new PxfException(_current.Pos, _current.Value);
+            }
             if (_current.Kind != TokenKind.COMMENT && _current.Kind != TokenKind.NEWLINE)
             {
                 return;
@@ -96,6 +106,24 @@ public class Decoder
     }
 
     private void DecodeFields(object obj, bool inBlock)
+    {
+        if (inBlock && _depth >= MaxNestingDepth)
+        {
+            throw new PxfException(_current.Pos,
+                $"nesting depth exceeds {MaxNestingDepth}");
+        }
+        if (inBlock) _depth++;
+        try
+        {
+            DecodeFieldsBody(obj, inBlock);
+        }
+        finally
+        {
+            if (inBlock) _depth--;
+        }
+    }
+
+    private void DecodeFieldsBody(object obj, bool inBlock)
     {
         var type = obj.GetType();
         IMessage? msg = obj as IMessage;

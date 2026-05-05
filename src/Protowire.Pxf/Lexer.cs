@@ -4,6 +4,13 @@ namespace Protowire.Pxf;
 
 internal class Lexer
 {
+    // HARDENING.md § UTF-8: a proto3 string is a sequence of valid UTF-8
+    // bytes. PXF \xHH and \NNN byte escapes can produce invalid sequences;
+    // the lexer assembles the literal as bytes and decodes strictly so the
+    // U+FFFD substitution path of the default Encoding.UTF8 cannot fire.
+    private static readonly UTF8Encoding StrictUtf8 = new(
+        encoderShouldEmitUTF8Identifier: false,
+        throwOnInvalidBytes: true);
     private readonly string _input;
     private int _pos;
     private int _line = 1;
@@ -157,17 +164,39 @@ internal class Lexer
     private Token LexString(Position pos)
     {
         Advance(); // opening "
-        var sb = new StringBuilder();
+        // Assemble as bytes (not UTF-16 chars) so \xHH / \NNN escapes preserve
+        // their raw byte semantics. A StringBuilder would silently lift each
+        // byte to a UTF-16 code unit and re-encode it as valid 2-byte UTF-8 on
+        // ToString — masking byte sequences that were never valid UTF-8 to
+        // begin with. See HARDENING.md § UTF-8.
+        var buf = new List<byte>();
+        Span<char> charBuf = stackalloc char[2];
         while (_pos < _input.Length)
         {
             char ch = Advance();
             if (ch == '"')
             {
-                return new Token(TokenKind.STRING, sb.ToString(), pos);
+                try
+                {
+                    var s = StrictUtf8.GetString(buf.ToArray());
+                    return new Token(TokenKind.STRING, s, pos);
+                }
+                catch (DecoderFallbackException)
+                {
+                    return new Token(TokenKind.ILLEGAL,
+                        "invalid UTF-8 in string literal (use b\"…\" for raw bytes)", pos);
+                }
             }
             if (ch != '\\')
             {
-                sb.Append(ch);
+                charBuf[0] = ch;
+                int charLen = 1;
+                if (char.IsHighSurrogate(ch) && _pos < _input.Length && char.IsLowSurrogate(_input[_pos]))
+                {
+                    charBuf[1] = Advance();
+                    charLen = 2;
+                }
+                AppendChars(buf, charBuf[..charLen]);
                 continue;
             }
             if (_pos >= _input.Length)
@@ -178,21 +207,21 @@ internal class Lexer
             switch (esc)
             {
                 case '"' or '\\' or '\'' or '?':
-                    sb.Append(esc); break;
-                case 'a': sb.Append(''); break;
-                case 'b': sb.Append(''); break;
-                case 'f': sb.Append(''); break;
-                case 'n': sb.Append('\n'); break;
-                case 'r': sb.Append('\r'); break;
-                case 't': sb.Append('\t'); break;
-                case 'v': sb.Append(''); break;
+                    buf.Add((byte)esc); break;
+                case 'a': buf.Add(0x07); break;
+                case 'b': buf.Add(0x08); break;
+                case 'f': buf.Add(0x0C); break;
+                case 'n': buf.Add((byte)'\n'); break;
+                case 'r': buf.Add((byte)'\r'); break;
+                case 't': buf.Add((byte)'\t'); break;
+                case 'v': buf.Add(0x0B); break;
                 case 'x':
                 {
                     if (ReadHexByte() is not int b)
                     {
                         return new Token(TokenKind.ILLEGAL, "invalid \\x escape: expected 2 hex digits", pos);
                     }
-                    sb.Append((char)b);
+                    buf.Add((byte)b);
                     break;
                 }
                 case >= '0' and <= '3':
@@ -201,7 +230,7 @@ internal class Lexer
                     {
                         return new Token(TokenKind.ILLEGAL, "invalid octal escape: expected 3 octal digits", pos);
                     }
-                    sb.Append((char)b);
+                    buf.Add((byte)b);
                     break;
                 }
                 case 'u':
@@ -211,7 +240,7 @@ internal class Lexer
                         return new Token(TokenKind.ILLEGAL,
                             "invalid \\u escape: expected 4 hex digits forming a valid codepoint", pos);
                     }
-                    sb.Append(char.ConvertFromUtf32(r));
+                    AppendRune(buf, r);
                     break;
                 }
                 case 'U':
@@ -221,7 +250,7 @@ internal class Lexer
                         return new Token(TokenKind.ILLEGAL,
                             "invalid \\U escape: expected 8 hex digits forming a valid codepoint", pos);
                     }
-                    sb.Append(char.ConvertFromUtf32(r));
+                    AppendRune(buf, r);
                     break;
                 }
                 default:
@@ -229,6 +258,22 @@ internal class Lexer
             }
         }
         return new Token(TokenKind.ILLEGAL, "unterminated string", pos);
+    }
+
+    /// <summary>Encodes the given UTF-16 chars as UTF-8 bytes into <paramref name="buf"/>.</summary>
+    private static void AppendChars(List<byte> buf, ReadOnlySpan<char> chars)
+    {
+        int n = StrictUtf8.GetByteCount(chars);
+        Span<byte> bytes = stackalloc byte[n];
+        StrictUtf8.GetBytes(chars, bytes);
+        for (int i = 0; i < n; i++) buf.Add(bytes[i]);
+    }
+
+    /// <summary>Encodes the given codepoint as UTF-8 bytes into <paramref name="buf"/>.</summary>
+    private static void AppendRune(List<byte> buf, int rune)
+    {
+        var s = char.ConvertFromUtf32(rune);
+        AppendChars(buf, s.AsSpan());
     }
 
     /// <summary>Reads exactly 2 hex digits and returns the assembled byte, or null on error.</summary>

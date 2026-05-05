@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Text;
 
 namespace Protowire.Sbe;
 
@@ -14,6 +15,14 @@ public class View
 
     private const int HeaderSize = 8;
     private const int GroupHeaderSize = 4;
+
+    // HARDENING.md § UTF-8: proto3 string fields are valid UTF-8. The default
+    // Encoding.UTF8 silently substitutes U+FFFD on invalid bytes, which is
+    // forbidden by the spec. This decoder throws DecoderFallbackException
+    // (caught and reclassified as a clean reject by check-decode).
+    private static readonly UTF8Encoding StrictUtf8 = new(
+        encoderShouldEmitUTF8Identifier: false,
+        throwOnInvalidBytes: true);
 
     internal View(byte[] data, Dictionary<ushort, MessageTemplate> byID)
     {
@@ -139,7 +148,7 @@ public class View
         var raw = _block.Span[ft.Offset..(ft.Offset + ft.Size)];
         int n = raw.Length;
         while (n > 0 && raw[n - 1] == 0) n--;
-        return System.Text.Encoding.UTF8.GetString(raw[..n]);
+        return StrictUtf8.GetString(raw[..n]);
     }
 
     /// <summary>
@@ -172,16 +181,27 @@ public class View
     /// <returns>A GroupView instance for traversing group entries.</returns>
     public GroupView Group(string name)
     {
-        int pos = HeaderSize + _block.Length;
+        long pos = HeaderSize + _block.Length;
         foreach (var gi in _schema.GroupOrder)
         {
-            ushort bl = BinaryPrimitives.ReadUInt16LittleEndian(_data.AsSpan(pos));
-            ushort n = BinaryPrimitives.ReadUInt16LittleEndian(_data.AsSpan(pos + 2));
+            if (pos + GroupHeaderSize > _data.Length)
+                throw new Exception("SBE: group header out of bounds");
+            ushort bl = BinaryPrimitives.ReadUInt16LittleEndian(_data.AsSpan((int)pos));
+            ushort n = BinaryPrimitives.ReadUInt16LittleEndian(_data.AsSpan((int)pos + 2));
+            // HARDENING.md § SBE step 3-4: 64-bit checked arithmetic before
+            // narrowing; reject blockLength==0 with count>0 (otherwise the
+            // group walk would loop or allocate without consuming input).
+            if (bl == 0 && n > 0)
+                throw new Exception("SBE: group blockLength=0 with count>0");
+            ulong groupBytes = (ulong)n * bl;
+            ulong nextPos = (ulong)pos + (ulong)GroupHeaderSize + groupBytes;
+            if (nextPos > (ulong)_data.Length)
+                throw new Exception("SBE: group entries out of bounds");
             if (gi.Name == name)
             {
-                return new GroupView(_data, pos, bl, n, gi.Schema);
+                return new GroupView(_data, (int)pos, bl, n, gi.Schema);
             }
-            pos += GroupHeaderSize + n * bl;
+            pos = (long)nextPos;
         }
         throw new Exception($"SBE: unknown group {name}");
     }

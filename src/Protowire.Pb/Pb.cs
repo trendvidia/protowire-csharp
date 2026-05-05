@@ -10,6 +10,13 @@ namespace Protowire.Pb;
 /// </summary>
 public static class Pb
 {
+    // HARDENING.md § Mandatory limits — bounds native call-stack growth on
+    // attacker input. Matches the cross-port default. The depth counter
+    // must survive nested submessage construction; we thread an explicit
+    // counter rather than relying on CodedInputStream's RecursionLimit,
+    // since that resets every time a fresh stream is constructed.
+    private const int MaxNestingDepth = 100;
+
     private static readonly ConcurrentDictionary<Type, StructInfo> StructCache = new();
 
     /// <summary>
@@ -38,7 +45,7 @@ public static class Pb
         var type = v.GetType();
         var info = GetStructInfo(type);
         var input = new CodedInputStream(data);
-        UnmarshalStruct(input, v, info);
+        UnmarshalStruct(input, v, info, depth: 0);
     }
 
     private static StructInfo GetStructInfo(Type type)
@@ -215,7 +222,7 @@ public static class Pb
         return false;
     }
 
-    private static void UnmarshalStruct(CodedInputStream input, object v, StructInfo info)
+    private static void UnmarshalStruct(CodedInputStream input, object v, StructInfo info, int depth)
     {
         uint tag;
         while ((tag = input.ReadTag()) != 0)
@@ -231,7 +238,7 @@ public static class Pb
                     }
                 }
                 var currentVal = field.GetValue(v);
-                var newVal = UnmarshalField(input, tag, field.Type, currentVal, field.ZigZag);
+                var newVal = UnmarshalField(input, tag, field.Type, currentVal, field.ZigZag, depth);
                 field.SetValue(v, newVal);
             }
             else
@@ -241,7 +248,7 @@ public static class Pb
         }
     }
 
-    private static object? UnmarshalField(CodedInputStream input, uint tag, Type type, object? currentVal, bool zigzag)
+    private static object? UnmarshalField(CodedInputStream input, uint tag, Type type, object? currentVal, bool zigzag, int depth)
     {
         var underlyingType = Nullable.GetUnderlyingType(type) ?? type;
         if (underlyingType == typeof(bool)) return input.ReadBool();
@@ -272,8 +279,8 @@ public static class Pb
             while ((etag = entryInput.ReadTag()) != 0)
             {
                 var enumNum = WireFormat.GetTagFieldNumber(etag);
-                if (enumNum == 1) key = UnmarshalField(entryInput, etag, keyType, null, zigzag);
-                else if (enumNum == 2) val = UnmarshalField(entryInput, etag, valType, null, zigzag);
+                if (enumNum == 1) key = UnmarshalField(entryInput, etag, keyType, null, zigzag, depth);
+                else if (enumNum == 2) val = UnmarshalField(entryInput, etag, valType, null, zigzag, depth);
                 else entryInput.SkipLastField();
             }
             if (key != null) map[key] = val;
@@ -283,7 +290,7 @@ public static class Pb
         if (typeof(System.Collections.IList).IsAssignableFrom(type))
         {
             var itemType = type.IsArray ? type.GetElementType()! : type.GetGenericArguments()[0];
-            var item = UnmarshalField(input, tag, itemType, null, zigzag);
+            var item = UnmarshalField(input, tag, itemType, null, zigzag, depth);
             if (type.IsArray)
             {
                 var array = (Array?)currentVal;
@@ -297,10 +304,21 @@ public static class Pb
             return list;
         }
 
+        // Nested submessage. HARDENING.md § Recursion: the depth counter
+        // must survive nested CodedInputStream construction. The library's
+        // CodedInputStream.RecursionLimit is reset every time a fresh stream
+        // is constructed (which we do per nesting level here), so we keep
+        // an explicit `depth` parameter threaded through and reject before
+        // a stack overflow becomes possible.
+        if (depth >= MaxNestingDepth)
+        {
+            throw new InvalidOperationException(
+                $"PB nesting depth exceeds {MaxNestingDepth}");
+        }
         var nestedData = input.ReadBytes().ToByteArray();
         var nestedVal = Activator.CreateInstance(type)!;
         var nestedInput = new CodedInputStream(nestedData);
-        UnmarshalStruct(nestedInput, nestedVal, GetStructInfo(type));
+        UnmarshalStruct(nestedInput, nestedVal, GetStructInfo(type), depth + 1);
         return nestedVal;
     }
 

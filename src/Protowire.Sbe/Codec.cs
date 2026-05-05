@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Text;
 using Google.Protobuf;
 using Google.Protobuf.Reflection;
 
@@ -14,6 +15,13 @@ public class Codec
 
     private const int HeaderSize = 8;
     private const int GroupHeaderSize = 4;
+
+    // HARDENING.md § UTF-8: proto3 string fields are valid UTF-8.
+    // Encoding.UTF8 silently substitutes U+FFFD on invalid bytes; use a
+    // throwing decoder for string-typed fields.
+    private static readonly UTF8Encoding StrictUtf8 = new(
+        encoderShouldEmitUTF8Identifier: false,
+        throwOnInvalidBytes: true);
 
     /// <summary>
     /// Initializes a new instance of the Codec class with the given proto file descriptors.
@@ -507,7 +515,7 @@ public class Codec
         // Trim trailing nulls for strings
         int n = data.Length;
         while (n > 0 && data[n - 1] == 0) n--;
-        return System.Text.Encoding.UTF8.GetString(data[..n]);
+        return StrictUtf8.GetString(data[..n]);
     }
 
     private int UnmarshalGroup(ReadOnlySpan<byte> buf, IMessage msg, GroupTemplate gt)
@@ -517,8 +525,16 @@ public class Codec
         ushort blockLength = BinaryPrimitives.ReadUInt16LittleEndian(buf[0..]);
         ushort numInGroup = BinaryPrimitives.ReadUInt16LittleEndian(buf[2..]);
 
-        int totalSize = GroupHeaderSize + numInGroup * blockLength;
-        if (buf.Length < totalSize) throw new Exception("SBE: data too short for group entries");
+        // HARDENING.md § SBE step 3-4: count * blockLength must be checked in
+        // 64-bit before allocating; reject blockLength==0 with count>0 to
+        // foreclose unbounded writer-state allocation that consumes no input.
+        if (blockLength == 0 && numInGroup > 0)
+            throw new Exception("SBE: group blockLength=0 with count>0");
+        ulong groupBytes = (ulong)numInGroup * blockLength;
+        ulong totalSizeChecked = (ulong)GroupHeaderSize + groupBytes;
+        if (totalSizeChecked > (ulong)buf.Length)
+            throw new Exception("SBE: data too short for group entries");
+        int totalSize = (int)totalSizeChecked;
 
         var val = gt.Fd.Accessor.GetValue(msg);
         for (int i = 0; i < numInGroup; i++)

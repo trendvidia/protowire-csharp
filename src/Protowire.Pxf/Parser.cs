@@ -11,9 +11,13 @@ public class PxfException : Exception
 
 public sealed class Parser
 {
+    // HARDENING.md § Mandatory limits.
+    private const int MaxNestingDepth = 100;
+
     private readonly Lexer _lex;
     private Token _current;
     private List<Comment> _comments = [];
+    private int _depth;
 
     private Parser(string input)
     {
@@ -30,6 +34,10 @@ public sealed class Parser
         while (true)
         {
             _current = _lex.Next();
+            if (_current.Kind == TokenKind.ILLEGAL)
+            {
+                throw new PxfException(_current.Pos, _current.Value);
+            }
             if (_current.Kind == TokenKind.NEWLINE) continue;
             if (_current.Kind == TokenKind.COMMENT)
             {
@@ -104,9 +112,21 @@ public sealed class Parser
                 return new MapEntry { Pos = pos, Key = key, Value = mapVal, LeadingComments = leading };
 
             case TokenKind.LBRACE:
-                Advance();
-                var entries = ParseBody();
-                return new Block { Pos = pos, Name = key, Entries = entries, LeadingComments = leading };
+                if (_depth >= MaxNestingDepth)
+                {
+                    throw new PxfException(_current.Pos, $"nesting depth exceeds {MaxNestingDepth}");
+                }
+                _depth++;
+                try
+                {
+                    Advance();
+                    var entries = ParseBody();
+                    return new Block { Pos = pos, Name = key, Entries = entries, LeadingComments = leading };
+                }
+                finally
+                {
+                    _depth--;
+                }
 
             default:
                 throw new PxfException(_current.Pos, $"expected '=', ':', or '{{' after \"{key}\", got {_current.Kind}");
@@ -191,32 +211,56 @@ public sealed class Parser
 
     private IValue ParseList()
     {
-        var pos = _current.Pos;
-        Advance(); // [
+        if (_depth >= MaxNestingDepth)
+        {
+            throw new PxfException(_current.Pos, $"nesting depth exceeds {MaxNestingDepth}");
+        }
+        _depth++;
+        try
+        {
+            var pos = _current.Pos;
+            Advance(); // [
 
-        var elems = new List<IValue>();
-        while (_current.Kind != TokenKind.RBRACKET && _current.Kind != TokenKind.EOF)
-        {
-            elems.Add(ParseValue());
-            if (_current.Kind == TokenKind.COMMA)
+            var elems = new List<IValue>();
+            while (_current.Kind != TokenKind.RBRACKET && _current.Kind != TokenKind.EOF)
             {
-                Advance();
+                elems.Add(ParseValue());
+                if (_current.Kind == TokenKind.COMMA)
+                {
+                    Advance();
+                }
             }
+            if (_current.Kind != TokenKind.RBRACKET)
+            {
+                throw new PxfException(_current.Pos, $"expected ']', got {_current.Kind}");
+            }
+            Advance();
+            return new ListVal { Pos = pos, Elements = elems };
         }
-        if (_current.Kind != TokenKind.RBRACKET)
+        finally
         {
-            throw new PxfException(_current.Pos, $"expected ']', got {_current.Kind}");
+            _depth--;
         }
-        Advance();
-        return new ListVal { Pos = pos, Elements = elems };
     }
 
     private IValue ParseBlockVal()
     {
-        var pos = _current.Pos;
-        Advance(); // {
-        var entries = ParseBody();
-        return new BlockVal { Pos = pos, Entries = entries };
+        if (_depth >= MaxNestingDepth)
+        {
+            throw new PxfException(_current.Pos, $"nesting depth exceeds {MaxNestingDepth}");
+        }
+        _depth++;
+        try
+        {
+            var pos = _current.Pos;
+            Advance(); // {
+            var entries = ParseBody();
+            return new BlockVal { Pos = pos, Entries = entries };
+        }
+        finally
+        {
+            _depth--;
+        }
     }
 
     private List<IEntry> ParseBody()
