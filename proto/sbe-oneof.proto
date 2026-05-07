@@ -1,0 +1,18 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 TrendVidia, LLC.
+syntax = "proto3";
+package bench.v1;
+
+import "sbe/annotations.proto";
+
+option (sbe.schema_id) = 1;
+option (sbe.version) = 0;
+
+message SbeOneof {
+  option (sbe.template_id) = 3;
+  uint64 id = 1;
+  oneof choice {
+    string name = 2 [(sbe.length) = 16];
+    int32 code = 3;
+  }
+}

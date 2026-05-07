@@ -1,0 +1,93 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 TrendVidia, LLC.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # ---------------------------------------------------------------------
+  # Build + test on Linux/macOS/Windows. Directory.Build.props sets
+  # -warnings-as-errors and EnforceCodeStyleInBuild globally, so a
+  # successful build is the lint gate.
+  # ---------------------------------------------------------------------
+  test:
+    name: test / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: dotnet --info
+        run: dotnet --info
+
+      - name: dotnet restore
+        run: dotnet restore
+
+      - name: dotnet build (Release)
+        run: dotnet build --configuration Release --no-restore
+
+      - name: dotnet test
+        run: dotnet test --configuration Release --no-build --verbosity normal
+
+  # ---------------------------------------------------------------------
+  # `dotnet pack` smoke build — exercises the publish path on every PR
+  # so packaging regressions surface before tag time.
+  # ---------------------------------------------------------------------
+  pack:
+    name: pack smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+      - run: dotnet restore
+      - run: dotnet pack --configuration Release --no-restore -o nupkgs
+      - name: List packages
+        run: ls -la nupkgs/
+
+  # ---------------------------------------------------------------------
+  # Adversarial decoder corpus — HARDENING.md conformance reference.
+  # The spec script handles per-port build and corpus iteration; this
+  # job just sets up the sibling layout the script expects.
+  # ---------------------------------------------------------------------
+  hardening:
+    name: HARDENING.md corpus
+    runs-on: ubuntu-latest
+    steps:
+      # cross_security_check.sh resolves SIBLING_DIR=parent_of_spec and
+      # then CSHARP_DIR=$SIBLING_DIR/protowire-csharp. Check both repos
+      # out as siblings so the path math works.
+      - uses: actions/checkout@v6
+        with:
+          path: protowire-csharp
+
+      - uses: actions/checkout@v6
+        with:
+          repository: trendvidia/protowire
+          path: protowire
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Run corpus
+        run: bash protowire/scripts/cross_security_check.sh

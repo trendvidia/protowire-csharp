@@ -1,0 +1,18 @@
+<!--
+SPDX-License-Identifier: MIT
+Copyright (c) 2026 TrendVidia, LLC.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Protowire.DumpEnvelope</RootNamespace>
+    <AssemblyName>dump-envelope</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Protowire.Envelope\Protowire.Envelope.csproj" />
+    <ProjectReference Include="..\..\src\Protowire.Pb\Protowire.Pb.csproj" />
+  </ItemGroup>
+
+</Project>

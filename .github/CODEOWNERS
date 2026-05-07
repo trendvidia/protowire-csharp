@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 TrendVidia, LLC.
+#
+# Code ownership for protowire-csharp.
+
+*                              @trendvidia/maintainers
+
+# --- Wire-impacting source (cross-port equivalence promise applies) ------
+/src/Protowire.Pb/              @trendvidia/maintainers
+/src/Protowire.Pxf/             @trendvidia/maintainers
+/src/Protowire.Sbe/             @trendvidia/maintainers
+/src/Protowire.Envelope/        @trendvidia/maintainers
+
+# --- Vendored proto annotations (part of the upstream wire contract) -----
+/proto/                         @trendvidia/maintainers
+
+# --- Tests + harnesses (open to broader reviewer pool) ------------------
+/tests/                         @trendvidia/contributors @trendvidia/maintainers
+/cmd/                           @trendvidia/contributors @trendvidia/maintainers
+/testdata/                      @trendvidia/contributors @trendvidia/maintainers
+
+# --- Build, packaging, CI -----------------------------------------------
+/.github/                       @trendvidia/maintainers
+/Directory.Build.props          @trendvidia/maintainers
+/Protowire.slnx                 @trendvidia/maintainers
+/buf.gen.yaml                   @trendvidia/maintainers

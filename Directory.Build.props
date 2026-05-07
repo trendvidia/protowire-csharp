@@ -1,0 +1,51 @@
+<!--
+SPDX-License-Identifier: MIT
+Copyright (c) 2026 TrendVidia, LLC.
+-->
+<Project>
+
+  <!-- Settings shared across every project in the solution. Override per-csproj
+       only when something genuinely needs to differ. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
+  <!-- NuGet package metadata. Per-csproj <PackageId> defaults to the
+       project's AssemblyName, so the four publishable libraries
+       (Protowire.Pb / .Pxf / .Sbe / .Envelope) end up at the obvious
+       package IDs without per-csproj overrides. cmd/* and tests/*
+       projects opt out via <IsPackable>false</IsPackable>. -->
+  <PropertyGroup>
+    <Version>0.70.0</Version>
+    <Authors>TrendVidia, LLC</Authors>
+    <Company>TrendVidia, LLC</Company>
+    <Copyright>Copyright (c) 2026 TrendVidia, LLC.</Copyright>
+    <Description>C# port of protowire — PXF text format, SBE binary, struct-tag protobuf, and standard API response envelope. Verified for byte-equivalence with the canonical Go reference and seven other sibling ports.</Description>
+    <PackageTags>protobuf;pxf;sbe;wire-format;encoding;fix-protocol;proto3;envelope;marshalling</PackageTags>
+    <PackageProjectUrl>https://protowire.org</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <RepositoryUrl>https://github.com/trendvidia/protowire-csharp</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <DebugType>portable</DebugType>
+  </PropertyGroup>
+
+  <!-- Pull the root README + LICENSE into every NuGet package. Path is
+       relative to each csproj; Directory.Build.props's $(MSBuildThisFileDirectory)
+       resolves to the repo root. -->
+  <ItemGroup Condition="'$(IsPackable)' != 'false'">
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" />
+    <None Include="$(MSBuildThisFileDirectory)LICENSE" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

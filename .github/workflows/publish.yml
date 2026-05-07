@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 TrendVidia, LLC.
+#
+# NuGet publishing pipeline.
+#
+# Triggered manually or on a `v*` tag push. Uses an API key (NUGET_API_KEY
+# repo secret) for authentication. NuGet.org introduced trusted publishing
+# (OIDC) in 2025; once it's GA-stable for our org we'll move to that.
+# The `nuget.org` environment is configured in repo settings to require
+# approval before publishing — a final human gate.
+#
+# Publishes the four library packages: Protowire.Pb, Protowire.Pxf,
+# Protowire.Sbe, Protowire.Envelope. The cmd/* harnesses are not
+# publishable (they have <IsPackable>false</IsPackable> in their csproj).
+
+name: Publish to NuGet
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to NuGet
+    runs-on: ubuntu-latest
+    environment:
+      name: nuget.org
+      url: https://www.nuget.org/profiles/trendvidia
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: dotnet restore
+        run: dotnet restore
+
+      - name: dotnet build (Release)
+        run: dotnet build --configuration Release --no-restore
+
+      - name: dotnet test (sanity check before publish)
+        run: dotnet test --configuration Release --no-build --verbosity normal
+
+      - name: dotnet pack
+        run: dotnet pack --configuration Release --no-build -o nupkgs
+
+      - name: List built packages
+        run: ls -la nupkgs/
+
+      - name: Publish to nuget.org
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        # `--skip-duplicate` makes re-runs idempotent: if any package was
+        # already pushed (e.g. a prior partial run), nuget reports
+        # success rather than failing. `*.snupkg` symbol packages get
+        # picked up automatically alongside their .nupkg.
+        run: |
+          dotnet nuget push 'nupkgs/*.nupkg' \
+            --api-key "$NUGET_API_KEY" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate

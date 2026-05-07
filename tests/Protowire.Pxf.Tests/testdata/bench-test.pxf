@@ -1,0 +1,36 @@
+hostname = "web-01.prod.example.com"
+port = 8443
+enabled = true
+weight = 0.85
+status = STATUS_SERVING
+tags = ["production", "us-east", "frontend", "critical"]
+tls {
+  cert_file = "/etc/ssl/certs/server.pem"
+  key_file = "/etc/ssl/private/server.key"
+  verify = true
+}
+labels = {
+  env: "production"
+  team: "platform"
+  region: "us-east-1"
+  tier: "frontend"
+}
+endpoints = [
+  {
+    path = "/api/v1/users"
+    method = "GET"
+    timeout_ms = 5000
+  },
+  {
+    path = "/api/v1/orders"
+    method = "POST"
+    timeout_ms = 10000
+  },
+  {
+    path = "/health"
+    method = "GET"
+    timeout_ms = 1000
+  }
+]
+created_at = 2024-06-15T12:00:00Z
+timeout = 30s

@@ -1,0 +1,35 @@
+version: v2
+managed:
+  enabled: true
+  override:
+    - file_option: csharp_namespace
+      value: Protowire.Envelopes.V1
+      path: envelope/v1/envelope.proto
+    - file_option: csharp_namespace
+      value: Protowire.Pxf
+      path: pxf/bignum.proto
+    - file_option: csharp_namespace
+      value: Protowire.Pxf
+      path: pxf/annotations.proto
+    - file_option: csharp_namespace
+      value: Protowire.Sbe
+      path: sbe/annotations.proto
+    - file_option: csharp_namespace
+      value: Protowire.Sbe.Tests.Bench
+      path: sbe-bench.proto
+    - file_option: csharp_namespace
+      value: Protowire.Sbe.Tests.Bench
+      path: sbe-extra.proto
+    - file_option: csharp_namespace
+      value: Protowire.Sbe.Tests.Bench
+      path: sbe-oneof.proto
+    - file_option: csharp_namespace
+      value: Protowire.Pxf.Tests.Bench
+      path: bench-test.proto
+    - file_option: csharp_namespace
+      value: Protowire.Pxf.Tests.Presence
+      path: pxf-presence-test.proto
+plugins:
+  - remote: buf.build/protocolbuffers/csharp:v29.3
+    out: src
+    opt: base_namespace=Protowire

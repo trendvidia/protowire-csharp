@@ -1,0 +1,11 @@
+<!--
+SPDX-License-Identifier: MIT
+Copyright (c) 2026 TrendVidia, LLC.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="3.34.1" />
+  </ItemGroup>
+
+</Project>

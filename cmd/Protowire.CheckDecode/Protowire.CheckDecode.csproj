@@ -1,0 +1,18 @@
+<!--
+SPDX-License-Identifier: MIT
+Copyright (c) 2026 TrendVidia, LLC.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Protowire.CheckDecode</RootNamespace>
+    <AssemblyName>check-decode</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Protowire.Pxf\Protowire.Pxf.csproj" />
+    <ProjectReference Include="..\..\src\Protowire.Pb\Protowire.Pb.csproj" />
+  </ItemGroup>
+
+</Project>
