@@ -185,8 +185,31 @@ public class Decoder
             {
                 throw new PxfException(pos, $"expected identifier, string, or integer, got {_current.Kind}");
             }
+            var keyKind = _current.Kind;
             string key = _current.Value;
             Advance();
+
+            // Strict-PXF-keys grammar: `=` (field assignment) and `{` (submessage)
+            // require an identifier key. String / integer keys are only valid
+            // with `:` (map entries). Enforce here before the unknown-field
+            // skip path silently swallows the input.
+            if (keyKind != TokenKind.IDENT)
+            {
+                if (_current.Kind == TokenKind.EQUALS)
+                {
+                    throw new PxfException(pos, $"field assignment with '=' requires an identifier key, got {keyKind} (\"{key}\"); use ':' for map entries");
+                }
+                if (_current.Kind == TokenKind.LBRACE)
+                {
+                    throw new PxfException(pos, $"submessage block requires an identifier key, got {keyKind} (\"{key}\")");
+                }
+            }
+            // `:` (map entry) is reserved for inside a `{ ... }` block; the
+            // document represents a proto message, never a map<K,V>.
+            if (_current.Kind == TokenKind.COLON && !inBlock)
+            {
+                throw new PxfException(pos, "map entry (':' form) is only allowed inside a '{ … }' block; use '=' for top-level field assignments");
+            }
 
             FieldDescriptor? fd = msgDesc?.Fields.InDeclarationOrder().FirstOrDefault(f => f.Name == key);
             if (fd != null && fd.ContainingOneof != null)

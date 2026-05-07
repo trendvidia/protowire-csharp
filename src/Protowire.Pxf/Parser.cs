@@ -79,7 +79,10 @@ public sealed class Parser
         var entries = new List<IEntry>();
         while (_current.Kind != TokenKind.EOF)
         {
-            entries.Add(ParseEntry());
+            // Top-level: only field_entry is allowed. The document
+            // represents a proto message, never a map<K,V>; map_entry
+            // (':' form) is reserved for the inside of a '{ ... }' block.
+            entries.Add(ParseEntry(allowMapEntry: false));
         }
         return new Document
         {
@@ -89,7 +92,11 @@ public sealed class Parser
         };
     }
 
-    private IEntry ParseEntry()
+    /// <summary>
+    /// `allowMapEntry` gates the `:` (map-entry) form: false at document
+    /// top level, true inside any '{ ... }' block.
+    /// </summary>
+    private IEntry ParseEntry(bool allowMapEntry = true)
     {
         var leading = FlushComments();
         var pos = _current.Pos;
@@ -98,22 +105,42 @@ public sealed class Parser
         {
             throw new PxfException(pos, $"expected identifier, string, or integer, got {_current.Kind} (\"{_current.Value}\")");
         }
+        var keyKind = _current.Kind;
         string key = _current.Value;
         Advance();
 
         switch (_current.Kind)
         {
             case TokenKind.EQUALS:
+                // `=` denotes a field assignment on a proto message; the key
+                // must be an identifier. Map-style keys (string / integer) are
+                // only valid with `:`.
+                if (keyKind != TokenKind.IDENT)
+                {
+                    throw new PxfException(pos, $"field assignment with '=' requires an identifier key, got {keyKind} (\"{key}\"); use ':' for map entries");
+                }
                 Advance();
                 var val = ParseValue();
                 return new Assignment { Pos = pos, Key = key, Value = val, LeadingComments = leading };
 
             case TokenKind.COLON:
+                // Map entry. Only allowed inside a '{ ... }' block, never at
+                // document top level.
+                if (!allowMapEntry)
+                {
+                    throw new PxfException(pos, "map entry (':' form) is only allowed inside a '{ … }' block; use '=' for top-level field assignments");
+                }
                 Advance();
                 var mapVal = ParseValue();
                 return new MapEntry { Pos = pos, Key = key, Value = mapVal, LeadingComments = leading };
 
             case TokenKind.LBRACE:
+                // `{ ... }` denotes a submessage field; same identifier-only
+                // rule as `=` applies.
+                if (keyKind != TokenKind.IDENT)
+                {
+                    throw new PxfException(pos, $"submessage block requires an identifier key, got {keyKind} (\"{key}\")");
+                }
                 if (_depth >= MaxNestingDepth)
                 {
                     throw new PxfException(_current.Pos, $"nesting depth exceeds {MaxNestingDepth}");
