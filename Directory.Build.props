@@ -21,7 +21,7 @@ Copyright (c) 2026 TrendVidia, LLC.
        package IDs without per-csproj overrides. cmd/* and tests/*
        projects opt out via <IsPackable>false</IsPackable>. -->
   <PropertyGroup>
-    <Version>0.70.0</Version>
+    <Version>1.0.0</Version>
     <Authors>TrendVidia, LLC</Authors>
     <Company>TrendVidia, LLC</Company>
     <Copyright>Copyright (c) 2026 TrendVidia, LLC.</Copyright>

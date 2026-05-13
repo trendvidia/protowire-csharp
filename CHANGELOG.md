@@ -11,6 +11,42 @@ format changes.
 
 ## [Unreleased]
 
+## [1.0.0]
+
+Lockstep release with the rest of the `protowire-*` stack at the v1.0.0
+spec freeze. Catches the C# port up from v0.70 to the full v0.72–v1.0
+directive grammar (drafts §3.4.2–§3.4.6).
+
+### Added
+
+- **`@<name>` generic directives** (draft §3.4.2): top-of-document
+  `@<name> *(<prefix-id>) [{ ... }]` blocks, e.g. chameleon's
+  `@header chameleon.v1.LayerHeader { id = "x" }`. Captured on
+  `Document.Directives` and on `Result.Directives` from `UnmarshalFull`.
+- **`@entry` named directive** (draft §3.4.3): zero/one/two-prefix
+  shape, handled by the same generic mechanism. The `entry` name itself
+  is registered, not future-reserved.
+- **`@dataset <type> ( col1, col2, ... ) row*`** (draft §3.4.4): the
+  protowire-native CSV — many instances of one message type in a single
+  document. Mutually exclusive with `@type` and top-level field entries.
+  Exposed on `Document.Datasets` and `Result.Datasets`.
+- **`@proto`** (draft §3.4.5): embedded protobuf schema with four
+  lexically-distinguished body shapes — anonymous `{ ... }`, named
+  `name { ... }`, source `""" ... """`, descriptor `b"..."`. Bodies are
+  captured as raw bytes; protobuf decoding is downstream.
+- **`Schema.IsFutureReservedDirective`** (draft §3.4.6): v1 decoders
+  reject `@table`, `@datasource`, `@view`, `@procedure`, `@function`,
+  `@permissions` so applications cannot squat the names before the spec
+  allocates semantics.
+
+### Changed (breaking)
+
+- **`@table` removed**; use `@dataset` (no alias period — same change
+  the rest of the stack made for v1.0).
+- **`Document` shape extended** with `Directives`, `Datasets`, `Protos`,
+  `BodyOffset` collections. Existing consumers of `Document.TypeURL` /
+  `Document.Entries` are unaffected.
+
 ## [0.70.0]
 
 Initial public release. The version number aligns this port with the rest

@@ -24,6 +24,9 @@ public sealed class Result
 {
     private readonly HashSet<string> _present = [];
     private readonly HashSet<string> _null = [];
+    private readonly List<Directive> _directives = [];
+    private readonly List<DatasetDirective> _datasets = [];
+    private readonly List<ProtoDirective> _protos = [];
 
     /// <summary>True if the field has a concrete (non-null) value.</summary>
     public bool IsSet(string path) => _present.Contains(path) && !_null.Contains(path);
@@ -50,6 +53,27 @@ public sealed class Result
         return arr;
     }
 
+    /// <summary>
+    /// Generic `@&lt;name&gt; *(prefix) [{ ... }]` directives the decoder
+    /// saw at document root, in source order. Excludes <c>@type</c>,
+    /// <c>@dataset</c>, and <c>@proto</c>, which have their own
+    /// accessors. See draft §3.4.2.
+    /// </summary>
+    public IReadOnlyList<Directive> Directives => _directives;
+
+    /// <summary>
+    /// <c>@dataset</c> directives in source order (draft §3.4.4). A
+    /// document with any <c>@dataset</c> has no body entries, so the
+    /// rows are the document's payload.
+    /// </summary>
+    public IReadOnlyList<DatasetDirective> Datasets => _datasets;
+
+    /// <summary>
+    /// <c>@proto</c> directives in source order (draft §3.4.5). Carry
+    /// embedded protobuf schemas, making the PXF document self-describing.
+    /// </summary>
+    public IReadOnlyList<ProtoDirective> Protos => _protos;
+
     internal void MarkPresent(string path) => _present.Add(path);
 
     internal void MarkNull(string path)
@@ -59,4 +83,8 @@ public sealed class Result
     }
 
     internal bool Has(string path) => _present.Contains(path);
+
+    internal void AddDirective(Directive d) => _directives.Add(d);
+    internal void AddDataset(DatasetDirective d) => _datasets.Add(d);
+    internal void AddProto(ProtoDirective p) => _protos.Add(p);
 }
