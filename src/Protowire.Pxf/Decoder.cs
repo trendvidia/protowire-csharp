@@ -78,17 +78,405 @@ public class Decoder
         _lex = new Lexer(data);
         Advance();
 
-        if (_current.Kind == TokenKind.AT_TYPE)
-        {
-            Advance();
-            if (_current.Kind != TokenKind.IDENT)
-            {
-                throw new PxfException(_current.Pos, "expected type name after @type");
-            }
-            Advance();
-        }
+        ConsumeDirectives();
 
         DecodeFields(obj, false);
+    }
+
+    /// <summary>
+    /// Drains any leading <c>@type</c> / <c>@&lt;name&gt;</c> /
+    /// <c>@dataset</c> / <c>@proto</c> directives at document root. The
+    /// AST-aware accessors land on <see cref="_result"/> when running
+    /// under <c>UnmarshalFull</c>; otherwise the directives are simply
+    /// consumed. Enforces the @dataset standalone constraint
+    /// (draft §3.4.4).
+    /// </summary>
+    private void ConsumeDirectives()
+    {
+        bool sawType = false;
+        bool hasDataset = false;
+        Position firstDatasetPos = Position.Empty;
+        for (;;)
+        {
+            switch (_current.Kind)
+            {
+                case TokenKind.AT_TYPE:
+                    if (hasDataset)
+                    {
+                        throw new PxfException(_current.Pos,
+                            "@dataset directive cannot coexist with @type (draft §3.4.4)");
+                    }
+                    sawType = true;
+                    Advance();
+                    if (_current.Kind != TokenKind.IDENT)
+                    {
+                        throw new PxfException(_current.Pos,
+                            $"expected type name after @type, got {_current.Kind}");
+                    }
+                    Advance();
+                    continue;
+                case TokenKind.AT_DIRECTIVE:
+                    {
+                        var dir = ConsumeDirective();
+                        _result?.AddDirective(dir);
+                        continue;
+                    }
+                case TokenKind.AT_DATASET:
+                    {
+                        if (sawType)
+                        {
+                            throw new PxfException(_current.Pos,
+                                "@dataset directive cannot coexist with @type (draft §3.4.4)");
+                        }
+                        var ds = ConsumeDatasetDirective();
+                        if (!hasDataset)
+                        {
+                            firstDatasetPos = ds.Pos;
+                            hasDataset = true;
+                        }
+                        _result?.AddDataset(ds);
+                        continue;
+                    }
+                case TokenKind.AT_PROTO:
+                    {
+                        var pd = ConsumeProtoDirective();
+                        _result?.AddProto(pd);
+                        continue;
+                    }
+            }
+            if (hasDataset && _current.Kind != TokenKind.EOF)
+            {
+                throw new PxfException(firstDatasetPos,
+                    "@dataset directive cannot coexist with top-level field entries (draft §3.4.4)");
+            }
+            return;
+        }
+    }
+
+    /// <summary>Mirrors <see cref="Parser.ParseDirective"/>.</summary>
+    private Directive ConsumeDirective()
+    {
+        var atPos = _current.Pos;
+        string name = _current.Value;
+        if (Schema.IsFutureReservedDirective(name))
+        {
+            throw new PxfException(atPos,
+                $"@{name} is a spec-reserved directive name with no v1 semantics (draft §3.4.6)");
+        }
+        var prefixes = new List<string>();
+        Advance();
+        while (_current.Kind == TokenKind.IDENT)
+        {
+            var pk = PeekKind();
+            if (pk == TokenKind.EQUALS || pk == TokenKind.COLON) break;
+            prefixes.Add(_current.Value);
+            Advance();
+        }
+        byte[] body = [];
+        bool hasBody = false;
+        if (_current.Kind == TokenKind.LBRACE)
+        {
+            int open = _current.Pos.Offset;
+            int close = BraceScan.FindMatchingBrace(_lex.Input, open);
+            if (close < 0)
+            {
+                throw new PxfException(atPos, $"directive @{name}: unmatched '{{'");
+            }
+            body = System.Text.Encoding.UTF8.GetBytes(_lex.Input[(open + 1)..close]);
+            hasBody = true;
+            _lex.RepositionTo(close + 1);
+            Advance();
+        }
+        string typeField = prefixes.Count == 1 ? prefixes[0] : string.Empty;
+        return new Directive
+        {
+            Pos = atPos,
+            Name = name,
+            Prefixes = prefixes,
+            Type = typeField,
+            Body = body,
+            HasBody = hasBody,
+        };
+    }
+
+    /// <summary>Mirrors <see cref="Parser.ParseDatasetDirective"/>.</summary>
+    private DatasetDirective ConsumeDatasetDirective()
+    {
+        var atPos = _current.Pos;
+        Advance();
+        string type = string.Empty;
+        if (_current.Kind == TokenKind.IDENT)
+        {
+            type = _current.Value;
+            Advance();
+        }
+        if (_current.Kind != TokenKind.LPAREN)
+        {
+            throw new PxfException(_current.Pos,
+                $"expected '(' to start @dataset column list, got {_current.Kind}");
+        }
+        Advance();
+        if (_current.Kind != TokenKind.IDENT)
+        {
+            throw new PxfException(_current.Pos,
+                $"@dataset column list must contain at least one field name, got {_current.Kind}");
+        }
+        var columns = new List<string>();
+        for (;;)
+        {
+            if (_current.Kind != TokenKind.IDENT)
+            {
+                throw new PxfException(_current.Pos, $"expected column field name, got {_current.Kind}");
+            }
+            string colName = _current.Value;
+            if (colName.Contains('.'))
+            {
+                throw new PxfException(_current.Pos,
+                    $"@dataset column \"{colName}\": dotted column paths are not supported in v1 (draft §3.4.4)");
+            }
+            columns.Add(colName);
+            Advance();
+            if (_current.Kind == TokenKind.COMMA) { Advance(); continue; }
+            if (_current.Kind == TokenKind.RPAREN) break;
+            throw new PxfException(_current.Pos,
+                $"expected ',' or ')' in @dataset column list, got {_current.Kind}");
+        }
+        Advance(); // consume )
+
+        var rows = new List<DatasetRow>();
+        while (_current.Kind == TokenKind.LPAREN)
+        {
+            var rowPos = _current.Pos;
+            Advance();
+            var cells = new List<IValue?>();
+            cells.Add(ConsumeRowCell());
+            while (_current.Kind == TokenKind.COMMA)
+            {
+                Advance();
+                cells.Add(ConsumeRowCell());
+            }
+            if (_current.Kind != TokenKind.RPAREN)
+            {
+                throw new PxfException(_current.Pos,
+                    $"expected ',' or ')' in @dataset row, got {_current.Kind}");
+            }
+            Advance();
+            if (cells.Count != columns.Count)
+            {
+                throw new PxfException(rowPos,
+                    $"@dataset row has {cells.Count} cells, expected {columns.Count} (column count)");
+            }
+            rows.Add(new DatasetRow { Pos = rowPos, Cells = cells });
+        }
+
+        return new DatasetDirective
+        {
+            Pos = atPos,
+            Type = type,
+            Columns = columns,
+            Rows = rows,
+        };
+    }
+
+    /// <summary>
+    /// Consumes one cell of a @dataset row. Returns null for an empty
+    /// cell. Rejects list and block values per v1 cell-grammar.
+    /// </summary>
+    private IValue? ConsumeRowCell()
+    {
+        switch (_current.Kind)
+        {
+            case TokenKind.COMMA:
+            case TokenKind.RPAREN:
+                return null;
+            case TokenKind.LBRACKET:
+                throw new PxfException(_current.Pos,
+                    "@dataset cells cannot contain list values in v1 (draft §3.4.4)");
+            case TokenKind.LBRACE:
+                throw new PxfException(_current.Pos,
+                    "@dataset cells cannot contain block values in v1 (draft §3.4.4)");
+        }
+        // Mirror the value-parsing subset used by row cells. AST shape
+        // matches Parser.ParseValue.
+        var pos = _current.Pos;
+        switch (_current.Kind)
+        {
+            case TokenKind.STRING:
+                {
+                    var v = new StringVal { Pos = pos, Value = _current.Value };
+                    Advance();
+                    return v;
+                }
+            case TokenKind.INT:
+                {
+                    var v = new IntVal { Pos = pos, Raw = _current.Value };
+                    Advance();
+                    return v;
+                }
+            case TokenKind.FLOAT:
+                {
+                    var v = new FloatVal { Pos = pos, Raw = _current.Value };
+                    Advance();
+                    return v;
+                }
+            case TokenKind.BOOL:
+                {
+                    var v = new BoolVal { Pos = pos, Value = _current.Value == "true" };
+                    Advance();
+                    return v;
+                }
+            case TokenKind.BYTES:
+                {
+                    byte[] decoded;
+                    try { decoded = Convert.FromBase64String(_current.Value); }
+                    catch (FormatException) { throw new PxfException(pos, $"invalid base64: {_current.Value}"); }
+                    var v = new BytesVal { Pos = pos, Value = decoded };
+                    Advance();
+                    return v;
+                }
+            case TokenKind.TIMESTAMP:
+                {
+                    if (!DateTime.TryParse(_current.Value, out var dt))
+                    {
+                        throw new PxfException(pos, $"invalid timestamp \"{_current.Value}\"");
+                    }
+                    var v = new TimestampVal { Pos = pos, Value = dt, Raw = _current.Value };
+                    Advance();
+                    return v;
+                }
+            case TokenKind.DURATION:
+                {
+                    var dv = DurationParser.Parse(_current.Value);
+                    var v = new DurationVal { Pos = pos, Value = dv, Raw = _current.Value };
+                    Advance();
+                    return v;
+                }
+            case TokenKind.NULL:
+                {
+                    var v = new NullVal { Pos = pos };
+                    Advance();
+                    return v;
+                }
+            case TokenKind.IDENT:
+                {
+                    var v = new IdentVal { Pos = pos, Name = _current.Value };
+                    Advance();
+                    return v;
+                }
+            default:
+                throw new PxfException(pos, $"expected value, got {_current.Kind} (\"{_current.Value}\")");
+        }
+    }
+
+    /// <summary>Mirrors <see cref="Parser.ParseProtoDirective"/>.</summary>
+    private ProtoDirective ConsumeProtoDirective()
+    {
+        var atPos = _current.Pos;
+        Advance();
+        switch (_current.Kind)
+        {
+            case TokenKind.LBRACE:
+                {
+                    var body = CaptureBraceBody("@proto (anonymous form)");
+                    return new ProtoDirective
+                    {
+                        Pos = atPos,
+                        Shape = ProtoShape.Anonymous,
+                        Body = body,
+                    };
+                }
+            case TokenKind.IDENT:
+                {
+                    string typeName = _current.Value;
+                    Advance();
+                    if (_current.Kind != TokenKind.LBRACE)
+                    {
+                        throw new PxfException(_current.Pos,
+                            $"expected '{{' after @proto {typeName}, got {_current.Kind}");
+                    }
+                    var body = CaptureBraceBody("@proto " + typeName);
+                    return new ProtoDirective
+                    {
+                        Pos = atPos,
+                        Shape = ProtoShape.Named,
+                        TypeName = typeName,
+                        Body = body,
+                    };
+                }
+            case TokenKind.STRING:
+                {
+                    var bytes = System.Text.Encoding.UTF8.GetBytes(_current.Value);
+                    Advance();
+                    return new ProtoDirective
+                    {
+                        Pos = atPos,
+                        Shape = ProtoShape.Source,
+                        Body = bytes,
+                    };
+                }
+            case TokenKind.BYTES:
+                {
+                    string raw = _current.Value;
+                    byte[] decoded;
+                    try { decoded = Convert.FromBase64String(raw); }
+                    catch (FormatException)
+                    {
+                        try
+                        {
+                            string padded = raw.Replace('-', '+').Replace('_', '/');
+                            int rem = padded.Length % 4;
+                            if (rem != 0) padded = padded.PadRight(padded.Length + (4 - rem), '=');
+                            decoded = Convert.FromBase64String(padded);
+                        }
+                        catch (FormatException)
+                        {
+                            throw new PxfException(_current.Pos,
+                                "@proto descriptor body: invalid base64");
+                        }
+                    }
+                    Advance();
+                    return new ProtoDirective
+                    {
+                        Pos = atPos,
+                        Shape = ProtoShape.Descriptor,
+                        Body = decoded,
+                    };
+                }
+            default:
+                throw new PxfException(_current.Pos,
+                    $"expected '{{', dotted identifier, triple-quoted string, or b\"...\" after @proto, got {_current.Kind}");
+        }
+    }
+
+    /// <summary>
+    /// LBRACE is current on entry. Slices raw inner bytes, repositions
+    /// the lexer past the closing `}`, and primes the parser to the
+    /// next token.
+    /// </summary>
+    private byte[] CaptureBraceBody(string label)
+    {
+        int open = _current.Pos.Offset;
+        int close = BraceScan.FindMatchingBrace(_lex.Input, open);
+        if (close < 0)
+        {
+            throw new PxfException(_current.Pos, $"{label}: unmatched '{{'");
+        }
+        var body = System.Text.Encoding.UTF8.GetBytes(_lex.Input[(open + 1)..close]);
+        _lex.RepositionTo(close + 1);
+        Advance();
+        return body;
+    }
+
+    /// <summary>One-token lookahead with full state restore.</summary>
+    private TokenKind PeekKind()
+    {
+        var lexState = _lex.Save();
+        var savedCurrent = _current;
+        Advance();
+        var peeked = _current.Kind;
+        _lex.Restore(lexState);
+        _current = savedCurrent;
+        return peeked;
     }
 
     private void Advance()

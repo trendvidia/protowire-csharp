@@ -23,11 +23,16 @@ public enum TokenKind
     RBRACE,
     LBRACKET,
     RBRACKET,
+    LPAREN,
+    RPAREN,
     EQUALS,
     COLON,
     COMMA,
 
-    AT_TYPE
+    AT_TYPE,
+    AT_DATASET,
+    AT_PROTO,
+    AT_DIRECTIVE,
 }
 
 public record Token(TokenKind Kind, string Value, Position Pos);

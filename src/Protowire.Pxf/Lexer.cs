@@ -23,6 +23,46 @@ internal class Lexer
         _input = input;
     }
 
+    /// <summary>The raw input the lexer is scanning.</summary>
+    internal string Input => _input;
+
+    /// <summary>Current byte offset in <see cref="Input"/>.</summary>
+    internal int Pos => _pos;
+
+    /// <summary>Opaque lexer state snapshot for one-token lookahead.</summary>
+    internal readonly record struct State(int Pos, int Line, int Col);
+
+    /// <summary>Captures the current lexer position for later restore.</summary>
+    internal State Save() => new(_pos, _line, _col);
+
+    /// <summary>Restores a previously-captured lexer position.</summary>
+    internal void Restore(State s)
+    {
+        _pos = s.Pos;
+        _line = s.Line;
+        _col = s.Col;
+    }
+
+    /// <summary>
+    /// Repositions the scanner to absolute offset <paramref name="target"/>.
+    /// Used by <c>parseProtoDirective</c> after slicing a brace-bounded body
+    /// out of the input directly: the interior is protobuf source rather
+    /// than PXF, so the lexer must skip past it. Walks the input one byte
+    /// at a time so line/col remain accurate.
+    /// </summary>
+    internal void RepositionTo(int target)
+    {
+        if (target < _pos)
+        {
+            throw new InvalidOperationException(
+                $"lexer cannot reposition backwards (have {_pos}, want {target})");
+        }
+        while (_pos < target && _pos < _input.Length)
+        {
+            Advance();
+        }
+    }
+
     private char Peek() => _pos >= _input.Length ? '\0' : _input[_pos];
 
     private char PeekAt(int offset)
@@ -110,6 +150,12 @@ internal class Lexer
             case ']':
                 Advance();
                 return new Token(TokenKind.RBRACKET, "]", pos);
+            case '(':
+                Advance();
+                return new Token(TokenKind.LPAREN, "(", pos);
+            case ')':
+                Advance();
+                return new Token(TokenKind.RPAREN, ")", pos);
             case '=':
                 Advance();
                 return new Token(TokenKind.EQUALS, "=", pos);
@@ -420,11 +466,17 @@ internal class Lexer
             Advance();
         }
         string name = _input[start.._pos];
-        if (name == "type")
+        if (name.Length == 0)
         {
-            return new Token(TokenKind.AT_TYPE, "@type", pos);
+            return new Token(TokenKind.ILLEGAL, "@", pos);
         }
-        return new Token(TokenKind.ILLEGAL, "@" + name, pos);
+        return name switch
+        {
+            "type" => new Token(TokenKind.AT_TYPE, "@type", pos),
+            "dataset" => new Token(TokenKind.AT_DATASET, "@dataset", pos),
+            "proto" => new Token(TokenKind.AT_PROTO, "@proto", pos),
+            _ => new Token(TokenKind.AT_DIRECTIVE, name, pos),
+        };
     }
 
     private Token LexNumber(Position pos)
@@ -497,7 +549,7 @@ internal class Lexer
         while (_pos < _input.Length)
         {
             char ch = Peek();
-            if (char.IsWhiteSpace(ch) || ch == ',' || ch == ']' || ch == '}' || ch == '#')
+            if (char.IsWhiteSpace(ch) || ch == ',' || ch == ']' || ch == '}' || ch == ')' || ch == '#')
             {
                 break;
             }
