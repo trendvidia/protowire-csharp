@@ -27,12 +27,12 @@ namespace Protowire.Pxf {
       byte[] descriptorData = global::System.Convert.FromBase64String(
           string.Concat(
             "ChVweGYvYW5ub3RhdGlvbnMucHJvdG8SA3B4ZhogZ29vZ2xlL3Byb3RvYnVm",
-            "L2Rlc2NyaXB0b3IucHJvdG86OwoIcmVxdWlyZWQSHS5nb29nbGUucHJvdG9i",
-            "dWYuRmllbGRPcHRpb25zGNCGAyABKAhSCHJlcXVpcmVkOjkKB2RlZmF1bHQS",
-            "HS5nb29nbGUucHJvdG9idWYuRmllbGRPcHRpb25zGNGGAyABKAlSB2RlZmF1",
-            "bHRCUQoHY29tLnB4ZkIQQW5ub3RhdGlvbnNQcm90b1ABogIDUFhYqgINUHJv",
-            "dG93aXJlLlB4ZsoCA1B4ZuICD1B4ZlxHUEJNZXRhZGF0YeoCA1B4ZmIGcHJv",
-            "dG8z"));
+            "L2Rlc2NyaXB0b3IucHJvdG86OgoIcmVxdWlyZWQSHS5nb29nbGUucHJvdG9i",
+            "dWYuRmllbGRPcHRpb25zGKIKIAEoCFIIcmVxdWlyZWQ6OAoHZGVmYXVsdBId",
+            "Lmdvb2dsZS5wcm90b2J1Zi5GaWVsZE9wdGlvbnMYowogASgJUgdkZWZhdWx0",
+            "QlEKB2NvbS5weGZCEEFubm90YXRpb25zUHJvdG9QAaICA1BYWKoCDVByb3Rv",
+            "d2lyZS5QeGbKAgNQeGbiAg9QeGZcR1BCTWV0YWRhdGHqAgNQeGZiBnByb3Rv",
+            "Mw=="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::Google.Protobuf.Reflection.DescriptorReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(null, new pb::Extension[] { AnnotationsExtensions.Required, AnnotationsExtensions.Default }, null));
@@ -47,13 +47,13 @@ namespace Protowire.Pxf {
     /// A field set to null still counts as present.
     /// </summary>
     public static readonly pb::Extension<global::Google.Protobuf.Reflection.FieldOptions, bool> Required =
-      new pb::Extension<global::Google.Protobuf.Reflection.FieldOptions, bool>(50000, pb::FieldCodec.ForBool(400000, false));
+      new pb::Extension<global::Google.Protobuf.Reflection.FieldOptions, bool>(1314, pb::FieldCodec.ForBool(10512, false));
     /// <summary>
     /// Default value applied when a field is absent (not null) in PXF.
     /// The value is a PXF literal string, e.g. "42", "true", "\"hello\"".
     /// </summary>
     public static readonly pb::Extension<global::Google.Protobuf.Reflection.FieldOptions, string> Default =
-      new pb::Extension<global::Google.Protobuf.Reflection.FieldOptions, string>(50001, pb::FieldCodec.ForString(400010, ""));
+      new pb::Extension<global::Google.Protobuf.Reflection.FieldOptions, string>(1315, pb::FieldCodec.ForString(10522, ""));
   }
 
 }
