@@ -5,7 +5,7 @@ Copyright (c) 2026 TrendVidia, LLC.
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <PackageReference Include="Google.Protobuf" Version="3.35.0" />
+    <PackageReference Include="Google.Protobuf" Version="3.36.0" />
   </ItemGroup>
 
 </Project>
