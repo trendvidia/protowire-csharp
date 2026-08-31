@@ -27,14 +27,13 @@ namespace Protowire.Sbe.Tests.Bench {
       byte[] descriptorData = global::System.Convert.FromBase64String(
           string.Concat(
             "Cg9zYmUtZXh0cmEucHJvdG8SCGJlbmNoLnYxGhVzYmUvYW5ub3RhdGlvbnMu",
-            "cHJvdG8itQEKCFNiZUV4dHJhEg4KAmlkGAEgASgEUgJpZBISCgR0YWdzGAIg",
-            "AygFUgR0YWdzEkIKCG1ldGFkYXRhGAMgAygLMiAuYmVuY2gudjEuU2JlRXh0",
-            "cmEuTWV0YWRhdGFFbnRyeUIE4McYEFIIbWV0YWRhdGEaOwoNTWV0YWRhdGFF",
-            "bnRyeRIQCgNrZXkYASABKAlSA2tleRIUCgV2YWx1ZRgCIAEoCVIFdmFsdWU6",
-            "AjgBOgTAwRgCQncKDGNvbS5iZW5jaC52MUINU2JlRXh0cmFQcm90b1ABogID",
-            "QlhYqgIZUHJvdG93aXJlLlNiZS5UZXN0cy5CZW5jaMoCCEJlbmNoXFYx4gIU",
-            "QmVuY2hcVjFcR1BCTWV0YWRhdGHqAglCZW5jaDo6VjGguxgBqLsYAGIGcHJv",
-            "dG8z"));
+            "cHJvdG8iswEKCFNiZUV4dHJhEg4KAmlkGAEgASgEUgJpZBISCgR0YWdzGAIg",
+            "AygFUgR0YWdzEkEKCG1ldGFkYXRhGAMgAygLMiAuYmVuY2gudjEuU2JlRXh0",
+            "cmEuTWV0YWRhdGFFbnRyeUID0FIQUghtZXRhZGF0YRo7Cg1NZXRhZGF0YUVu",
+            "dHJ5EhAKA2tleRgBIAEoCVIDa2V5EhQKBXZhbHVlGAIgASgJUgV2YWx1ZToC",
+            "OAE6A8hSAkJ1Cgxjb20uYmVuY2gudjFCDVNiZUV4dHJhUHJvdG9QAaICA0JY",
+            "WKoCGVByb3Rvd2lyZS5TYmUuVGVzdHMuQmVuY2jKAghCZW5jaFxWMeICFEJl",
+            "bmNoXFYxXEdQQk1ldGFkYXRh6gIJQmVuY2g6OlYxuFIBwFIAYgZwcm90bzM="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::Protowire.Sbe.AnnotationsReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {

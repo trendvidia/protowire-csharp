@@ -27,18 +27,18 @@ namespace Protowire.Sbe.Tests.Bench {
       byte[] descriptorData = global::System.Convert.FromBase64String(
           string.Concat(
             "Cg9zYmUtYmVuY2gucHJvdG8SCGJlbmNoLnYxGhVzYmUvYW5ub3RhdGlvbnMu",
-            "cHJvdG8i6QIKBU9yZGVyEhkKCG9yZGVyX2lkGAEgASgEUgdvcmRlcklkEhwK",
-            "BnN5bWJvbBgCIAEoCUIE4McYCFIGc3ltYm9sEhQKBXByaWNlGAMgASgDUgVw",
-            "cmljZRIaCghxdWFudGl0eRgEIAEoDVIIcXVhbnRpdHkSIgoEc2lkZRgFIAEo",
-            "DjIOLmJlbmNoLnYxLlNpZGVSBHNpZGUSFgoGYWN0aXZlGAYgASgIUgZhY3Rp",
-            "dmUSFgoGd2VpZ2h0GAcgASgBUgZ3ZWlnaHQSFAoFc2NvcmUYCCABKAJSBXNj",
-            "b3JlEioKBWZpbGxzGAkgAygLMhQuYmVuY2gudjEuT3JkZXIuRmlsbFIFZmls",
-            "bHMaWQoERmlsbBIdCgpmaWxsX3ByaWNlGAEgASgDUglmaWxsUHJpY2USGQoI",
-            "ZmlsbF9xdHkYAiABKA1SB2ZpbGxRdHkSFwoHZmlsbF9pZBgDIAEoBFIGZmls",
-            "bElkOgTAwRgBKiMKBFNpZGUSDAoIU0lERV9CVVkQABINCglTSURFX1NFTEwQ",
-            "AUJ3Cgxjb20uYmVuY2gudjFCDVNiZUJlbmNoUHJvdG9QAaICA0JYWKoCGVBy",
-            "b3Rvd2lyZS5TYmUuVGVzdHMuQmVuY2jKAghCZW5jaFxWMeICFEJlbmNoXFYx",
-            "XEdQQk1ldGFkYXRh6gIJQmVuY2g6OlYxoLsYAai7GABiBnByb3RvMw=="));
+            "cHJvdG8i5wIKBU9yZGVyEhkKCG9yZGVyX2lkGAEgASgEUgdvcmRlcklkEhsK",
+            "BnN5bWJvbBgCIAEoCUID0FIIUgZzeW1ib2wSFAoFcHJpY2UYAyABKANSBXBy",
+            "aWNlEhoKCHF1YW50aXR5GAQgASgNUghxdWFudGl0eRIiCgRzaWRlGAUgASgO",
+            "Mg4uYmVuY2gudjEuU2lkZVIEc2lkZRIWCgZhY3RpdmUYBiABKAhSBmFjdGl2",
+            "ZRIWCgZ3ZWlnaHQYByABKAFSBndlaWdodBIUCgVzY29yZRgIIAEoAlIFc2Nv",
+            "cmUSKgoFZmlsbHMYCSADKAsyFC5iZW5jaC52MS5PcmRlci5GaWxsUgVmaWxs",
+            "cxpZCgRGaWxsEh0KCmZpbGxfcHJpY2UYASABKANSCWZpbGxQcmljZRIZCghm",
+            "aWxsX3F0eRgCIAEoDVIHZmlsbFF0eRIXCgdmaWxsX2lkGAMgASgEUgZmaWxs",
+            "SWQ6A8hSASojCgRTaWRlEgwKCFNJREVfQlVZEAASDQoJU0lERV9TRUxMEAFC",
+            "dQoMY29tLmJlbmNoLnYxQg1TYmVCZW5jaFByb3RvUAGiAgNCWFiqAhlQcm90",
+            "b3dpcmUuU2JlLlRlc3RzLkJlbmNoygIIQmVuY2hcVjHiAhRCZW5jaFxWMVxH",
+            "UEJNZXRhZGF0YeoCCUJlbmNoOjpWMbhSAcBSAGIGcHJvdG8z"));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::Protowire.Sbe.AnnotationsReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(new[] {typeof(global::Protowire.Sbe.Tests.Bench.Side), }, null, new pbr::GeneratedClrTypeInfo[] {
