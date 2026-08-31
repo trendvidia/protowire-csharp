@@ -106,7 +106,7 @@ internal static class CheckDecode
     {
         byte[] bytes = File.ReadAllBytes(input);
         var msg = NewMessage(schema);
-        Pb.Unmarshal(bytes, msg);
+        Protowire.Pb.Pb.Unmarshal(bytes, msg);
     }
 
     private static object NewMessage(string schema) => schema switch
