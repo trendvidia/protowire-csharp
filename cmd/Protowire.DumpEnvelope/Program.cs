@@ -19,5 +19,5 @@ env.Error!
     .WithField("amount", "MIN_VALUE", "below minimum", "10.00")
     .WithMeta("request_id", "req-123");
 
-byte[] bytes = Pb.Marshal(env);
+byte[] bytes = Protowire.Pb.Pb.Marshal(env);
 Console.WriteLine(Convert.ToHexString(bytes).ToLowerInvariant());
