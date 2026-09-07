@@ -56,8 +56,21 @@ dotnet pack -c Release
 
 ### Regenerating proto bindings
 
-The `proto/` tree mirrors the upstream wire contract. Bindings are
-generated through `buf` (see `buf.gen.yaml`).
+The `proto/` tree mirrors the upstream wire contract. Regenerate with
+
+```bash
+tool/generate.sh          # in place
+tool/generate.sh --check  # CI's check: drift, missing SPDX header, orphan
+```
+
+which runs `buf generate proto` with the generator pinned in
+`buf.gen.yaml`, moves every file from the `.generated/` staging tree to
+the project that compiles it (the table at the top of the script), and
+prepends the SPDX header. A new `.proto` needs a `csharp_namespace`
+override in `buf.gen.yaml` and a row in that table; the script refuses
+output it has no row for, so nothing can land in staging and be
+forgotten. `buf generate` on its own writes only to `.generated/`
+(gitignored), which nothing compiles (#24).
 
 ## Sending changes
 

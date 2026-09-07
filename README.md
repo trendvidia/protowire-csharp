@@ -111,15 +111,16 @@ string pxfText = encoder.Marshal(config);
 
 ## Code Generation (`buf.build`)
 
-This project uses [buf.build](https://buf.build) for managing `.proto` files and generating C# code.
+The `.proto` files live under `proto/`; the C# bindings live in the `Generated/` folder of the project that compiles them (`src/Protowire.Envelope/Generated/`, `tests/Protowire.Sbe.Tests/Generated/`, …) and are committed.
 
-To generate C# code from the schemas in the `proto/` directory:
+To regenerate after a `.proto` change:
 
 ```bash
-buf generate proto
+tool/generate.sh          # regenerate in place
+tool/generate.sh --check  # what CI runs: fails on drift, a missing SPDX header, or an orphan
 ```
 
-Generated files are placed in the `Generated/` folders of each project (e.g., `src/Protowire.Envelope/Generated/`).
+The script runs `buf generate proto` (pinned generator, see `buf.gen.yaml`), moves each file from the `.generated/` staging tree to its project — the table at the top of the script says which — and prepends the SPDX header. Running `buf generate` by itself only fills `.generated/`, which nothing compiles.
 
 ## Project Structure
 

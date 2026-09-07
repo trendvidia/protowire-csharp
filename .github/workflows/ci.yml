@@ -17,6 +17,22 @@ concurrency:
 
 jobs:
   # ---------------------------------------------------------------------
+  # The committed proto bindings must be what tool/generate.sh produces:
+  # a fresh generation with the pinned plugin, in the compiled locations,
+  # with the SPDX header (#24). Fails on drift, a missing header, or a
+  # generated file no table row owns.
+  # ---------------------------------------------------------------------
+  generated:
+    name: generated bindings
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: bufbuild/buf-action@v1
+        with:
+          setup_only: true
+      - run: tool/generate.sh --check
+
+  # ---------------------------------------------------------------------
   # Build + test on Linux/macOS/Windows. Directory.Build.props sets
   # -warnings-as-errors and EnforceCodeStyleInBuild globally, so a
   # successful build is the lint gate.

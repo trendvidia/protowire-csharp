@@ -1,3 +1,10 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 TrendVidia, LLC.
+#
+# Do not run `buf generate` by hand: it writes to .generated/ (gitignored),
+# and nothing compiles from there. tool/generate.sh runs it, moves every
+# file to the project that compiles it, and prepends the SPDX header;
+# `tool/generate.sh --check` is what CI runs (#24).
 version: v2
 managed:
   enabled: true
@@ -29,7 +36,10 @@ managed:
     - file_option: csharp_namespace
       value: Protowire.Pxf.Tests.Presence
       path: pxf-presence-test.proto
+    - file_option: csharp_namespace
+      value: Protowire.DumpEnvelope.Fixtures
+      path: settings.proto
 plugins:
   - remote: buf.build/protocolbuffers/csharp:v29.3
-    out: src
+    out: .generated
     opt: base_namespace=Protowire
