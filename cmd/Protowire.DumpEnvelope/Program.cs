@@ -33,6 +33,7 @@ using Google.Protobuf.Reflection;
 using Protowire.Envelopes;
 using Protowire.Pxf;
 using Protowire.Sbe;
+using Protowire.DumpEnvelope.Fixtures;
 using Protowire.Sbe.Tests.Bench;
 
 if (args.Length == 0)
@@ -63,7 +64,7 @@ static void DumpEnvelope()
 /// <summary>Generated types the fixture modes can name, by proto full name.</summary>
 static (Func<IMessage> make, FileDescriptor file)? Generated(string message) => message switch
 {
-    "settings.v1.Settings" => (() => new Settings.V1.Settings(), Settings.V1.SettingsReflection.Descriptor),
+    "settings.v1.Settings" => (() => new Settings(), SettingsReflection.Descriptor),
     "bench.v1.Order" => (() => new Order(), SbeBenchReflection.Descriptor),
     _ => null,
 };

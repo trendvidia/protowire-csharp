@@ -11,7 +11,7 @@ using pb = global::Google.Protobuf;
 using pbc = global::Google.Protobuf.Collections;
 using pbr = global::Google.Protobuf.Reflection;
 using scg = global::System.Collections.Generic;
-namespace Settings.V1 {
+namespace Protowire.DumpEnvelope.Fixtures {
 
   /// <summary>Holder for reflection information generated from settings.proto</summary>
   public static partial class SettingsReflection {
@@ -27,13 +27,17 @@ namespace Settings.V1 {
       byte[] descriptorData = global::System.Convert.FromBase64String(
           string.Concat(
             "Cg5zZXR0aW5ncy5wcm90bxILc2V0dGluZ3MudjEaFXB4Zi9hbm5vdGF0aW9u",
-            "cy5wcm90byJsCghTZXR0aW5ncxIRCgRuYW1lGAEgASgJQgOQUgESFQoHcmV0",
-            "cmllcxgCIAEoBUIEmlIBMxIcCgZyZWdpb24YAyABKAlCDJpSCXVzLWVhc3Qt",
-            "MRIYCgd2ZXJib3NlGAQgASgIQgeaUgR0cnVlYgZwcm90bzM="));
+            "cy5wcm90byKMAQoIU2V0dGluZ3MSFwoEbmFtZRgBIAEoCUIDkFIBUgRuYW1l",
+            "Eh4KB3JldHJpZXMYAiABKAVCBJpSATNSB3JldHJpZXMSJAoGcmVnaW9uGAMg",
+            "ASgJQgyaUgl1cy1lYXN0LTFSBnJlZ2lvbhIhCgd2ZXJib3NlGAQgASgIQgea",
+            "UgR0cnVlUgd2ZXJib3NlQoEBCg9jb20uc2V0dGluZ3MudjFCDVNldHRpbmdz",
+            "UHJvdG9QAaICA1NYWKoCH1Byb3Rvd2lyZS5EdW1wRW52ZWxvcGUuRml4dHVy",
+            "ZXPKAgtTZXR0aW5nc1xWMeICF1NldHRpbmdzXFYxXEdQQk1ldGFkYXRh6gIM",
+            "U2V0dGluZ3M6OlYxYgZwcm90bzM="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::Protowire.Pxf.AnnotationsReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::Settings.V1.Settings), global::Settings.V1.Settings.Parser, new[]{ "Name", "Retries", "Region", "Verbose" }, null, null, null, null)
+            new pbr::GeneratedClrTypeInfo(typeof(global::Protowire.DumpEnvelope.Fixtures.Settings), global::Protowire.DumpEnvelope.Fixtures.Settings.Parser, new[]{ "Name", "Retries", "Region", "Verbose" }, null, null, null, null)
           }));
     }
     #endregion
@@ -55,7 +59,7 @@ namespace Settings.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Settings.V1.SettingsReflection.Descriptor.MessageTypes[0]; }
+      get { return global::Protowire.DumpEnvelope.Fixtures.SettingsReflection.Descriptor.MessageTypes[0]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
