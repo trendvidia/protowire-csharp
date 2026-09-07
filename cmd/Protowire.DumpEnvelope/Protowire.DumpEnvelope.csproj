@@ -13,6 +13,17 @@ Copyright (c) 2026 TrendVidia, LLC.
   <ItemGroup>
     <ProjectReference Include="..\..\src\Protowire.Envelope\Protowire.Envelope.csproj" />
     <ProjectReference Include="..\..\src\Protowire.Pb\Protowire.Pb.csproj" />
+    <ProjectReference Include="..\..\src\Protowire.Pxf\Protowire.Pxf.csproj" />
+    <ProjectReference Include="..\..\src\Protowire.Sbe\Protowire.Sbe.csproj" />
+  </ItemGroup>
+
+  <!-- The fixture types the pb / sbe fixture modes decode into (protowire#244,
+       #26). settings.v1.Settings is generated here from proto/settings.proto
+       (a copy of protowire/testdata/annotations/settings.proto); bench.v1.
+       Order is the sbe-bench.proto codegen the SBE tests and bench-sbe share. -->
+  <ItemGroup>
+    <Compile Include="..\..\tests\Protowire.Sbe.Tests\Generated\SbeBench.cs"
+             Link="Generated\SbeBench.cs" />
   </ItemGroup>
 
 </Project>
