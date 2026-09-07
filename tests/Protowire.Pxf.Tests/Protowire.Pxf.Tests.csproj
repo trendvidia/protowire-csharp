@@ -14,12 +14,20 @@ Copyright (c) 2026 TrendVidia, LLC.
   <ItemGroup>
     <ProjectReference Include="..\..\src\Protowire.Pxf\Protowire.Pxf.csproj" />
     <ProjectReference Include="..\..\src\Protowire.Envelope\Protowire.Envelope.csproj" />
+    <ProjectReference Include="..\..\src\Protowire.Sbe\Protowire.Sbe.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <None Update="testdata\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+
+  <!-- bench.v1.Order carries the uint32 / uint64 fields UnsignedTests
+       decodes; shared with the SBE tests and bench-sbe. -->
+  <ItemGroup>
+    <Compile Include="..\Protowire.Sbe.Tests\Generated\SbeBench.cs"
+             Link="Generated\SbeBench.cs" />
   </ItemGroup>
 
 </Project>

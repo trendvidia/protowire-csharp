@@ -11,6 +11,24 @@ format changes.
 
 ## [Unreleased]
 
+### Added
+
+- `dump-envelope --pb FDS MESSAGE DOC` and `--sbe FDS MESSAGE DOC` (#26),
+  the two legs of protowire's `cross_envelope_check.sh` that prove a port
+  reads `(pxf.required)` = 1314, `(pxf.default)` = 1315 and the SBE
+  numbers 1319–1323 from a schema. `Decoder.UnmarshalFull` and `Sbe.Codec`
+  already read them from the generated types' descriptors; the dumper maps
+  `MESSAGE` to those types (`settings.v1.Settings` generated from a copy of
+  protowire's `testdata/annotations/settings.proto`, `bench.v1.Order` from
+  `sbe-bench.proto`) and reads FDS only to check it declares `MESSAGE`.
+
+### Fixed
+
+- **`uint32` / `uint64` fields decode** (#26). The reflection decode path
+  had no branch for `uint` or `ulong`, so a generated message with either
+  was rejected with `unsupported type System.UInt64`; protowire's shared
+  `sbe-bench.pxf` tripped it at `order_id`.
+
 ## [1.0.0]
 
 Lockstep release with the rest of the `protowire-*` stack at the v1.0.0
