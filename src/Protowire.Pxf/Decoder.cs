@@ -844,6 +844,21 @@ public class Decoder
             Advance();
             return l;
         }
+        // uint32 / fixed32 and uint64 / fixed64 generate uint / ulong; the
+        // shared sbe-bench fixture's order_id is the first uint64 this path
+        // met (#26).
+        if (type == typeof(uint))
+        {
+            var u = uint.Parse(_current.Value);
+            Advance();
+            return u;
+        }
+        if (type == typeof(ulong))
+        {
+            var u = ulong.Parse(_current.Value);
+            Advance();
+            return u;
+        }
         if (type == typeof(float))
         {
             var f = float.Parse(_current.Value);
