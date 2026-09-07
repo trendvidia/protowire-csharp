@@ -96,7 +96,7 @@ public class Decoder
         bool sawType = false;
         bool hasDataset = false;
         Position firstDatasetPos = Position.Empty;
-        for (;;)
+        for (; ; )
         {
             switch (_current.Kind)
             {
@@ -222,7 +222,7 @@ public class Decoder
                 $"@dataset column list must contain at least one field name, got {_current.Kind}");
         }
         var columns = new List<string>();
-        for (;;)
+        for (; ; )
         {
             if (_current.Kind != TokenKind.IDENT)
             {
@@ -551,15 +551,15 @@ public class Decoder
                     // Actually, if we are inside DecodeFields for an Any, we should probably 
                     // have already resolved the type.
                     // But if we are here, it means we are decoding an Any that was just created.
-                    
+
                     var typeName = typeUrl;
                     if (typeName.Contains("/")) typeName = typeName[(typeName.LastIndexOf('/') + 1)..];
                     var desc = Registry.Find(typeName);
                     if (desc == null) throw new PxfException(pos, $"type \"{typeName}\" not found in registry");
-                    
+
                     var unpackedMsg = desc.Parser.ParseFrom(Array.Empty<byte>());
                     DecodeFields(unpackedMsg, true);
-                    
+
                     var typeUrlProp = any.GetType().GetProperty("TypeUrl");
                     var valueProp = any.GetType().GetProperty("Value");
                     typeUrlProp?.SetValue(any, typeUrl);
@@ -947,11 +947,11 @@ public class Decoder
 
         var msg = desc.Parser.ParseFrom(Array.Empty<byte>());
         DecodeFields(msg, true);
-        
+
         var any = (IMessage)(currentVal ?? Activator.CreateInstance(typeof(Google.Protobuf.WellKnownTypes.Any))!);
         var packMethod = any.GetType().GetMethod("Pack", new[] { typeof(IMessage) });
         packMethod?.Invoke(any, new object[] { msg });
-        
+
         return any;
     }
 
@@ -959,13 +959,13 @@ public class Decoder
     {
         if (_current.Kind != TokenKind.LBRACKET) throw new PxfException(_current.Pos, "expected '['");
         Advance();
-        
+
         var itemType = type.IsArray ? type.GetElementType()! : type.GetGenericArguments()[0];
         var list = (currentList as IList) ?? (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(itemType))!;
-        
+
         if (list.IsReadOnly && list is not IList) // Handle RepeatedField which is not exactly IList in some contexts but usually is
         {
-             // RepeatedField implements IList
+            // RepeatedField implements IList
         }
 
         while (_current.Kind != TokenKind.RBRACKET && _current.Kind != TokenKind.EOF)
@@ -1121,12 +1121,12 @@ public class Decoder
                 fd.Accessor.SetValue(msg, ByteString.CopyFrom(Convert.FromBase64String(def)));
                 return;
             case FieldType.Enum:
-            {
-                var ev = fd.EnumType.FindValueByName(def);
-                int n = ev != null ? ev.Number : int.Parse(def, CultureInfo.InvariantCulture);
-                fd.Accessor.SetValue(msg, n);
-                return;
-            }
+                {
+                    var ev = fd.EnumType.FindValueByName(def);
+                    int n = ev != null ? ev.Number : int.Parse(def, CultureInfo.InvariantCulture);
+                    fd.Accessor.SetValue(msg, n);
+                    return;
+                }
             case FieldType.Message:
             case FieldType.Group:
                 ApplyMessageDefault(msg, fd, def);
