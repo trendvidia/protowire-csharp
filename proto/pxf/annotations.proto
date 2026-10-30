@@ -26,5 +26,4 @@ extend google.protobuf.FieldOptions {
   // Default value applied when a field is absent (not null) in PXF.
   // The value is a PXF literal string, e.g. "42", "true", "\"hello\"".
   string default = 1315;
-
 }
