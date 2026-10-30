@@ -1,6 +1,20 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 TrendVidia, LLC.
+using System.Runtime.CompilerServices;
+using Google.Protobuf.Reflection;
+
 namespace Protowire.Pxf;
+
+/// <summary>
+/// One schema element that fails a PXF bind-time check. <paramref name="File"/>
+/// is the .proto declaring the element, <paramref name="Element"/> its
+/// fully-qualified name, <paramref name="Name"/> the annotation value.
+/// </summary>
+public sealed record Violation(string File, string Element, string Name, string Detail)
+{
+    public override string ToString() =>
+        $"{File}: field \"{Element}\": invalid (pxf.key) = \"{Name}\": {Detail} (draft -01 §3.13)";
+}
 
 /// <summary>
 /// PXF directive-name reservations per draft §3.4.6.
@@ -35,4 +49,90 @@ public static class Schema
         "table" or "datasource" or "view" or "procedure" or "function" or "permissions" => true,
         _ => false,
     };
+
+    // Decoders re-check on every bind, and the closure of any annotated
+    // file reaches descriptor.proto, so the result is kept per file
+    // (draft -01 "Scope of Bind-Time Checks", non-normative note).
+    private static readonly ConditionalWeakTable<FileDescriptor, IReadOnlyList<Violation>> ClosureCache = new();
+
+    /// <summary>
+    /// The <c>(pxf.key)</c> placement violations (draft -01 "Schema
+    /// Placement") in the file declaring <paramref name="desc"/> and its
+    /// transitive imports. Empty means conformant.
+    /// </summary>
+    public static IReadOnlyList<Violation> ValidateDescriptor(MessageDescriptor desc) => ValidateFile(desc.File);
+
+    /// <summary>
+    /// The <c>(pxf.key)</c> placement violations in <paramref name="file"/>
+    /// and its transitive imports, sorted by declaring file and then by
+    /// element name. Each file is checked once, however many import paths
+    /// reach it, and a violation names the file that declares it.
+    /// </summary>
+    public static IReadOnlyList<Violation> ValidateFile(FileDescriptor file) =>
+        ClosureCache.GetValue(file, static f =>
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            var found = new List<Violation>();
+            WalkFile(f, seen, found);
+            return found
+                .OrderBy(v => v.File, StringComparer.Ordinal)
+                .ThenBy(v => v.Element, StringComparer.Ordinal)
+                .ToArray();
+        });
+
+    /// <summary>Throws if <paramref name="desc"/>'s closure has a violation.</summary>
+    internal static void EnsureBindable(MessageDescriptor desc)
+    {
+        var violations = ValidateDescriptor(desc);
+        if (violations.Count > 0)
+        {
+            throw new PxfException(Position.Empty, string.Join("; ", violations));
+        }
+    }
+
+    private static void WalkFile(FileDescriptor file, HashSet<string> seen, List<Violation> found)
+    {
+        if (!seen.Add(file.Name)) return;
+        WalkMessages(file.Name, file.MessageTypes, found);
+        foreach (var dep in file.Dependencies)
+        {
+            WalkFile(dep, seen, found);
+        }
+    }
+
+    private static void WalkMessages(string path, IEnumerable<MessageDescriptor> messages, List<Violation> found)
+    {
+        foreach (var msg in messages)
+        {
+            foreach (var fd in msg.Fields.InDeclarationOrder())
+            {
+                var keyName = AnnotationsRuntime.GetKey(fd);
+                if (keyName == null) continue;
+                var detail = KeyPlacementProblem(fd, keyName);
+                if (detail != null)
+                {
+                    found.Add(new Violation(path, fd.FullName, keyName, detail));
+                }
+            }
+            WalkMessages(path, msg.NestedTypes, found);
+        }
+    }
+
+    private static string? KeyPlacementProblem(FieldDescriptor fd, string keyName)
+    {
+        if (!fd.IsRepeated || fd.IsMap || fd.FieldType != FieldType.Message)
+        {
+            return "(pxf.key) is valid only on repeated message-typed fields";
+        }
+        var keyFd = fd.MessageType.FindFieldByName(keyName);
+        if (keyFd == null)
+        {
+            return $"element message {fd.MessageType.FullName} has no field \"{keyName}\"";
+        }
+        if (keyFd.IsRepeated || keyFd.IsMap || keyFd.FieldType != FieldType.String)
+        {
+            return $"key field {keyFd.FullName} must be a singular string field";
+        }
+        return null;
+    }
 }
