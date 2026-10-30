@@ -27,6 +27,7 @@ TABLE=(
   "Pxf/Tests/Bench/BenchTest.cs          tests/Protowire.Pxf.Tests/Generated/BenchTest.cs"
   "Pxf/Tests/Presence/PxfPresenceTest.cs tests/Protowire.Pxf.Tests/Generated/PxfPresenceTest.cs"
   "Pxf/Tests/KeyedFixtures/Keyed.cs      tests/Protowire.Pxf.Tests/Generated/Keyed.cs"
+  "Pxf/Tests/KeyedFixtures/PxfKeyInvalidTest.cs tests/Protowire.Pxf.Tests/Generated/PxfKeyInvalidTest.cs"
   "Sbe/Tests/Bench/SbeBench.cs           tests/Protowire.Sbe.Tests/Generated/SbeBench.cs"
   "Sbe/Tests/Bench/SbeExtra.cs           tests/Protowire.Sbe.Tests/Generated/SbeExtra.cs"
   "Sbe/Tests/Bench/SbeOneof.cs           tests/Protowire.Sbe.Tests/Generated/SbeOneof.cs"

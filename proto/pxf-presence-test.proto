@@ -48,3 +48,16 @@ message Nested {
 message Inner {
   string label = 1 [(pxf.required) = true];
 }
+
+// A keyed field whose element shares a field name with its parent, so a
+// presence path that loses the element prefix shows up as the parent's.
+message KeyedItem {
+  string id = 1;
+  string note = 2;
+}
+
+message KeyedParent {
+  string id = 1 [(pxf.required) = true];
+  repeated KeyedItem items = 2 [(pxf.key) = "id"];
+  google.protobuf.FieldMask _null = 99;
+}
