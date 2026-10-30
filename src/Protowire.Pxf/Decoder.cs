@@ -24,6 +24,13 @@ public class Decoder
     private IMessage? _rootMsg;
     private FieldDescriptor? _nullMaskFd;
     private int _depth;
+    // How many list elements enclose the current body. A FieldMask path
+    // names fields, not elements, so a null inside one stays out of `_null`.
+    private int _elemDepth;
+    // Set for exactly the next body: the immediate entries of one element
+    // of a keyed repeated field. Consumed there, so nested submessages do
+    // not inherit the key-field checks.
+    private KeyedElemState? _keyedElem;
     public TypeRegistry Registry { get; set; } = TypeRegistry.Empty;
 
     /// <summary>
@@ -71,10 +78,16 @@ public class Decoder
         _rootMsg = null;
         _nullMaskFd = null;
         _depth = 0;
+        _elemDepth = 0;
+        _keyedElem = null;
     }
 
     private void ParseInto(string data, object obj)
     {
+        if (obj is IMessage bound)
+        {
+            Schema.EnsureBindable(bound.Descriptor);
+        }
         _lex = new Lexer(data);
         Advance();
 
@@ -524,6 +537,9 @@ public class Decoder
 
         var localSetFields = new HashSet<string>();
 
+        var keyedElem = _keyedElem;
+        _keyedElem = null;
+
         while (true)
         {
             if (inBlock && _current.Kind == TokenKind.RBRACE)
@@ -577,19 +593,25 @@ public class Decoder
             string key = _current.Value;
             Advance();
 
-            // Strict-PXF-keys grammar: `=` (field assignment) and `{` (submessage)
-            // require an identifier key. String / integer keys are only valid
-            // with `:` (map entries). Enforce here before the unknown-field
-            // skip path silently swallows the input.
-            if (keyKind != TokenKind.IDENT)
+            // Strict-PXF-keys grammar: an integer key is only valid with `:`
+            // (map entries). A string key before `=` or `{` is well-formed,
+            // but it is a quoted entry name: keyed blocks have their own
+            // decode loop, so in message context it never names a field.
+            // Enforce both here before the unknown-field skip path silently
+            // swallows the input.
+            if (_current.Kind == TokenKind.EQUALS || _current.Kind == TokenKind.LBRACE)
             {
-                if (_current.Kind == TokenKind.EQUALS)
+                if (keyKind == TokenKind.STRING)
                 {
-                    throw new PxfException(pos, $"field assignment with '=' requires an identifier key, got {keyKind} (\"{key}\"); use ':' for map entries");
+                    throw Keyed.QuotedNameUnkeyed(pos, key);
                 }
-                if (_current.Kind == TokenKind.LBRACE)
+                if (keyKind == TokenKind.INT && _current.Kind == TokenKind.EQUALS)
                 {
-                    throw new PxfException(pos, $"submessage block requires an identifier key, got {keyKind} (\"{key}\")");
+                    throw new PxfException(pos, $"field assignment with '=' requires an identifier or string key, got {keyKind} (\"{key}\"); use ':' for map entries");
+                }
+                if (keyKind == TokenKind.INT)
+                {
+                    throw new PxfException(pos, $"submessage block requires an identifier or string key, got {keyKind} (\"{key}\")");
                 }
             }
             // `:` (map entry) is reserved for inside a `{ ... }` block; the
@@ -644,7 +666,7 @@ public class Decoder
                         {
                             var path = _pathPrefix + fd.Name;
                             _result.MarkNull(path);
-                            if (_nullMaskFd != null && _rootMsg != null)
+                            if (_nullMaskFd != null && _rootMsg != null && _elemDepth == 0)
                             {
                                 AnnotationsRuntime.AppendNullPath(_rootMsg, _nullMaskFd, path);
                             }
@@ -652,11 +674,23 @@ public class Decoder
                         Advance();
                         continue;
                     }
+                    if (keyedElem != null && fd?.Name == keyedElem.KeyName && _current.Kind == TokenKind.STRING)
+                    {
+                        keyedElem.CheckExplicitKey(_current.Value, _current.Pos);
+                    }
                     if (_result != null && fd != null)
                     {
                         _result.MarkPresent(_pathPrefix + fd.Name);
                     }
                     var currentVal = prop?.GetValue(obj) ?? field?.GetValue(obj);
+                    // `name = { ... }` spells the keyed block form: a block
+                    // tail abbreviates `= { ... }`.
+                    if (_current.Kind == TokenKind.LBRACE && fd != null && Keyed.KeyField(fd) is { } assignedKeyFd)
+                    {
+                        Advance();
+                        DecodeKeyedBlock((IList)currentVal!, fd, assignedKeyFd);
+                        break;
+                    }
                     var val = DecodeValue(memberType, fd, currentVal);
                     if (prop != null && prop.CanWrite) prop.SetValue(obj, val);
                     else if (field != null) field.SetValue(obj, val);
@@ -664,6 +698,19 @@ public class Decoder
 
                 case TokenKind.LBRACE:
                     Advance();
+                    if (fd != null && Keyed.KeyField(fd) is { } blockKeyFd)
+                    {
+                        _result?.MarkPresent(_pathPrefix + fd.Name);
+                        DecodeKeyedBlock((IList)(prop?.GetValue(obj) ?? field?.GetValue(obj))!, fd, blockKeyFd);
+                        break;
+                    }
+                    if (fd != null && fd.IsRepeated && !fd.IsMap && _current.Kind == TokenKind.STRING)
+                    {
+                        // The block spells the keyed form on a field with no
+                        // (pxf.key). Report the quoted name, the more specific
+                        // schema violation.
+                        throw Keyed.QuotedNameUnkeyed(_current.Pos, _current.Value);
+                    }
                     var subObj = prop?.GetValue(obj) ?? field?.GetValue(obj);
                     if (subObj == null)
                     {
@@ -695,6 +742,105 @@ public class Decoder
                     throw new PxfException(_current.Pos, $"expected '=' or '{{' after \"{key}\"");
             }
         }
+    }
+
+    /// <summary>
+    /// Decodes the block form of a keyed repeated field: named entries,
+    /// <c>name { ... }</c> or <c>name = { ... }</c>, one per element in list
+    /// order. Each entry name, unquoted, populates the element's key field.
+    /// The opening <c>{</c> is consumed on entry, the closing <c>}</c> on
+    /// return. Mirrors <c>decodeKeyedBlockBody</c> in
+    /// <c>protowire-go/encoding/pxf/decode_fast.go</c>.
+    /// </summary>
+    private void DecodeKeyedBlock(IList list, FieldDescriptor fd, FieldDescriptor keyFd)
+    {
+        if (_depth >= MaxNestingDepth)
+        {
+            throw new PxfException(_current.Pos, $"nesting depth exceeds {MaxNestingDepth}");
+        }
+        _depth++;
+        try
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            while (_current.Kind != TokenKind.RBRACE)
+            {
+                if (_current.Kind == TokenKind.EOF)
+                {
+                    throw new PxfException(_current.Pos, $"expected '}}' to close keyed field \"{fd.Name}\", got EOF");
+                }
+                if (_current.Kind != TokenKind.IDENT && _current.Kind != TokenKind.STRING)
+                {
+                    throw new PxfException(_current.Pos,
+                        $"expected entry name (identifier or string) in keyed field \"{fd.Name}\", got {_current.Kind}");
+                }
+                var namePos = _current.Pos;
+                string name = _current.Value;
+                if (name.Length == 0)
+                {
+                    throw Keyed.EmptyName(namePos, fd.Name);
+                }
+                if (!seen.Add(name))
+                {
+                    throw Keyed.DuplicateKey(namePos, fd.Name, name);
+                }
+                Advance();
+
+                if (_current.Kind == TokenKind.EQUALS)
+                {
+                    Advance();
+                    if (_current.Kind != TokenKind.LBRACE)
+                    {
+                        throw new PxfException(_current.Pos,
+                            $"keyed entry \"{name}\" of field \"{fd.Name}\" must have a block value ('{{ ... }}'): the element type is a message");
+                    }
+                }
+                else if (_current.Kind != TokenKind.LBRACE)
+                {
+                    throw new PxfException(_current.Pos,
+                        $"expected '{{' or '=' after entry name \"{name}\" in keyed field \"{fd.Name}\", got {_current.Kind}");
+                }
+                Advance();
+
+                var element = fd.MessageType.Parser.ParseFrom(Array.Empty<byte>());
+                keyFd.Accessor.SetValue(element, name);
+                _keyedElem = new KeyedElemState(fd.Name, keyFd.Name, name, Named: true);
+                var saved = EnterElement(fd, list.Count);
+                try
+                {
+                    DecodeFields(element, true);
+                }
+                finally
+                {
+                    LeaveElement(saved);
+                }
+                list.Add(element);
+            }
+            Advance();
+        }
+        finally
+        {
+            _depth--;
+        }
+    }
+
+    /// <summary>
+    /// Descends into element <paramref name="index"/> of <paramref name="fd"/>:
+    /// presence paths inside it are <c>name[i].field</c>, so they cannot
+    /// pass for fields of the enclosing message. Returns the prefix to hand
+    /// to <see cref="LeaveElement"/>.
+    /// </summary>
+    private string EnterElement(FieldDescriptor fd, int index)
+    {
+        var saved = _pathPrefix;
+        _pathPrefix = $"{saved}{fd.Name}[{index}].";
+        _elemDepth++;
+        return saved;
+    }
+
+    private void LeaveElement(string saved)
+    {
+        _pathPrefix = saved;
+        _elemDepth--;
     }
 
     private object? DecodeValue(Type type, FieldDescriptor? fd, object? currentVal)
@@ -968,9 +1114,29 @@ public class Decoder
             // RepeatedField implements IList
         }
 
+        // The anonymous form of a keyed repeated field: elements get the
+        // key-field checks, with no entry name to agree with.
+        var keyFd = fd != null ? Keyed.KeyField(fd) : null;
+
         while (_current.Kind != TokenKind.RBRACKET && _current.Kind != TokenKind.EOF)
         {
-            list.Add(DecodeValue(itemType, null, null));
+            if (keyFd != null && _current.Kind == TokenKind.LBRACE)
+            {
+                _keyedElem = new KeyedElemState(fd!.Name, keyFd.Name, EntryName: "", Named: false);
+                var saved = EnterElement(fd, list.Count);
+                try
+                {
+                    list.Add(DecodeValue(itemType, null, null));
+                }
+                finally
+                {
+                    LeaveElement(saved);
+                }
+            }
+            else
+            {
+                list.Add(DecodeValue(itemType, null, null));
+            }
             if (_current.Kind == TokenKind.COMMA) Advance();
         }
         if (_current.Kind != TokenKind.RBRACKET) throw new PxfException(_current.Pos, "expected ']'");
