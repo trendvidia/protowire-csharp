@@ -17,6 +17,13 @@ public class Decoder
     // attacker input. Matches the cross-port default.
     private const int MaxNestingDepth = 100;
 
+    // HARDENING.md § Mandatory limits — bounds the superlinear big-number
+    // parsers. Counts a literal's significant mantissa digits only (#410),
+    // and is enforced at each big-number parse rather than in the lexer so
+    // that a (pxf.default) string, which never passes the lexer, is under
+    // it too. It also bounds the scale of a pxf.Decimal literal.
+    private const int MaxNumericLiteralDigits = 4096;
+
     private Lexer _lex = null!;
     private Token _current = null!;
     private Result? _result;
@@ -732,6 +739,7 @@ public class Decoder
         {
             if (WellKnown.IsBigInt(fd.MessageType))
             {
+                CheckLiteralDigits(_current.Value, pos);
                 var bi = System.Numerics.BigInteger.Parse(_current.Value);
                 Advance();
                 var msg = currentVal ?? Activator.CreateInstance(type)!;
@@ -741,6 +749,7 @@ public class Decoder
             if (WellKnown.IsDecimal(fd.MessageType))
             {
                 var s = _current.Value;
+                CheckLiteralDigits(s, pos);
                 bool negative = s.StartsWith('-');
                 if (negative) s = s[1..];
                 int dotIdx = s.IndexOf('.');
@@ -750,6 +759,7 @@ public class Decoder
                     scale = s.Length - dotIdx - 1;
                     s = s.Remove(dotIdx, 1);
                 }
+                CheckDecimalScale(scale, pos);
                 var unscaled = System.Numerics.BigInteger.Parse(s);
                 Advance();
                 var msg = currentVal ?? Activator.CreateInstance(type)!;
@@ -759,6 +769,7 @@ public class Decoder
             if (WellKnown.IsBigFloat(fd.MessageType))
             {
                 var s = _current.Value;
+                CheckLiteralDigits(s, pos);
                 bool negative = s.StartsWith('-');
                 if (negative) s = s[1..];
                 int dotIdx = s.IndexOf('.');
@@ -779,6 +790,7 @@ public class Decoder
         if (type == typeof(System.Numerics.BigInteger))
         {
             var s = _current.Value.Trim();
+            CheckLiteralDigits(s, pos);
             var bi = System.Numerics.BigInteger.Parse(s);
             Advance();
             return bi;
@@ -786,6 +798,7 @@ public class Decoder
         if (type == typeof(Protowire.Pb.Decimal))
         {
             var s = _current.Value.Trim();
+            CheckLiteralDigits(s, pos);
             bool negative = s.StartsWith('-');
             if (negative) s = s[1..];
             int dotIdx = s.IndexOf('.');
@@ -795,6 +808,7 @@ public class Decoder
                 scale = s.Length - dotIdx - 1;
                 s = s.Remove(dotIdx, 1);
             }
+            CheckDecimalScale(scale, pos);
             if (string.IsNullOrEmpty(s)) s = "0";
             var unscaled = System.Numerics.BigInteger.Parse(s);
             Advance();
@@ -804,6 +818,7 @@ public class Decoder
         {
             // Simple parsing for now: treat as decimal and convert
             var s = _current.Value.Trim();
+            CheckLiteralDigits(s, pos);
             bool negative = s.StartsWith('-');
             if (negative) s = s[1..];
             int dotIdx = s.IndexOf('.');
@@ -1144,7 +1159,7 @@ public class Decoder
     ///
     /// <para>Mirrors <c>applyMessageDefault</c> in <c>decode_fast.go</c>.</para>
     /// </summary>
-    private static void ApplyMessageDefault(IMessage msg, FieldDescriptor fd, string def)
+    internal static void ApplyMessageDefault(IMessage msg, FieldDescriptor fd, string def)
     {
         var mdesc = fd.MessageType;
 
@@ -1173,6 +1188,7 @@ public class Decoder
         }
         else if (WellKnown.IsBigInt(mdesc))
         {
+            CheckLiteralDigits(def, Position.Empty);
             WellKnown.SetBigInt(sub, System.Numerics.BigInteger.Parse(def, CultureInfo.InvariantCulture));
         }
         else if (WellKnown.IsDecimal(mdesc))
@@ -1212,6 +1228,7 @@ public class Decoder
 
     private static Protowire.Pb.Decimal ParseDecimalLiteral(string s)
     {
+        CheckLiteralDigits(s, Position.Empty);
         bool negative = s.StartsWith('-');
         if (negative) s = s[1..];
         int dot = s.IndexOf('.');
@@ -1221,6 +1238,7 @@ public class Decoder
             scale = s.Length - dot - 1;
             s = s.Remove(dot, 1);
         }
+        CheckDecimalScale(scale, Position.Empty);
         if (s.Length == 0) s = "0";
         return new Protowire.Pb.Decimal(
             System.Numerics.BigInteger.Parse(s, CultureInfo.InvariantCulture), scale, negative);
@@ -1228,6 +1246,7 @@ public class Decoder
 
     private static Protowire.Pb.BigFloat ParseBigFloatLiteral(string s)
     {
+        CheckLiteralDigits(s, Position.Empty);
         bool negative = s.StartsWith('-');
         if (negative) s = s[1..];
         int dot = s.IndexOf('.');
@@ -1241,6 +1260,48 @@ public class Decoder
         return new Protowire.Pb.BigFloat(
             System.Numerics.BigInteger.Parse(s, CultureInfo.InvariantCulture),
             -scale, (uint)s.Length, negative);
+    }
+
+    // Rejects a literal past MaxNumericLiteralDigits before it reaches a
+    // big-number parser. A literal no longer than the limit needs no count.
+    private static void CheckLiteralDigits(string s, Position pos)
+    {
+        if (s.Length <= MaxNumericLiteralDigits) return;
+        int n = CountDigits(s);
+        if (n > MaxNumericLiteralDigits)
+        {
+            throw new PxfException(pos,
+                $"numeric literal has {n} digits; MaxNumericLiteralDigits={MaxNumericLiteralDigits}");
+        }
+    }
+
+    // What MaxNumericLiteralDigits counts: the significant digits of a
+    // literal's mantissa, either side of the point, leading zeros excluded.
+    // An exponent and a precision suffix are not counted, so the count stops
+    // at either marker (HARDENING.md § Mandatory limits, protowire#410).
+    internal static int CountDigits(string s)
+    {
+        int n = 0;
+        bool leading = true;
+        foreach (char c in s)
+        {
+            if (c == 'e' || c == 'E' || c == 'p') break;
+            if (c < '0' || c > '9' || (leading && c == '0')) continue;
+            leading = false;
+            n++;
+        }
+        return n;
+    }
+
+    // Leading zeros do not count as digits, so "0.000…1" is one digit however
+    // many places it has; its scale is bounded here, as on the PB wire.
+    private static void CheckDecimalScale(int scale, Position pos)
+    {
+        if (scale > MaxNumericLiteralDigits)
+        {
+            throw new PxfException(pos,
+                $"pxf.Decimal scale {scale} exceeds MaxNumericLiteralDigits={MaxNumericLiteralDigits}");
+        }
     }
 
     private bool IsDefaultValue(Type type, object? val)

@@ -37,6 +37,16 @@ format changes.
 
 ### Fixed
 
+- **`MaxNumericLiteralDigits` is enforced** (#34, HARDENING.md § Mandatory
+  limits). The port had no digit cap, so a big-number literal of any length
+  reached `BigInteger.Parse`, on generated messages, POCOs and
+  `(pxf.default)` strings alike. A `pxf.BigInt`, `pxf.Decimal` or
+  `pxf.BigFloat` literal of exactly 4096 significant digits now decodes and
+  one digit more is rejected naming the limit. Leading zeros, the sign, the
+  point, an exponent and a precision suffix are not counted (protowire#410).
+  A `pxf.Decimal` literal's scale is bounded by the same number.
+  `check-decode` links `adversarial.v1.BigNumHolder`. It did not, so
+  `pxf/long-numeric` was rejected as an unknown schema, never by a cap.
 - **`uint32` / `uint64` fields decode** (#26). The reflection decode path
   had no branch for `uint` or `ulong`, so a generated message with either
   was rejected with `unsupported type System.UInt64`; protowire's shared
