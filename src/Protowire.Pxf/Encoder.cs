@@ -79,9 +79,16 @@ public class Encoder
         for (int i = 0; i < level; i++) _sb.Append(_indent);
     }
 
-    private void EncodeMessage(object obj, int level)
+    /// <param name="obj">The message to write.</param>
+    /// <param name="level">Indent level.</param>
+    /// <param name="skipKey">
+    /// The key field of a keyed-block entry: the entry name already carries
+    /// its value, so the field is not written again inside the block.
+    /// </param>
+    private void EncodeMessage(object obj, int level, FieldDescriptor? skipKey = null)
     {
         var type = obj.GetType();
+        var desc = (obj as IMessage)?.Descriptor;
         var props = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
         var fields = type.GetFields(BindingFlags.Public | BindingFlags.Instance);
 
@@ -100,6 +107,7 @@ public class Encoder
         foreach (var prop in props)
         {
             if (prop.Name == "_null" || prop.Name == "Null") continue;
+            if (skipKey != null && prop.Name == skipKey.PropertyName) continue;
             var val = prop.GetValue(obj);
             
             if (nullFields.Contains(prop.Name.ToLowerInvariant()) || nullFields.Contains(ToSnakeCase(prop.Name)))
@@ -110,6 +118,11 @@ public class Encoder
             }
 
             if (!_emitDefaults && IsDefault(prop.PropertyType, val)) continue;
+            if (val is IList list && KeyedFieldOf(desc, prop.Name) is { } keyed && KeyedFormEligible(list, keyed.KeyField))
+            {
+                EncodeKeyedList(keyed.Field, list, keyed.KeyField, level);
+                continue;
+            }
             EncodeMember(ToSnakeCase(prop.Name), prop.PropertyType, val, level);
         }
 
@@ -218,6 +231,63 @@ public class Encoder
             return false;
         }
         return false;
+    }
+
+    /// <summary>
+    /// The keyed repeated field behind the generated property
+    /// <paramref name="propertyName"/>, if it is one.
+    /// </summary>
+    private static (FieldDescriptor Field, FieldDescriptor KeyField)? KeyedFieldOf(MessageDescriptor? desc, string propertyName)
+    {
+        var fd = desc?.Fields.InDeclarationOrder().FirstOrDefault(f => f.PropertyName == propertyName);
+        if (fd == null) return null;
+        return Keyed.KeyField(fd) is { } keyFd ? (fd, keyFd) : null;
+    }
+
+    /// <summary>
+    /// The draft -01 condition for the keyed block form: every element's
+    /// key is present, non-empty, and distinct. Anything else can only be
+    /// represented in the anonymous list form.
+    /// </summary>
+    private static bool KeyedFormEligible(IList list, FieldDescriptor keyFd)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var elem in list)
+        {
+            var key = (string?)keyFd.Accessor.GetValue((IMessage)elem!);
+            if (string.IsNullOrEmpty(key) || !seen.Add(key)) return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Writes a keyed repeated field as a block of named blocks, in list
+    /// order. An entry name is bare when identifier-safe and quoted
+    /// otherwise; the key field is not repeated inside the entry.
+    /// </summary>
+    private void EncodeKeyedList(FieldDescriptor fd, IList list, FieldDescriptor keyFd, int level)
+    {
+        WriteIndent(level);
+        _sb.Append(fd.Name).Append(" {\n");
+        foreach (var elem in list)
+        {
+            var key = (string)keyFd.Accessor.GetValue((IMessage)elem!);
+            WriteIndent(level + 1);
+            if (Keyed.IdentSafeEntryName(key))
+            {
+                _sb.Append(key);
+            }
+            else
+            {
+                WriteQuotedString(_sb, key);
+            }
+            _sb.Append(" {\n");
+            EncodeMessage(elem!, level + 2, keyFd);
+            WriteIndent(level + 1);
+            _sb.Append("}\n");
+        }
+        WriteIndent(level);
+        _sb.Append("}\n");
     }
 
     private void EncodeListField(string name, IEnumerable? list, int level)
