@@ -137,6 +137,17 @@ public class PbTests
         Assert.Equal(exponent, got.Flt.Exponent);
     }
 
+    // Expected bytes from `protoc --encode`, wrapped in field 1.
+    [Fact]
+    public void TestZeroMagnitudeIsEmptyOnTheWire()
+    {
+        Assert.Equal(Convert.FromHexString("0a021002"),
+            Pb.Marshal(new ScaleMessage { Dec = new Decimal(BigInteger.Zero, 2, false) }));
+        // A BigFloat zero keeps prec and drops its exponent.
+        Assert.Equal(Convert.FromHexString("0a021835"),
+            Pb.Marshal(new ExponentMessage { Flt = new BigFloat(BigInteger.Zero, 3, 53, false) }));
+    }
+
     public class DictionaryMessage
     {
         [Protowire(1)] public Dictionary<string, string> Labels { get; set; } = new();

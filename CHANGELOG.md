@@ -19,6 +19,10 @@ format changes.
   port on every non-zero value: a wire scale of 2 read as 1, and 4096 as
   2048. **Bytes written by earlier versions read back wrong.** This is the
   bug protowire-go fixed in protowire-go#96 (STABILITY.md § v1.13).
+- **A zero magnitude is empty on the PB wire.** `Protowire.Pb` wrote a zero
+  `BigInt`, `Decimal.unscaled` or `BigFloat.mantissa` as one `0` byte, and
+  kept a `BigFloat` zero's exponent. A zero now has the one encoding
+  STABILITY.md § v1.13 describes. Earlier bytes still decode.
 
 ### Changed
 

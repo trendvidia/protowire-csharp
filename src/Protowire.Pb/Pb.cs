@@ -349,7 +349,7 @@ public static class Pb
         using var ms = new MemoryStream();
         using var output = new CodedOutputStream(ms);
         var abs = BigInteger.Abs(bi);
-        var bytes = abs.ToByteArray(isUnsigned: true, isBigEndian: true);
+        var bytes = MagnitudeBytes(abs);
         if (bytes.Length > 0)
         {
             output.WriteTag(WireFormat.MakeTag(1, WireFormat.WireType.LengthDelimited));
@@ -364,11 +364,16 @@ public static class Pb
         return ms.ToArray();
     }
 
+    // BigInteger.Zero's ToByteArray is one 0 byte; on the wire a zero
+    // magnitude is empty.
+    private static byte[] MagnitudeBytes(BigInteger magnitude) =>
+        magnitude.IsZero ? [] : magnitude.ToByteArray(isUnsigned: true, isBigEndian: true);
+
     private static byte[] MarshalDecimal(Decimal dec)
     {
         using var ms = new MemoryStream();
         using var output = new CodedOutputStream(ms);
-        var bytes = dec.Unscaled.ToByteArray(isUnsigned: true, isBigEndian: true);
+        var bytes = MagnitudeBytes(dec.Unscaled);
         if (bytes.Length > 0)
         {
             output.WriteTag(WireFormat.MakeTag(1, WireFormat.WireType.LengthDelimited));
@@ -410,13 +415,14 @@ public static class Pb
     {
         using var ms = new MemoryStream();
         using var output = new CodedOutputStream(ms);
-        var bytes = bf.Mantissa.ToByteArray(isUnsigned: true, isBigEndian: true);
+        var bytes = MagnitudeBytes(bf.Mantissa);
         if (bytes.Length > 0)
         {
             output.WriteTag(WireFormat.MakeTag(1, WireFormat.WireType.LengthDelimited));
             output.WriteBytes(ByteString.CopyFrom(bytes));
         }
-        if (bf.Exponent != 0)
+        // A zero has one encoding: an empty mantissa and exponent 0.
+        if (bf.Exponent != 0 && !bf.Mantissa.IsZero)
         {
             output.WriteTag(WireFormat.MakeTag(2, WireFormat.WireType.Varint));
             output.WriteInt32(bf.Exponent);
