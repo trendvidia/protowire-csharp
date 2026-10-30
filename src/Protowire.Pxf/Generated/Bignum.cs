@@ -32,9 +32,10 @@ namespace Protowire.Pxf {
             "c2NhbGUSGgoIbmVnYXRpdmUYAyABKAhSCG5lZ2F0aXZlInIKCEJpZ0Zsb2F0",
             "EhoKCG1hbnRpc3NhGAEgASgMUghtYW50aXNzYRIaCghleHBvbmVudBgCIAEo",
             "BVIIZXhwb25lbnQSEgoEcHJlYxgDIAEoDVIEcHJlYxIaCghuZWdhdGl2ZRgE",
-            "IAEoCFIIbmVnYXRpdmVCTAoHY29tLnB4ZkILQmlnbnVtUHJvdG9QAaICA1BY",
-            "WKoCDVByb3Rvd2lyZS5QeGbKAgNQeGbiAg9QeGZcR1BCTWV0YWRhdGHqAgNQ",
-            "eGZiBnByb3RvMw=="));
+            "IAEoCFIIbmVnYXRpdmVCcgoHY29tLnB4ZkILQmlnbnVtUHJvdG9QAVokZ2l0",
+            "aHViLmNvbS90cmVuZHZpZGlhL3Byb3Rvcy9weGY7cHhmogIDUFhYqgINUHJv",
+            "dG93aXJlLlB4ZsoCA1B4ZuICD1B4ZlxHUEJNZXRhZGF0YeoCA1B4ZmIGcHJv",
+            "dG8z"));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
@@ -565,9 +566,12 @@ namespace Protowire.Pxf {
   }
 
   /// <summary>
-  /// Arbitrary-precision binary floating point.
+  /// Arbitrary-precision binary floating point: value = (-1)^negative × mantissa × 2^exponent,
+  /// rounded to prec bits.
   /// Wire: unsigned big-endian integer mantissa + binary exponent + precision + sign flag.
-  /// PXF text: float literal with arbitrary mantissa precision.
+  /// PXF text: numeric literal with a precision suffix, "p" and a bit count
+  /// (e.g. "0.10000000000000001p53"), read at that precision, or at 256 bits
+  /// without one. See draft -01 § PXF Annotations.
   /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class BigFloat : pb::IMessage<BigFloat>
