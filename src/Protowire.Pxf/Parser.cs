@@ -522,16 +522,18 @@ public sealed class Parser
         switch (_current.Kind)
         {
             case TokenKind.EQUALS:
-                // `=` denotes a field assignment on a proto message; the key
-                // must be an identifier. Map-style keys (string / integer) are
-                // only valid with `:`.
-                if (keyKind != TokenKind.IDENT)
+                // `=` takes a field_entry name: an identifier, or a string
+                // (the quoted entry name of draft -01 "Keyed Repeated
+                // Fields"; well-formed everywhere, and the schema layer
+                // restricts it to keyed blocks). An integer key is only
+                // valid with `:`.
+                if (keyKind == TokenKind.INT)
                 {
-                    throw new PxfException(pos, $"field assignment with '=' requires an identifier key, got {keyKind} (\"{key}\"); use ':' for map entries");
+                    throw new PxfException(pos, $"field assignment with '=' requires an identifier or string key, got {keyKind} (\"{key}\"); use ':' for map entries");
                 }
                 Advance();
                 var val = ParseValue();
-                return new Assignment { Pos = pos, Key = key, Value = val, LeadingComments = leading };
+                return new Assignment { Pos = pos, Key = key, KeyQuoted = keyKind == TokenKind.STRING, Value = val, LeadingComments = leading };
 
             case TokenKind.COLON:
                 // Map entry. Only allowed inside a '{ ... }' block, never at
@@ -545,11 +547,11 @@ public sealed class Parser
                 return new MapEntry { Pos = pos, Key = key, Value = mapVal, LeadingComments = leading };
 
             case TokenKind.LBRACE:
-                // `{ ... }` denotes a submessage field; same identifier-only
-                // rule as `=` applies.
-                if (keyKind != TokenKind.IDENT)
+                // `{ ... }` is the block tail of a field_entry; same name
+                // rule as `=`.
+                if (keyKind == TokenKind.INT)
                 {
-                    throw new PxfException(pos, $"submessage block requires an identifier key, got {keyKind} (\"{key}\")");
+                    throw new PxfException(pos, $"submessage block requires an identifier or string key, got {keyKind} (\"{key}\")");
                 }
                 if (_depth >= MaxNestingDepth)
                 {
@@ -560,7 +562,7 @@ public sealed class Parser
                 {
                     Advance();
                     var entries = ParseBody();
-                    return new Block { Pos = pos, Name = key, Entries = entries, LeadingComments = leading };
+                    return new Block { Pos = pos, Name = key, NameQuoted = keyKind == TokenKind.STRING, Entries = entries, LeadingComments = leading };
                 }
                 finally
                 {

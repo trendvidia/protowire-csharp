@@ -19,6 +19,12 @@ namespace Protowire.Pxf;
 /// pass through literally so valid UTF-8 stays UTF-8.
 /// </para>
 ///
+/// <para>
+/// This pass has no schema, so quoted entry names stay quoted. The
+/// schema-aware <c>pxf fmt</c> pipeline runs
+/// <see cref="Keyed.Canonicalize"/> first.
+/// </para>
+///
 /// <para>Mirrors <c>protowire-go/encoding/pxf/format.go</c>.</para>
 /// </summary>
 public static class Format
@@ -48,7 +54,8 @@ public static class Format
                 case Assignment a:
                     WriteComments(sb, a.LeadingComments, level);
                     WriteIndent(sb, level);
-                    sb.Append(a.Key).Append(" = ");
+                    WriteEntryName(sb, a.Key, a.KeyQuoted);
+                    sb.Append(" = ");
                     FormatValue(sb, a.Value, level);
                     if (!string.IsNullOrEmpty(a.TrailingComment))
                     {
@@ -78,12 +85,29 @@ public static class Format
                 case Block b:
                     WriteComments(sb, b.LeadingComments, level);
                     WriteIndent(sb, level);
-                    sb.Append(b.Name).Append(" {\n");
+                    WriteEntryName(sb, b.Name, b.NameQuoted);
+                    sb.Append(" {\n");
                     FormatEntries(sb, b.Entries, level + 1);
                     WriteIndent(sb, level);
                     sb.Append("}\n");
                     break;
             }
+        }
+    }
+
+    /// <summary>
+    /// Writes a field-entry name as the source spelled it. Canonicalizing
+    /// the spelling needs the schema: see <see cref="Keyed.Canonicalize"/>.
+    /// </summary>
+    private static void WriteEntryName(StringBuilder sb, string name, bool quoted)
+    {
+        if (quoted)
+        {
+            Encoder.WriteQuotedString(sb, name);
+        }
+        else
+        {
+            sb.Append(name);
         }
     }
 
