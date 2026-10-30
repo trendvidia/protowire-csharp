@@ -28,6 +28,8 @@ format changes.
 
 ### Added
 
+- **Quoted entry names and keyed repeated fields** ([#15](https://github.com/trendvidia/protowire-csharp/issues/15), [trendvidia/protowire#116](https://github.com/trendvidia/protowire/issues/116)). The parser accepts a string as a field-entry name and the AST keeps the unquoted value plus `Assignment.KeyQuoted` / `Block.NameQuoted`, so `Format` reproduces the spelling. `(pxf.key)` = 1316 is back in `proto/pxf/annotations.proto`, and a repeated message field carrying it can be written as a block of named blocks: the entry name fills the key field and entry order is list order. The decoder rejects duplicate names (compared unquoted), an empty key in either surface form, an entry name that disagrees with an explicit key assignment, and a quoted name outside a keyed block, as `KeyedException` with a `KeyedErrorKind`. The encoder writes the keyed form whenever every key is present, non-empty and distinct, and the anonymous list form otherwise. `Keyed.Canonicalize` is the schema-aware half of fmt; run it before `Format.FormatDocument`. `Schema.ValidateDescriptor` and `Schema.ValidateFile` report misplaced `(pxf.key)` annotations across the import closure, and `Decoder` refuses such a schema. The pb and SBE wire outputs do not change. The cross-port fixtures from the spec repo's `testdata/keyed` are vendored under `tests/Protowire.Pxf.Tests/testdata/keyed` and all run.
+
 - `dump-envelope --pb FDS MESSAGE DOC` and `--sbe FDS MESSAGE DOC` (#26),
   the two legs of protowire's `cross_envelope_check.sh` that prove a port
   reads `(pxf.required)` = 1314, `(pxf.default)` = 1315 and the SBE
