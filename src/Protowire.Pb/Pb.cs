@@ -281,8 +281,10 @@ public static class Pb
             while ((etag = entryInput.ReadTag()) != 0)
             {
                 var enumNum = WireFormat.GetTagFieldNumber(etag);
-                if (enumNum == 1) key = UnmarshalField(entryInput, etag, keyType, null, zigzag, depth);
-                else if (enumNum == 2) val = UnmarshalField(entryInput, etag, valType, null, zigzag, depth);
+                // HARDENING.md § Recursion: a map entry is one descent, so a
+                // message value sits two below the map field's parent.
+                if (enumNum == 1) key = UnmarshalField(entryInput, etag, keyType, null, zigzag, depth + 1);
+                else if (enumNum == 2) val = UnmarshalField(entryInput, etag, valType, null, zigzag, depth + 1);
                 else entryInput.SkipLastField();
             }
             if (key != null) map[key] = val;

@@ -128,6 +128,7 @@ internal sealed class Tree
 {
     [Protowire(1)] public Tree? Child { get; set; }
     [Protowire(2)] public string Label { get; set; } = "";
+    [Protowire(3)] public List<Tree> Children { get; set; } = new();
 }
 
 internal sealed class StringHolder

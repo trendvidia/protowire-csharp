@@ -41,6 +41,17 @@ format changes.
   had no branch for `uint` or `ulong`, so a generated message with either
   was rejected with `unsupported type System.UInt64`; protowire's shared
   `sbe-bench.pxf` tripped it at `order_id`.
+- **Nesting depth counts every descent, from a root at depth 0** (#33,
+  HARDENING.md § Recursion). The PXF decoder did not count a `[`, so
+  `children = [{ … }]` nested twice as deep as the limit said, and it did
+  not bound a value skipped for an unknown field at all; both now count
+  from the enclosing body. An `Any` body written as `details { @type … }`
+  counted its one `{` twice, and so did the text parser for a directive
+  body, which rejected a document one level short of the limit. PB now
+  counts a map entry as a descent when its value is a message.
+  `check-decode`'s `Tree` gains the `children` field the corpus rows
+  `pxf/deep-nesting-lists-100` / `-101` use. Without it those rows were
+  skipped as an unknown field and never reached the list decoder.
 
 ## [1.0.0]
 
