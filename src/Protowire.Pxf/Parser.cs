@@ -190,20 +190,9 @@ public sealed class Parser
         if (_current.Kind == TokenKind.LBRACE)
         {
             int open = _current.Pos.Offset;
-            if (_depth >= MaxNestingDepth)
-            {
-                throw new PxfException(_current.Pos, $"nesting depth exceeds {MaxNestingDepth}");
-            }
-            _depth++;
-            try
-            {
-                // Parse the block to validate inner well-formedness.
-                ParseBlockVal();
-            }
-            finally
-            {
-                _depth--;
-            }
+            // Parse the block to validate inner well-formedness. ParseBlockVal
+            // counts this `{` as the one descent it is.
+            ParseBlockVal();
             int close = BraceScan.FindMatchingBrace(_lex.Input, open);
             if (close < 0)
             {
