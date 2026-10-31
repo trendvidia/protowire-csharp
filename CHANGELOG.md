@@ -11,6 +11,8 @@ format changes.
 
 ## [Unreleased]
 
+## [1.1.0]
+
 ### Fixed
 
 - **`pxf.Decimal.scale` and `pxf.BigFloat.exponent` are plain varints on the
