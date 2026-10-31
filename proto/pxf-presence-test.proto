@@ -6,6 +6,7 @@ syntax = "proto3";
 package presence.v1;
 
 import "pxf/annotations.proto";
+import "pxf/bignum.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
@@ -47,4 +48,12 @@ message Nested {
 
 message Inner {
   string label = 1 [(pxf.required) = true];
+}
+
+// Big-number fields on a generated message, which decode through a separate
+// path from the POCO one.
+message BigNumbers {
+  pxf.BigInt big_int = 1;
+  pxf.Decimal dec = 2;
+  pxf.BigFloat big_float = 3;
 }
