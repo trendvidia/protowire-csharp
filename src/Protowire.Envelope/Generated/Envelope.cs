@@ -38,11 +38,11 @@ namespace Protowire.Envelopes.V1 {
             "IAEoCVIDa2V5EhQKBXZhbHVlGAIgASgJUgV2YWx1ZToCOAEiZAoKRmllbGRF",
             "cnJvchIUCgVmaWVsZBgBIAEoCVIFZmllbGQSEgoEY29kZRgCIAEoCVIEY29k",
             "ZRIYCgdtZXNzYWdlGAMgASgJUgdtZXNzYWdlEhIKBGFyZ3MYBCADKAlSBGFy",
-            "Z3NCrgEKD2NvbS5lbnZlbG9wZS52MUINRW52ZWxvcGVQcm90b1ABWjRnaXRo",
-            "dWIuY29tL3RyZW5kdmlkaWEvcHJvdG93aXJlL2VudmVsb3BlL3YxO2VudmVs",
-            "b3BlogIDRVhYqgIWUHJvdG93aXJlLkVudmVsb3Blcy5WMcoCC0VudmVsb3Bl",
-            "XFYx4gIXRW52ZWxvcGVcVjFcR1BCTWV0YWRhdGHqAgxFbnZlbG9wZTo6VjFi",
-            "BnByb3RvMw=="));
+            "Z3NCrQEKD2NvbS5lbnZlbG9wZS52MUINRW52ZWxvcGVQcm90b1ABWjNnaXRo",
+            "dWIuY29tL3RyZW5kdmlkaWEvcHJvdG9zL2VudmVsb3BlL3YxO2VudmVsb3Bl",
+            "djGiAgNFWFiqAhZQcm90b3dpcmUuRW52ZWxvcGVzLlYxygILRW52ZWxvcGVc",
+            "VjHiAhdFbnZlbG9wZVxWMVxHUEJNZXRhZGF0YeoCDEVudmVsb3BlOjpWMWIG",
+            "cHJvdG8z"));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
