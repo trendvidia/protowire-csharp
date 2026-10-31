@@ -36,6 +36,14 @@ format changes.
   has no table row for. `tool/generate.sh --check` runs in CI and fails on
   drift, a missing header, or an orphaned binding. The four committed
   stray copies are removed.
+- **A map's `{` and every PB map entry count toward the nesting limit**
+  (protowire#449, HARDENING.md § Recursion). The PXF decoder did not count
+  a map's own `{`, and PB counted neither a map entry nor anything about a
+  scalar-valued one, so maps could nest past the limit in both. This
+  narrows what decodes: a document nesting maps past 50 levels is now
+  rejected, as it is by the text parser here and by protowire-go.
+  `check-decode`'s `Tree` gains `branches` and `tags`. Without them the
+  corpus rows for this were skipped as unknown fields and tested nothing.
 
 ### Added
 
@@ -50,10 +58,31 @@ format changes.
 
 ### Fixed
 
+- **`MaxNumericLiteralDigits` is enforced** (#34, HARDENING.md § Mandatory
+  limits). The port had no digit cap, so a big-number literal of any length
+  reached `BigInteger.Parse`, on generated messages, POCOs and
+  `(pxf.default)` strings alike. A `pxf.BigInt`, `pxf.Decimal` or
+  `pxf.BigFloat` literal of exactly 4096 significant digits now decodes and
+  one digit more is rejected naming the limit. Leading zeros, the sign, the
+  point, an exponent and a precision suffix are not counted (protowire#410).
+  A `pxf.Decimal` literal's scale is bounded by the same number.
+  `check-decode` links `adversarial.v1.BigNumHolder`. It did not, so
+  `pxf/long-numeric` was rejected as an unknown schema, never by a cap.
 - **`uint32` / `uint64` fields decode** (#26). The reflection decode path
   had no branch for `uint` or `ulong`, so a generated message with either
   was rejected with `unsupported type System.UInt64`; protowire's shared
   `sbe-bench.pxf` tripped it at `order_id`.
+- **Nesting depth counts every descent, from a root at depth 0** (#33,
+  HARDENING.md § Recursion). The PXF decoder did not count a `[`, so
+  `children = [{ … }]` nested twice as deep as the limit said, and it did
+  not bound a value skipped for an unknown field at all; both now count
+  from the enclosing body. An `Any` body written as `details { @type … }`
+  counted its one `{` twice, and so did the text parser for a directive
+  body, which rejected a document one level short of the limit. PB now
+  counts a map entry as a descent when its value is a message.
+  `check-decode`'s `Tree` gains the `children` field the corpus rows
+  `pxf/deep-nesting-lists-100` / `-101` use. Without it those rows were
+  skipped as an unknown field and never reached the list decoder.
 
 ## [1.0.0]
 
