@@ -1,0 +1,13 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 TrendVidia, LLC.
+// Clean itself is conformant. The violation is in a file it imports, and the
+// bind-time scope is the import closure.
+syntax = "proto3";
+package required_default.v1;
+
+import "pxf-required-default-test.proto";
+
+message Clean {
+  string s = 1;
+  RequiredWithDefault imported = 2;
+}
