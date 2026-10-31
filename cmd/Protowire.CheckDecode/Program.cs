@@ -21,7 +21,7 @@
 // `protowire-rust/crates/check-decode/src/main.rs`.
 //
 // The C# port's PXF and PB decoders consume hand-written POCOs annotated
-// with `[Protowire(N)]`, so the four adversarial schemas are mirrored as
+// with `[Protowire(N)]`, so the adversarial schemas are mirrored as
 // POCOs below. Drift between this file and adversarial.proto must be caught
 // by the conformance run itself: a wrong field number flips the manifest's
 // accept/reject expectations.
@@ -115,6 +115,7 @@ internal static class CheckDecode
         "adversarial.v1.StringHolder" => new StringHolder(),
         "adversarial.v1.BytesHolder" => new BytesHolder(),
         "adversarial.v1.BigIntHolder" => new BigIntHolder(),
+        "adversarial.v1.BigNumHolder" => new BigNumHolder(),
         _ => throw new ArgumentException($"unknown schema: {schema}"),
     };
 }
@@ -126,6 +127,8 @@ internal static class CheckDecode
 
 internal sealed class Tree
 {
+    [Protowire(4)] public Dictionary<string, Tree> Branches { get; set; } = new();
+    [Protowire(5)] public Dictionary<string, string> Tags { get; set; } = new();
     [Protowire(1)] public Tree? Child { get; set; }
     [Protowire(2)] public string Label { get; set; } = "";
     [Protowire(3)] public List<Tree> Children { get; set; } = new();
@@ -144,4 +147,11 @@ internal sealed class BytesHolder
 internal sealed class BigIntHolder
 {
     [Protowire(1)] public long Value { get; set; }
+}
+
+internal sealed class BigNumHolder
+{
+    [Protowire(1)] public System.Numerics.BigInteger BigInt { get; set; }
+    [Protowire(2)] public Protowire.Pb.Decimal? Decimal { get; set; }
+    [Protowire(3)] public Protowire.Pb.BigFloat? BigFloat { get; set; }
 }
