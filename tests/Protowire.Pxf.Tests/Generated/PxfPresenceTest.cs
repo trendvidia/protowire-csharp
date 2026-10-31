@@ -27,44 +27,48 @@ namespace Protowire.Pxf.Tests.Presence {
       byte[] descriptorData = global::System.Convert.FromBase64String(
           string.Concat(
             "ChdweGYtcHJlc2VuY2UtdGVzdC5wcm90bxILcHJlc2VuY2UudjEaFXB4Zi9h",
-            "bm5vdGF0aW9ucy5wcm90bxoeZ29vZ2xlL3Byb3RvYnVmL2R1cmF0aW9uLnBy",
-            "b3RvGiBnb29nbGUvcHJvdG9idWYvZmllbGRfbWFzay5wcm90bxofZ29vZ2xl",
-            "L3Byb3RvYnVmL3RpbWVzdGFtcC5wcm90bxoeZ29vZ2xlL3Byb3RvYnVmL3dy",
-            "YXBwZXJzLnByb3RvIqcBCgRVc2VyEhcKBG5hbWUYASABKAlCA5BSAVIEbmFt",
-            "ZRIdCgRyb2xlGAIgASgJQgmaUgZ2aWV3ZXJSBHJvbGUSIAoIcHJpb3JpdHkY",
-            "AyABKAVCBJpSATVSCHByaW9yaXR5EhQKBWFkbWluGAQgASgIUgVhZG1pbhIv",
-            "CgVfbnVsbBhjIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5GaWVsZE1hc2tSBE51",
-            "bGwi5wMKCERlZmF1bHRzEhYKAXMYASABKAlCCJpSBWhlbGxvUgFzEhUKAWIY",
-            "AiABKAhCB5pSBHRydWVSAWISFwoDaTMyGAMgASgFQgWaUgItN1IDaTMyEh8K",
-            "A2k2NBgEIAEoA0INmlIKOTAwMDAwMDAwMFIDaTY0EhcKA3UzMhgFIAEoDUIF",
-            "mlICNDJSA3UzMhIgCgN1NjQYBiABKARCDppSCzE4MDAwMDAwMDAwUgN1NjQS",
-            "GAoDZjMyGAcgASgCQgaaUgMwLjVSA2YzMhIYCgNmNjQYCCABKAFCBppSAzIu",
-            "NVIDZjY0EhcKAmJ5GAkgASgMQgeaUgRBUUlEUgJieRIwCgVjb2xvchgKIAEo",
-            "DjISLnByZXNlbmNlLnYxLkNvbG9yQgaaUgNSRURSBWNvbG9yEkMKAnRzGAsg",
-            "ASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIXmlIUMjAyNC0wMS0w",
-            "MlQwMzowNDowNVpSAnRzEjUKA2R1chgMIAEoCzIZLmdvb2dsZS5wcm90b2J1",
-            "Zi5EdXJhdGlvbkIImlIFMWgzMG1SA2R1chI8Cgd3cmFwcGVkGA0gASgLMhsu",
-            "Z29vZ2xlLnByb3RvYnVmLkludDMyVmFsdWVCBZpSAjk5Ugd3cmFwcGVkIjIK",
-            "Bk5lc3RlZBIoCgVpbm5lchgBIAEoCzISLnByZXNlbmNlLnYxLklubmVyUgVp",
-            "bm5lciIiCgVJbm5lchIZCgVsYWJlbBgBIAEoCUIDkFIBUgVsYWJlbCIvCglL",
-            "ZXllZEl0ZW0SDgoCaWQYASABKAlSAmlkEhIKBG5vdGUYAiABKAlSBG5vdGUi",
-            "iAEKC0tleWVkUGFyZW50EhMKAmlkGAEgASgJQgOQUgFSAmlkEjMKBWl0ZW1z",
-            "GAIgAygLMhYucHJlc2VuY2UudjEuS2V5ZWRJdGVtQgWiUgJpZFIFaXRlbXMS",
-            "LwoFX251bGwYYyABKAsyGi5nb29nbGUucHJvdG9idWYuRmllbGRNYXNrUgRO",
-            "dWxsKjIKBUNvbG9yEhUKEUNPTE9SX1VOU1BFQ0lGSUVEEAASBwoDUkVEEAES",
-            "CQoFR1JFRU4QAkKFAQoPY29tLnByZXNlbmNlLnYxQhRQeGZQcmVzZW5jZVRl",
-            "c3RQcm90b1ABogIDUFhYqgIcUHJvdG93aXJlLlB4Zi5UZXN0cy5QcmVzZW5j",
-            "ZcoCC1ByZXNlbmNlXFYx4gIXUHJlc2VuY2VcVjFcR1BCTWV0YWRhdGHqAgxQ",
-            "cmVzZW5jZTo6VjFiBnByb3RvMw=="));
+            "bm5vdGF0aW9ucy5wcm90bxoQcHhmL2JpZ251bS5wcm90bxoeZ29vZ2xlL3By",
+            "b3RvYnVmL2R1cmF0aW9uLnByb3RvGiBnb29nbGUvcHJvdG9idWYvZmllbGRf",
+            "bWFzay5wcm90bxofZ29vZ2xlL3Byb3RvYnVmL3RpbWVzdGFtcC5wcm90bxoe",
+            "Z29vZ2xlL3Byb3RvYnVmL3dyYXBwZXJzLnByb3RvIqcBCgRVc2VyEhcKBG5h",
+            "bWUYASABKAlCA5BSAVIEbmFtZRIdCgRyb2xlGAIgASgJQgmaUgZ2aWV3ZXJS",
+            "BHJvbGUSIAoIcHJpb3JpdHkYAyABKAVCBJpSATVSCHByaW9yaXR5EhQKBWFk",
+            "bWluGAQgASgIUgVhZG1pbhIvCgVfbnVsbBhjIAEoCzIaLmdvb2dsZS5wcm90",
+            "b2J1Zi5GaWVsZE1hc2tSBE51bGwi5wMKCERlZmF1bHRzEhYKAXMYASABKAlC",
+            "CJpSBWhlbGxvUgFzEhUKAWIYAiABKAhCB5pSBHRydWVSAWISFwoDaTMyGAMg",
+            "ASgFQgWaUgItN1IDaTMyEh8KA2k2NBgEIAEoA0INmlIKOTAwMDAwMDAwMFID",
+            "aTY0EhcKA3UzMhgFIAEoDUIFmlICNDJSA3UzMhIgCgN1NjQYBiABKARCDppS",
+            "CzE4MDAwMDAwMDAwUgN1NjQSGAoDZjMyGAcgASgCQgaaUgMwLjVSA2YzMhIY",
+            "CgNmNjQYCCABKAFCBppSAzIuNVIDZjY0EhcKAmJ5GAkgASgMQgeaUgRBUUlE",
+            "UgJieRIwCgVjb2xvchgKIAEoDjISLnByZXNlbmNlLnYxLkNvbG9yQgaaUgNS",
+            "RURSBWNvbG9yEkMKAnRzGAsgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVz",
+            "dGFtcEIXmlIUMjAyNC0wMS0wMlQwMzowNDowNVpSAnRzEjUKA2R1chgMIAEo",
+            "CzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkIImlIFMWgzMG1SA2R1chI8",
+            "Cgd3cmFwcGVkGA0gASgLMhsuZ29vZ2xlLnByb3RvYnVmLkludDMyVmFsdWVC",
+            "BZpSAjk5Ugd3cmFwcGVkIjIKBk5lc3RlZBIoCgVpbm5lchgBIAEoCzISLnBy",
+            "ZXNlbmNlLnYxLklubmVyUgVpbm5lciIiCgVJbm5lchIZCgVsYWJlbBgBIAEo",
+            "CUIDkFIBUgVsYWJlbCIvCglLZXllZEl0ZW0SDgoCaWQYASABKAlSAmlkEhIK",
+            "BG5vdGUYAiABKAlSBG5vdGUiiAEKC0tleWVkUGFyZW50EhMKAmlkGAEgASgJ",
+            "QgOQUgFSAmlkEjMKBWl0ZW1zGAIgAygLMhYucHJlc2VuY2UudjEuS2V5ZWRJ",
+            "dGVtQgWiUgJpZFIFaXRlbXMSLwoFX251bGwYYyABKAsyGi5nb29nbGUucHJv",
+            "dG9idWYuRmllbGRNYXNrUgROdWxsIn4KCkJpZ051bWJlcnMSJAoHYmlnX2lu",
+            "dBgBIAEoCzILLnB4Zi5CaWdJbnRSBmJpZ0ludBIeCgNkZWMYAiABKAsyDC5w",
+            "eGYuRGVjaW1hbFIDZGVjEioKCWJpZ19mbG9hdBgDIAEoCzINLnB4Zi5CaWdG",
+            "bG9hdFIIYmlnRmxvYXQqMgoFQ29sb3ISFQoRQ09MT1JfVU5TUEVDSUZJRUQQ",
+            "ABIHCgNSRUQQARIJCgVHUkVFThACQoUBCg9jb20ucHJlc2VuY2UudjFCFFB4",
+            "ZlByZXNlbmNlVGVzdFByb3RvUAGiAgNQWFiqAhxQcm90b3dpcmUuUHhmLlRl",
+            "c3RzLlByZXNlbmNlygILUHJlc2VuY2VcVjHiAhdQcmVzZW5jZVxWMVxHUEJN",
+            "ZXRhZGF0YeoCDFByZXNlbmNlOjpWMWIGcHJvdG8z"));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
-          new pbr::FileDescriptor[] { global::Protowire.Pxf.AnnotationsReflection.Descriptor, global::Google.Protobuf.WellKnownTypes.DurationReflection.Descriptor, global::Google.Protobuf.WellKnownTypes.FieldMaskReflection.Descriptor, global::Google.Protobuf.WellKnownTypes.TimestampReflection.Descriptor, global::Google.Protobuf.WellKnownTypes.WrappersReflection.Descriptor, },
+          new pbr::FileDescriptor[] { global::Protowire.Pxf.AnnotationsReflection.Descriptor, global::Protowire.Pxf.BignumReflection.Descriptor, global::Google.Protobuf.WellKnownTypes.DurationReflection.Descriptor, global::Google.Protobuf.WellKnownTypes.FieldMaskReflection.Descriptor, global::Google.Protobuf.WellKnownTypes.TimestampReflection.Descriptor, global::Google.Protobuf.WellKnownTypes.WrappersReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(new[] {typeof(global::Protowire.Pxf.Tests.Presence.Color), }, null, new pbr::GeneratedClrTypeInfo[] {
             new pbr::GeneratedClrTypeInfo(typeof(global::Protowire.Pxf.Tests.Presence.User), global::Protowire.Pxf.Tests.Presence.User.Parser, new[]{ "Name", "Role", "Priority", "Admin", "Null" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Protowire.Pxf.Tests.Presence.Defaults), global::Protowire.Pxf.Tests.Presence.Defaults.Parser, new[]{ "S", "B", "I32", "I64", "U32", "U64", "F32", "F64", "By", "Color", "Ts", "Dur", "Wrapped" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Protowire.Pxf.Tests.Presence.Nested), global::Protowire.Pxf.Tests.Presence.Nested.Parser, new[]{ "Inner" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Protowire.Pxf.Tests.Presence.Inner), global::Protowire.Pxf.Tests.Presence.Inner.Parser, new[]{ "Label" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Protowire.Pxf.Tests.Presence.KeyedItem), global::Protowire.Pxf.Tests.Presence.KeyedItem.Parser, new[]{ "Id", "Note" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Protowire.Pxf.Tests.Presence.KeyedParent), global::Protowire.Pxf.Tests.Presence.KeyedParent.Parser, new[]{ "Id", "Items", "Null" }, null, null, null, null)
+            new pbr::GeneratedClrTypeInfo(typeof(global::Protowire.Pxf.Tests.Presence.KeyedParent), global::Protowire.Pxf.Tests.Presence.KeyedParent.Parser, new[]{ "Id", "Items", "Null" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Protowire.Pxf.Tests.Presence.BigNumbers), global::Protowire.Pxf.Tests.Presence.BigNumbers.Parser, new[]{ "BigInt", "Dec", "BigFloat" }, null, null, null, null)
           }));
     }
     #endregion
@@ -2008,6 +2012,309 @@ namespace Protowire.Pxf.Tests.Presence {
               Null = new global::Google.Protobuf.WellKnownTypes.FieldMask();
             }
             input.ReadMessage(Null);
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  /// <summary>
+  /// Big-number fields on a generated message, which decode through a separate
+  /// path from the POCO one.
+  /// </summary>
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class BigNumbers : pb::IMessage<BigNumbers>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<BigNumbers> _parser = new pb::MessageParser<BigNumbers>(() => new BigNumbers());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<BigNumbers> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::Protowire.Pxf.Tests.Presence.PxfPresenceTestReflection.Descriptor.MessageTypes[6]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public BigNumbers() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public BigNumbers(BigNumbers other) : this() {
+      bigInt_ = other.bigInt_ != null ? other.bigInt_.Clone() : null;
+      dec_ = other.dec_ != null ? other.dec_.Clone() : null;
+      bigFloat_ = other.bigFloat_ != null ? other.bigFloat_.Clone() : null;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public BigNumbers Clone() {
+      return new BigNumbers(this);
+    }
+
+    /// <summary>Field number for the "big_int" field.</summary>
+    public const int BigIntFieldNumber = 1;
+    private global::Protowire.Pxf.BigInt bigInt_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Protowire.Pxf.BigInt BigInt {
+      get { return bigInt_; }
+      set {
+        bigInt_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "dec" field.</summary>
+    public const int DecFieldNumber = 2;
+    private global::Protowire.Pxf.Decimal dec_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Protowire.Pxf.Decimal Dec {
+      get { return dec_; }
+      set {
+        dec_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "big_float" field.</summary>
+    public const int BigFloatFieldNumber = 3;
+    private global::Protowire.Pxf.BigFloat bigFloat_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Protowire.Pxf.BigFloat BigFloat {
+      get { return bigFloat_; }
+      set {
+        bigFloat_ = value;
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as BigNumbers);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(BigNumbers other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (!object.Equals(BigInt, other.BigInt)) return false;
+      if (!object.Equals(Dec, other.Dec)) return false;
+      if (!object.Equals(BigFloat, other.BigFloat)) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (bigInt_ != null) hash ^= BigInt.GetHashCode();
+      if (dec_ != null) hash ^= Dec.GetHashCode();
+      if (bigFloat_ != null) hash ^= BigFloat.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (bigInt_ != null) {
+        output.WriteRawTag(10);
+        output.WriteMessage(BigInt);
+      }
+      if (dec_ != null) {
+        output.WriteRawTag(18);
+        output.WriteMessage(Dec);
+      }
+      if (bigFloat_ != null) {
+        output.WriteRawTag(26);
+        output.WriteMessage(BigFloat);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (bigInt_ != null) {
+        output.WriteRawTag(10);
+        output.WriteMessage(BigInt);
+      }
+      if (dec_ != null) {
+        output.WriteRawTag(18);
+        output.WriteMessage(Dec);
+      }
+      if (bigFloat_ != null) {
+        output.WriteRawTag(26);
+        output.WriteMessage(BigFloat);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (bigInt_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(BigInt);
+      }
+      if (dec_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Dec);
+      }
+      if (bigFloat_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(BigFloat);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(BigNumbers other) {
+      if (other == null) {
+        return;
+      }
+      if (other.bigInt_ != null) {
+        if (bigInt_ == null) {
+          BigInt = new global::Protowire.Pxf.BigInt();
+        }
+        BigInt.MergeFrom(other.BigInt);
+      }
+      if (other.dec_ != null) {
+        if (dec_ == null) {
+          Dec = new global::Protowire.Pxf.Decimal();
+        }
+        Dec.MergeFrom(other.Dec);
+      }
+      if (other.bigFloat_ != null) {
+        if (bigFloat_ == null) {
+          BigFloat = new global::Protowire.Pxf.BigFloat();
+        }
+        BigFloat.MergeFrom(other.BigFloat);
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            if (bigInt_ == null) {
+              BigInt = new global::Protowire.Pxf.BigInt();
+            }
+            input.ReadMessage(BigInt);
+            break;
+          }
+          case 18: {
+            if (dec_ == null) {
+              Dec = new global::Protowire.Pxf.Decimal();
+            }
+            input.ReadMessage(Dec);
+            break;
+          }
+          case 26: {
+            if (bigFloat_ == null) {
+              BigFloat = new global::Protowire.Pxf.BigFloat();
+            }
+            input.ReadMessage(BigFloat);
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            if (bigInt_ == null) {
+              BigInt = new global::Protowire.Pxf.BigInt();
+            }
+            input.ReadMessage(BigInt);
+            break;
+          }
+          case 18: {
+            if (dec_ == null) {
+              Dec = new global::Protowire.Pxf.Decimal();
+            }
+            input.ReadMessage(Dec);
+            break;
+          }
+          case 26: {
+            if (bigFloat_ == null) {
+              BigFloat = new global::Protowire.Pxf.BigFloat();
+            }
+            input.ReadMessage(BigFloat);
             break;
           }
         }

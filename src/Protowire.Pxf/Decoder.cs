@@ -17,6 +17,13 @@ public class Decoder
     // attacker input. Matches the cross-port default.
     private const int MaxNestingDepth = 100;
 
+    // HARDENING.md § Mandatory limits — bounds the superlinear big-number
+    // parsers. Counts a literal's significant mantissa digits only (#410),
+    // and is enforced at each big-number parse rather than in the lexer so
+    // that a (pxf.default) string, which never passes the lexer, is under
+    // it too. It also bounds the scale of a pxf.Decimal literal.
+    private const int MaxNumericLiteralDigits = 4096;
+
     private Lexer _lex = null!;
     private Token _current = null!;
     private Result? _result;
@@ -84,9 +91,15 @@ public class Decoder
 
     private void ParseInto(string data, object obj)
     {
+        // The schema is refused here, before any document is read, so the
+        // outcome does not depend on which fields the document supplies.
         if (obj is IMessage bound)
         {
             Schema.EnsureBindable(bound.Descriptor);
+        }
+        else
+        {
+            Schema.EnsureBindable(obj.GetType());
         }
         _lex = new Lexer(data);
         Advance();
@@ -508,14 +521,22 @@ public class Decoder
         }
     }
 
-    private void DecodeFields(object obj, bool inBlock)
+    // HARDENING.md § Recursion: the root message is depth 0 and every `{`
+    // or `[` is one descent, so a document exactly MaxNestingDepth deep is
+    // accepted and one deeper is rejected. Parser counts the same way.
+    private void EnterDescent()
     {
-        if (inBlock && _depth >= MaxNestingDepth)
+        if (_depth >= MaxNestingDepth)
         {
             throw new PxfException(_current.Pos,
                 $"nesting depth exceeds {MaxNestingDepth}");
         }
-        if (inBlock) _depth++;
+        _depth++;
+    }
+
+    private void DecodeFields(object obj, bool inBlock)
+    {
+        if (inBlock) EnterDescent();
         try
         {
             DecodeFieldsBody(obj, inBlock);
@@ -573,8 +594,10 @@ public class Decoder
                     var desc = Registry.Find(typeName);
                     if (desc == null) throw new PxfException(pos, $"type \"{typeName}\" not found in registry");
 
+                    // The body shares the Any's braces, which the enclosing
+                    // DecodeFields has already counted as one descent.
                     var unpackedMsg = desc.Parser.ParseFrom(Array.Empty<byte>());
-                    DecodeFields(unpackedMsg, true);
+                    DecodeFieldsBody(unpackedMsg, true);
 
                     var typeUrlProp = any.GetType().GetProperty("TypeUrl");
                     var valueProp = any.GetType().GetProperty("Value");
@@ -648,8 +671,7 @@ public class Decoder
                 }
                 else if (_current.Kind == TokenKind.LBRACE)
                 {
-                    Advance();
-                    SkipBraced();
+                    SkipValue();
                 }
                 continue;
             }
@@ -878,6 +900,7 @@ public class Decoder
         {
             if (WellKnown.IsBigInt(fd.MessageType))
             {
+                CheckLiteralDigits(_current.Value, pos);
                 var bi = System.Numerics.BigInteger.Parse(_current.Value);
                 Advance();
                 var msg = currentVal ?? Activator.CreateInstance(type)!;
@@ -887,6 +910,7 @@ public class Decoder
             if (WellKnown.IsDecimal(fd.MessageType))
             {
                 var s = _current.Value;
+                CheckLiteralDigits(s, pos);
                 bool negative = s.StartsWith('-');
                 if (negative) s = s[1..];
                 int dotIdx = s.IndexOf('.');
@@ -896,6 +920,7 @@ public class Decoder
                     scale = s.Length - dotIdx - 1;
                     s = s.Remove(dotIdx, 1);
                 }
+                CheckDecimalScale(scale, pos);
                 var unscaled = System.Numerics.BigInteger.Parse(s);
                 Advance();
                 var msg = currentVal ?? Activator.CreateInstance(type)!;
@@ -905,6 +930,7 @@ public class Decoder
             if (WellKnown.IsBigFloat(fd.MessageType))
             {
                 var s = _current.Value;
+                CheckLiteralDigits(s, pos);
                 bool negative = s.StartsWith('-');
                 if (negative) s = s[1..];
                 int dotIdx = s.IndexOf('.');
@@ -925,6 +951,7 @@ public class Decoder
         if (type == typeof(System.Numerics.BigInteger))
         {
             var s = _current.Value.Trim();
+            CheckLiteralDigits(s, pos);
             var bi = System.Numerics.BigInteger.Parse(s);
             Advance();
             return bi;
@@ -932,6 +959,7 @@ public class Decoder
         if (type == typeof(Protowire.Pb.Decimal))
         {
             var s = _current.Value.Trim();
+            CheckLiteralDigits(s, pos);
             bool negative = s.StartsWith('-');
             if (negative) s = s[1..];
             int dotIdx = s.IndexOf('.');
@@ -941,6 +969,7 @@ public class Decoder
                 scale = s.Length - dotIdx - 1;
                 s = s.Remove(dotIdx, 1);
             }
+            CheckDecimalScale(scale, pos);
             if (string.IsNullOrEmpty(s)) s = "0";
             var unscaled = System.Numerics.BigInteger.Parse(s);
             Advance();
@@ -950,6 +979,7 @@ public class Decoder
         {
             // Simple parsing for now: treat as decimal and convert
             var s = _current.Value.Trim();
+            CheckLiteralDigits(s, pos);
             bool negative = s.StartsWith('-');
             if (negative) s = s[1..];
             int dotIdx = s.IndexOf('.');
@@ -1104,6 +1134,19 @@ public class Decoder
     private object DecodeList(Type type, FieldDescriptor? fd, IEnumerable? currentList)
     {
         if (_current.Kind != TokenKind.LBRACKET) throw new PxfException(_current.Pos, "expected '['");
+        EnterDescent();
+        try
+        {
+            return DecodeListBody(type, fd, currentList);
+        }
+        finally
+        {
+            _depth--;
+        }
+    }
+
+    private object DecodeListBody(Type type, FieldDescriptor? fd, IEnumerable? currentList)
+    {
         Advance();
 
         var itemType = type.IsArray ? type.GetElementType()! : type.GetGenericArguments()[0];
@@ -1154,6 +1197,26 @@ public class Decoder
     private IDictionary DecodeMap(Type type, FieldDescriptor? fd, IDictionary? currentMap)
     {
         if (_current.Kind != TokenKind.LBRACE) throw new PxfException(_current.Pos, "expected '{'");
+        // HARDENING.md § Recursion: a map's `{` is a descent like any other,
+        // whether or not its values are messages.
+        if (_depth >= MaxNestingDepth)
+        {
+            throw new PxfException(_current.Pos,
+                $"nesting depth exceeds {MaxNestingDepth}");
+        }
+        _depth++;
+        try
+        {
+            return DecodeMapBody(type, currentMap);
+        }
+        finally
+        {
+            _depth--;
+        }
+    }
+
+    private IDictionary DecodeMapBody(Type type, IDictionary? currentMap)
+    {
         Advance();
         var keyType = type.GetGenericArguments()[0];
         var valType = type.GetGenericArguments()[1];
@@ -1310,7 +1373,7 @@ public class Decoder
     ///
     /// <para>Mirrors <c>applyMessageDefault</c> in <c>decode_fast.go</c>.</para>
     /// </summary>
-    private static void ApplyMessageDefault(IMessage msg, FieldDescriptor fd, string def)
+    internal static void ApplyMessageDefault(IMessage msg, FieldDescriptor fd, string def)
     {
         var mdesc = fd.MessageType;
 
@@ -1339,6 +1402,7 @@ public class Decoder
         }
         else if (WellKnown.IsBigInt(mdesc))
         {
+            CheckLiteralDigits(def, Position.Empty);
             WellKnown.SetBigInt(sub, System.Numerics.BigInteger.Parse(def, CultureInfo.InvariantCulture));
         }
         else if (WellKnown.IsDecimal(mdesc))
@@ -1378,6 +1442,7 @@ public class Decoder
 
     private static Protowire.Pb.Decimal ParseDecimalLiteral(string s)
     {
+        CheckLiteralDigits(s, Position.Empty);
         bool negative = s.StartsWith('-');
         if (negative) s = s[1..];
         int dot = s.IndexOf('.');
@@ -1387,6 +1452,7 @@ public class Decoder
             scale = s.Length - dot - 1;
             s = s.Remove(dot, 1);
         }
+        CheckDecimalScale(scale, Position.Empty);
         if (s.Length == 0) s = "0";
         return new Protowire.Pb.Decimal(
             System.Numerics.BigInteger.Parse(s, CultureInfo.InvariantCulture), scale, negative);
@@ -1394,6 +1460,7 @@ public class Decoder
 
     private static Protowire.Pb.BigFloat ParseBigFloatLiteral(string s)
     {
+        CheckLiteralDigits(s, Position.Empty);
         bool negative = s.StartsWith('-');
         if (negative) s = s[1..];
         int dot = s.IndexOf('.');
@@ -1407,6 +1474,48 @@ public class Decoder
         return new Protowire.Pb.BigFloat(
             System.Numerics.BigInteger.Parse(s, CultureInfo.InvariantCulture),
             -scale, (uint)s.Length, negative);
+    }
+
+    // Rejects a literal past MaxNumericLiteralDigits before it reaches a
+    // big-number parser. A literal no longer than the limit needs no count.
+    private static void CheckLiteralDigits(string s, Position pos)
+    {
+        if (s.Length <= MaxNumericLiteralDigits) return;
+        int n = CountDigits(s);
+        if (n > MaxNumericLiteralDigits)
+        {
+            throw new PxfException(pos,
+                $"numeric literal has {n} digits; MaxNumericLiteralDigits={MaxNumericLiteralDigits}");
+        }
+    }
+
+    // What MaxNumericLiteralDigits counts: the significant digits of a
+    // literal's mantissa, either side of the point, leading zeros excluded.
+    // An exponent and a precision suffix are not counted, so the count stops
+    // at either marker (HARDENING.md § Mandatory limits, protowire#410).
+    internal static int CountDigits(string s)
+    {
+        int n = 0;
+        bool leading = true;
+        foreach (char c in s)
+        {
+            if (c == 'e' || c == 'E' || c == 'p') break;
+            if (c < '0' || c > '9' || (leading && c == '0')) continue;
+            leading = false;
+            n++;
+        }
+        return n;
+    }
+
+    // Leading zeros do not count as digits, so "0.000…1" is one digit however
+    // many places it has; its scale is bounded here, as on the PB wire.
+    private static void CheckDecimalScale(int scale, Position pos)
+    {
+        if (scale > MaxNumericLiteralDigits)
+        {
+            throw new PxfException(pos,
+                $"pxf.Decimal scale {scale} exceeds MaxNumericLiteralDigits={MaxNumericLiteralDigits}");
+        }
     }
 
     private bool IsDefaultValue(Type type, object? val)
@@ -1430,43 +1539,37 @@ public class Decoder
         return normalizedMember == normalizedKey;
     }
 
+    // Skips a value the target has no member for. Iterative, so a skipped
+    // value costs no stack, but it is bounded like a decoded one: the
+    // counter starts from the depth of the enclosing body and `{` and `[`
+    // count alike (HARDENING.md § Recursion).
     private void SkipValue()
     {
-        switch (_current.Kind)
+        if (_current.Kind != TokenKind.LBRACE && _current.Kind != TokenKind.LBRACKET)
         {
-            case TokenKind.LBRACE:
-                Advance();
-                SkipBraced();
-                break;
-            case TokenKind.LBRACKET:
-                Advance();
-                SkipBracketed();
-                break;
-            default:
-                Advance();
-                break;
-        }
-    }
-
-    private void SkipBraced()
-    {
-        int depth = 1;
-        while (depth > 0 && _current.Kind != TokenKind.EOF)
-        {
-            if (_current.Kind == TokenKind.LBRACE) depth++;
-            else if (_current.Kind == TokenKind.RBRACE) depth--;
             Advance();
+            return;
         }
-    }
-
-    private void SkipBracketed()
-    {
-        int depth = 1;
-        while (depth > 0 && _current.Kind != TokenKind.EOF)
+        int open = 0;
+        do
         {
-            if (_current.Kind == TokenKind.LBRACKET) depth++;
-            else if (_current.Kind == TokenKind.RBRACKET) depth--;
+            switch (_current.Kind)
+            {
+                case TokenKind.LBRACE:
+                case TokenKind.LBRACKET:
+                    if (_depth + open >= MaxNestingDepth)
+                    {
+                        throw new PxfException(_current.Pos,
+                            $"nesting depth exceeds {MaxNestingDepth}");
+                    }
+                    open++;
+                    break;
+                case TokenKind.RBRACE:
+                case TokenKind.RBRACKET:
+                    open--;
+                    break;
+            }
             Advance();
-        }
+        } while (open > 0 && _current.Kind != TokenKind.EOF);
     }
 }

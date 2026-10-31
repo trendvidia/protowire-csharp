@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 TrendVidia, LLC.
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using Google.Protobuf.Reflection;
 
@@ -8,12 +9,15 @@ namespace Protowire.Pxf;
 /// <summary>
 /// One schema element that fails a PXF bind-time check. <paramref name="File"/>
 /// is the .proto declaring the element, <paramref name="Element"/> its
-/// fully-qualified name, <paramref name="Name"/> the annotation value.
+/// fully-qualified name, <paramref name="Detail"/> what is wrong, and
+/// <paramref name="Name"/> the annotation value when the rule has one (the
+/// <c>(pxf.key)</c> value; null for the required-and-default rule).
 /// </summary>
-public sealed record Violation(string File, string Element, string Name, string Detail)
+public sealed record Violation(string File, string Element, string Detail, string? Name = null)
 {
-    public override string ToString() =>
-        $"{File}: field \"{Element}\": invalid (pxf.key) = \"{Name}\": {Detail} (draft -01 §3.13)";
+    internal string Message { get; init; } = Detail;
+
+    public override string ToString() => $"{File}: field \"{Element}\": {Message}";
 }
 
 /// <summary>
@@ -56,17 +60,18 @@ public static class Schema
     private static readonly ConditionalWeakTable<FileDescriptor, IReadOnlyList<Violation>> ClosureCache = new();
 
     /// <summary>
-    /// The <c>(pxf.key)</c> placement violations (draft -01 "Schema
-    /// Placement") in the file declaring <paramref name="desc"/> and its
-    /// transitive imports. Empty means conformant.
+    /// The bind-time violations in the file declaring <paramref name="desc"/>
+    /// and its transitive imports. Empty means conformant.
     /// </summary>
     public static IReadOnlyList<Violation> ValidateDescriptor(MessageDescriptor desc) => ValidateFile(desc.File);
 
     /// <summary>
-    /// The <c>(pxf.key)</c> placement violations in <paramref name="file"/>
-    /// and its transitive imports, sorted by declaring file and then by
-    /// element name. Each file is checked once, however many import paths
-    /// reach it, and a violation names the file that declares it.
+    /// The bind-time violations in <paramref name="file"/> and its transitive
+    /// imports, sorted by declaring file and then by element name. Each file
+    /// is checked once, however many import paths reach it, and a violation
+    /// names the file that declares it. Two rules so far: draft -01 "Required
+    /// and Default" (<c>(pxf.required) = true</c> and <c>(pxf.default)</c> on
+    /// one field) and <c>(pxf.key)</c> placement (draft -01 "Schema Placement").
     /// </summary>
     public static IReadOnlyList<Violation> ValidateFile(FileDescriptor file) =>
         ClosureCache.GetValue(file, static f =>
@@ -90,6 +95,26 @@ public static class Schema
         }
     }
 
+    /// <summary>
+    /// The attribute spelling of the same rule, for a hand-written type.
+    /// Only the bound type's own properties are read, because those are the
+    /// only ones <see cref="Decoder"/> honours the attributes on.
+    /// </summary>
+    internal static void EnsureBindable(Type type)
+    {
+        foreach (var prop in type.GetProperties())
+        {
+            if (prop.IsDefined(typeof(PxfRequiredAttribute)) && prop.IsDefined(typeof(PxfDefaultAttribute)))
+            {
+                throw new PxfException(Position.Empty,
+                    $"{type.FullName}.{prop.Name}: [PxfRequired] and [PxfDefault] are exclusive on one field: " + RequiredDefaultReason);
+            }
+        }
+    }
+
+    private const string RequiredDefaultReason =
+        "the first rejects a document where the field is absent, and the second treats it as supplied";
+
     private static void WalkFile(FileDescriptor file, HashSet<string> seen, List<Violation> found)
     {
         if (!seen.Add(file.Name)) return;
@@ -107,11 +132,21 @@ public static class Schema
             foreach (var fd in msg.Fields.InDeclarationOrder())
             {
                 var keyName = AnnotationsRuntime.GetKey(fd);
-                if (keyName == null) continue;
-                var detail = KeyPlacementProblem(fd, keyName);
-                if (detail != null)
+                var keyProblem = keyName == null ? null : KeyPlacementProblem(fd, keyName);
+                if (keyProblem != null)
                 {
-                    found.Add(new Violation(path, fd.FullName, keyName, detail));
+                    found.Add(new Violation(path, fd.FullName, keyProblem, keyName)
+                    {
+                        Message = $"invalid (pxf.key) = \"{keyName}\": {keyProblem} (draft -01 §3.13)",
+                    });
+                }
+                if (AnnotationsRuntime.IsRequired(fd) && AnnotationsRuntime.GetDefault(fd) != null)
+                {
+                    var detail = "(pxf.required) and (pxf.default) are exclusive on one field: " + RequiredDefaultReason;
+                    found.Add(new Violation(path, fd.FullName, detail)
+                    {
+                        Message = $"invalid (pxf.required): {detail} (draft -01 §annotation-extensions)",
+                    });
                 }
             }
             WalkMessages(path, msg.NestedTypes, found);

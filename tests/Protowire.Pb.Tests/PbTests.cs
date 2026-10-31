@@ -97,6 +97,57 @@ public class PbTests
         Assert.Equal(msg.Dec.Negative, got.Dec.Negative);
     }
 
+    public class ScaleMessage
+    {
+        [Protowire(1)] public Decimal Dec { get; set; } = new();
+    }
+
+    public class ExponentMessage
+    {
+        [Protowire(1)] public BigFloat Flt { get; set; } = new();
+    }
+
+    // bignum.proto declares scale and exponent int32, a plain varint. The
+    // expected bytes come from `protoc --encode`, wrapped in field 1, so the
+    // codec can't agree only with itself (#55).
+    [Theory]
+    [InlineData(2, "0a050a01051002")]
+    [InlineData(-2, "0a0e0a010510feffffffffffffffff01")]
+    [InlineData(4096, "0a060a0105108020")]
+    public void TestDecimalScaleIsAPlainVarint(int scale, string hex)
+    {
+        var wire = Convert.FromHexString(hex);
+        Assert.Equal(wire, Pb.Marshal(new ScaleMessage { Dec = new Decimal(5, scale, false) }));
+
+        var got = new ScaleMessage();
+        Pb.Unmarshal(wire, got);
+        Assert.Equal(scale, got.Dec.Scale);
+    }
+
+    [Theory]
+    [InlineData(3, "0a070a010510031835")]
+    [InlineData(-3, "0a100a010510fdffffffffffffffff011835")]
+    public void TestBigFloatExponentIsAPlainVarint(int exponent, string hex)
+    {
+        var wire = Convert.FromHexString(hex);
+        Assert.Equal(wire, Pb.Marshal(new ExponentMessage { Flt = new BigFloat(5, exponent, 53, false) }));
+
+        var got = new ExponentMessage();
+        Pb.Unmarshal(wire, got);
+        Assert.Equal(exponent, got.Flt.Exponent);
+    }
+
+    // Expected bytes from `protoc --encode`, wrapped in field 1.
+    [Fact]
+    public void TestZeroMagnitudeIsEmptyOnTheWire()
+    {
+        Assert.Equal(Convert.FromHexString("0a021002"),
+            Pb.Marshal(new ScaleMessage { Dec = new Decimal(BigInteger.Zero, 2, false) }));
+        // A BigFloat zero keeps prec and drops its exponent.
+        Assert.Equal(Convert.FromHexString("0a021835"),
+            Pb.Marshal(new ExponentMessage { Flt = new BigFloat(BigInteger.Zero, 3, 53, false) }));
+    }
+
     public class DictionaryMessage
     {
         [Protowire(1)] public Dictionary<string, string> Labels { get; set; } = new();
@@ -141,5 +192,69 @@ public class PbTests
         Pb.Unmarshal(data, got);
         Assert.Equal(42, got.B);
         Assert.Null(got.A);
+    }
+
+    // HARDENING.md § Recursion: the root is depth 0 and every submessage or
+    // map entry is one descent. The submessage shape is protowire's corpus
+    // rows pb/deep-submessage-100 / -101.
+    public class Node
+    {
+        [Protowire(1)] public Node? Child { get; set; }
+        [Protowire(2)] public Dictionary<string, Node> Map { get; set; } = new();
+    }
+
+    private static byte[] Delimited(int field, byte[] payload)
+    {
+        using var ms = new MemoryStream();
+        using var output = new Google.Protobuf.CodedOutputStream(ms);
+        output.WriteTag(field, Google.Protobuf.WireFormat.WireType.LengthDelimited);
+        output.WriteBytes(Google.Protobuf.ByteString.CopyFrom(payload));
+        output.Flush();
+        return ms.ToArray();
+    }
+
+    private static byte[] Submessages(int n)
+    {
+        byte[] data = [];
+        for (int i = 0; i < n; i++) data = Delimited(1, data);
+        return data;
+    }
+
+    // n levels of map entry + value submessage: 2n descents.
+    private static byte[] MapEntries(int n)
+    {
+        byte[] data = [];
+        for (int i = 0; i < n; i++) data = Delimited(2, Delimited(2, data));
+        return data;
+    }
+
+    [Fact]
+    public void TestSubmessages_AtTheBound_Accepted()
+    {
+        var got = new Node();
+        Pb.Unmarshal(Submessages(100), got);
+
+        int depth = 0;
+        for (var n = got.Child; n != null; n = n.Child) depth++;
+        Assert.Equal(100, depth);
+    }
+
+    [Fact]
+    public void TestSubmessages_OnePast_Rejected()
+    {
+        var e = Assert.Throws<InvalidOperationException>(() => Pb.Unmarshal(Submessages(101), new Node()));
+        Assert.Contains("nesting depth exceeds 100", e.Message);
+    }
+
+    [Fact]
+    public void TestMapEntries_AtTheBound_Accepted() => Pb.Unmarshal(MapEntries(50), new Node());
+
+    [Fact]
+    public void TestMapEntries_OnePast_Rejected()
+    {
+        // 50 map levels are 100 descents; one submessage around them is 101.
+        var doc = Delimited(1, MapEntries(50));
+        var e = Assert.Throws<InvalidOperationException>(() => Pb.Unmarshal(doc, new Node()));
+        Assert.Contains("nesting depth exceeds 100", e.Message);
     }
 }
