@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 TrendVidia, LLC.
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using Google.Protobuf.Reflection;
 
@@ -88,6 +89,23 @@ public static class Schema
         if (violations.Count > 0)
         {
             throw new PxfException(Position.Empty, string.Join("; ", violations));
+        }
+    }
+
+    /// <summary>
+    /// The attribute spelling of the same rule, for a hand-written type.
+    /// Only the bound type's own properties are read, because those are the
+    /// only ones <see cref="Decoder"/> honours the attributes on.
+    /// </summary>
+    internal static void EnsureBindable(Type type)
+    {
+        foreach (var prop in type.GetProperties())
+        {
+            if (prop.IsDefined(typeof(PxfRequiredAttribute)) && prop.IsDefined(typeof(PxfDefaultAttribute)))
+            {
+                throw new PxfException(Position.Empty,
+                    $"{type.FullName}.{prop.Name}: [PxfRequired] and [PxfDefault] are exclusive on one field: " + RequiredDefaultReason);
+            }
         }
     }
 

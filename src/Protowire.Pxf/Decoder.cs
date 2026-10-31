@@ -81,6 +81,10 @@ public class Decoder
         {
             Schema.EnsureBindable(bound.Descriptor);
         }
+        else
+        {
+            Schema.EnsureBindable(obj.GetType());
+        }
         _lex = new Lexer(data);
         Advance();
 

@@ -49,6 +49,8 @@ format changes.
   transitive imports before reading the document, and
   `Schema.ValidateDescriptor` / `Schema.ValidateFile` report the same
   violations. `(pxf.required) = false` beside a default stays accepted.
+  `[PxfRequired]` with `[PxfDefault]` on one property of a hand-written type
+  is refused the same way.
 
 ## [1.0.0]
 

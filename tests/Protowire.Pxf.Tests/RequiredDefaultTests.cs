@@ -54,4 +54,31 @@ public class RequiredDefaultTests
         new Decoder().UnmarshalFull("", got);
         Assert.Equal("x", got.F);
     }
+
+    public class PocoPair
+    {
+        [PxfRequired, PxfDefault("x")] public string F { get; set; } = "";
+    }
+
+    public class PocoDefaultOnly
+    {
+        [PxfDefault("x")] public string F { get; set; } = "";
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("F = \"present\"")]
+    public void PocoAttributes_Pair_Refused(string doc)
+    {
+        var e = Assert.Throws<PxfException>(() => new Decoder().Unmarshal(doc, new PocoPair()));
+        Assert.Contains("[PxfRequired] and [PxfDefault] " + Exclusive, e.Message);
+    }
+
+    [Fact]
+    public void PocoAttributes_DefaultAlone_Applied()
+    {
+        var got = new PocoDefaultOnly();
+        new Decoder().Unmarshal("", got);
+        Assert.Equal("x", got.F);
+    }
 }
