@@ -70,10 +70,12 @@ format changes.
   A `pxf.Decimal` literal's scale is bounded by the same number.
   `check-decode` links `adversarial.v1.BigNumHolder`. It did not, so
   `pxf/long-numeric` was rejected as an unknown schema, never by a cap.
+  
 - **`uint32` / `uint64` fields decode** (#26). The reflection decode path
   had no branch for `uint` or `ulong`, so a generated message with either
   was rejected with `unsupported type System.UInt64`; protowire's shared
   `sbe-bench.pxf` tripped it at `order_id`.
+  
 - **`(pxf.required)` with `(pxf.default)` on one field is refused when the
   schema is bound** (#57, draft -01 "Required and Default"). `Decoder` used
   to accept such a schema, and which option won depended on whether the
@@ -84,6 +86,7 @@ format changes.
   violations. `(pxf.required) = false` beside a default stays accepted.
   `[PxfRequired]` with `[PxfDefault]` on one property of a hand-written type
   is refused the same way.
+  
 - **Nesting depth counts every descent, from a root at depth 0** (#33,
   HARDENING.md § Recursion). The PXF decoder did not count a `[`, so
   `children = [{ … }]` nested twice as deep as the limit said, and it did
