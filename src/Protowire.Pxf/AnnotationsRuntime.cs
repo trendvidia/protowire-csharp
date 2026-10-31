@@ -9,7 +9,7 @@ namespace Protowire.Pxf;
 
 /// <summary>
 /// Runtime readers for the proto-level <c>(pxf.required)</c> /
-/// <c>(pxf.default)</c> annotations and helpers for the <c>_null</c>
+/// <c>(pxf.default)</c> / <c>(pxf.key)</c> annotations and helpers for the <c>_null</c>
 /// <see cref="FieldMask"/> convention. These work against
 /// <see cref="FieldDescriptor"/> (descriptor-driven), complementing the
 /// reflection-attribute-based <see cref="PxfRequiredAttribute"/> /
@@ -39,6 +39,17 @@ internal static class AnnotationsRuntime
         if (opts == null) return null;
         if (!opts.HasExtension(AnnotationsExtensions.Default)) return null;
         return opts.GetExtension(AnnotationsExtensions.Default);
+    }
+
+    /// <summary>
+    /// The field's <c>(pxf.key)</c> string, or null if the option is absent.
+    /// </summary>
+    public static string? GetKey(FieldDescriptor fd)
+    {
+        var opts = fd.GetOptions();
+        if (opts == null) return null;
+        if (!opts.HasExtension(AnnotationsExtensions.Key)) return null;
+        return opts.GetExtension(AnnotationsExtensions.Key);
     }
 
     /// <summary>

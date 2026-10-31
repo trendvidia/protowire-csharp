@@ -9,12 +9,15 @@ namespace Protowire.Pxf;
 /// <summary>
 /// One schema element that fails a PXF bind-time check. <paramref name="File"/>
 /// is the .proto declaring the element, <paramref name="Element"/> its
-/// fully-qualified name.
+/// fully-qualified name, <paramref name="Detail"/> what is wrong, and
+/// <paramref name="Name"/> the annotation value when the rule has one (the
+/// <c>(pxf.key)</c> value; null for the required-and-default rule).
 /// </summary>
-public sealed record Violation(string File, string Element, string Detail)
+public sealed record Violation(string File, string Element, string Detail, string? Name = null)
 {
-    public override string ToString() =>
-        $"{File}: field \"{Element}\": invalid (pxf.required): {Detail} (draft -01 §annotation-extensions)";
+    internal string Message { get; init; } = Detail;
+
+    public override string ToString() => $"{File}: field \"{Element}\": {Message}";
 }
 
 /// <summary>
@@ -66,9 +69,9 @@ public static class Schema
     /// The bind-time violations in <paramref name="file"/> and its transitive
     /// imports, sorted by declaring file and then by element name. Each file
     /// is checked once, however many import paths reach it, and a violation
-    /// names the file that declares it. The one rule so far is draft -01
-    /// "Required and Default": <c>(pxf.required) = true</c> and
-    /// <c>(pxf.default)</c> on one field.
+    /// names the file that declares it. Two rules so far: draft -01 "Required
+    /// and Default" (<c>(pxf.required) = true</c> and <c>(pxf.default)</c> on
+    /// one field) and <c>(pxf.key)</c> placement (draft -01 "Schema Placement").
     /// </summary>
     public static IReadOnlyList<Violation> ValidateFile(FileDescriptor file) =>
         ClosureCache.GetValue(file, static f =>
@@ -128,13 +131,43 @@ public static class Schema
         {
             foreach (var fd in msg.Fields.InDeclarationOrder())
             {
+                var keyName = AnnotationsRuntime.GetKey(fd);
+                var keyProblem = keyName == null ? null : KeyPlacementProblem(fd, keyName);
+                if (keyProblem != null)
+                {
+                    found.Add(new Violation(path, fd.FullName, keyProblem, keyName)
+                    {
+                        Message = $"invalid (pxf.key) = \"{keyName}\": {keyProblem} (draft -01 §3.13)",
+                    });
+                }
                 if (AnnotationsRuntime.IsRequired(fd) && AnnotationsRuntime.GetDefault(fd) != null)
                 {
-                    found.Add(new Violation(path, fd.FullName,
-                        "(pxf.required) and (pxf.default) are exclusive on one field: " + RequiredDefaultReason));
+                    var detail = "(pxf.required) and (pxf.default) are exclusive on one field: " + RequiredDefaultReason;
+                    found.Add(new Violation(path, fd.FullName, detail)
+                    {
+                        Message = $"invalid (pxf.required): {detail} (draft -01 §annotation-extensions)",
+                    });
                 }
             }
             WalkMessages(path, msg.NestedTypes, found);
         }
+    }
+
+    private static string? KeyPlacementProblem(FieldDescriptor fd, string keyName)
+    {
+        if (!fd.IsRepeated || fd.IsMap || fd.FieldType != FieldType.Message)
+        {
+            return "(pxf.key) is valid only on repeated message-typed fields";
+        }
+        var keyFd = fd.MessageType.FindFieldByName(keyName);
+        if (keyFd == null)
+        {
+            return $"element message {fd.MessageType.FullName} has no field \"{keyName}\"";
+        }
+        if (keyFd.IsRepeated || keyFd.IsMap || keyFd.FieldType != FieldType.String)
+        {
+            return $"key field {keyFd.FullName} must be a singular string field";
+        }
+        return null;
     }
 }

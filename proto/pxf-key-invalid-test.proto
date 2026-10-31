@@ -1,0 +1,13 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 TrendVidia, LLC.
+// A (pxf.key) placement the bind-time check must refuse. Generated so the
+// test can prove a decoder refuses it, which a descriptor built at runtime
+// cannot show: it has no CLR type to decode into.
+syntax = "proto3";
+package keyinvalid.v1;
+
+import "pxf/annotations.proto";
+
+message Misplaced {
+  string id = 1 [(pxf.key) = "id"];
+}

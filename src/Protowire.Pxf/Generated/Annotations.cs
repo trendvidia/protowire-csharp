@@ -30,12 +30,13 @@ namespace Protowire.Pxf {
             "L2Rlc2NyaXB0b3IucHJvdG86OgoIcmVxdWlyZWQSHS5nb29nbGUucHJvdG9i",
             "dWYuRmllbGRPcHRpb25zGKIKIAEoCFIIcmVxdWlyZWQ6OAoHZGVmYXVsdBId",
             "Lmdvb2dsZS5wcm90b2J1Zi5GaWVsZE9wdGlvbnMYowogASgJUgdkZWZhdWx0",
-            "QncKB2NvbS5weGZCEEFubm90YXRpb25zUHJvdG9QAVokZ2l0aHViLmNvbS90",
-            "cmVuZHZpZGlhL3Byb3Rvcy9weGY7cHhmogIDUFhYqgINUHJvdG93aXJlLlB4",
-            "ZsoCA1B4ZuICD1B4ZlxHUEJNZXRhZGF0YeoCA1B4ZmIGcHJvdG8z"));
+            "OjAKA2tleRIdLmdvb2dsZS5wcm90b2J1Zi5GaWVsZE9wdGlvbnMYpAogASgJ",
+            "UgNrZXlCdwoHY29tLnB4ZkIQQW5ub3RhdGlvbnNQcm90b1ABWiRnaXRodWIu",
+            "Y29tL3RyZW5kdmlkaWEvcHJvdG9zL3B4ZjtweGaiAgNQWFiqAg1Qcm90b3dp",
+            "cmUuUHhmygIDUHhm4gIPUHhmXEdQQk1ldGFkYXRh6gIDUHhmYgZwcm90bzM="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::Google.Protobuf.Reflection.DescriptorReflection.Descriptor, },
-          new pbr::GeneratedClrTypeInfo(null, new pb::Extension[] { AnnotationsExtensions.Required, AnnotationsExtensions.Default }, null));
+          new pbr::GeneratedClrTypeInfo(null, new pb::Extension[] { AnnotationsExtensions.Required, AnnotationsExtensions.Default, AnnotationsExtensions.Key }, null));
     }
     #endregion
 
@@ -54,6 +55,15 @@ namespace Protowire.Pxf {
     /// </summary>
     public static readonly pb::Extension<global::Google.Protobuf.Reflection.FieldOptions, string> Default =
       new pb::Extension<global::Google.Protobuf.Reflection.FieldOptions, string>(1315, pb::FieldCodec.ForString(10522, ""));
+    /// <summary>
+    /// Key field of a keyed repeated field (issue #116). Valid only on
+    /// repeated message-typed fields; the value names a singular string
+    /// field of the element message. In PXF text the field may then be
+    /// written as a block of named blocks — entry name = key value,
+    /// entry order = list order. pb/SBE wire outputs are unchanged.
+    /// </summary>
+    public static readonly pb::Extension<global::Google.Protobuf.Reflection.FieldOptions, string> Key =
+      new pb::Extension<global::Google.Protobuf.Reflection.FieldOptions, string>(1316, pb::FieldCodec.ForString(10530, ""));
   }
 
 }

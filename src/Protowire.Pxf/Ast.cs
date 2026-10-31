@@ -126,6 +126,15 @@ public sealed record Assignment : IEntry
 {
     public required Position Pos { get; init; }
     public string Key { get; init; } = string.Empty;
+    /// <summary>
+    /// True when <see cref="Key"/> was written as a string literal (the
+    /// quoted entry-name form of draft -01 "Keyed Repeated Fields").
+    /// <see cref="Key"/> always holds the unquoted value; the flag keeps
+    /// the source spelling for <see cref="Format"/>. A quoted name means
+    /// something only as the key of a keyed repeated field; the schema
+    /// layer rejects it anywhere else.
+    /// </summary>
+    public bool KeyQuoted { get; init; }
     public required IValue Value { get; init; }
     public List<Comment> LeadingComments { get; init; } = [];
     public string TrailingComment { get; init; } = string.Empty;
@@ -144,6 +153,11 @@ public sealed record Block : IEntry
 {
     public required Position Pos { get; init; }
     public string Name { get; init; } = string.Empty;
+    /// <summary>
+    /// True when <see cref="Name"/> was written as a string literal. See
+    /// <see cref="Assignment.KeyQuoted"/>.
+    /// </summary>
+    public bool NameQuoted { get; init; }
     public List<IEntry> Entries { get; init; } = [];
     public List<Comment> LeadingComments { get; init; } = [];
 }
