@@ -1,6 +1,20 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 TrendVidia, LLC.
+using System.Runtime.CompilerServices;
+using Google.Protobuf.Reflection;
+
 namespace Protowire.Pxf;
+
+/// <summary>
+/// One schema element that fails a PXF bind-time check. <paramref name="File"/>
+/// is the .proto declaring the element, <paramref name="Element"/> its
+/// fully-qualified name.
+/// </summary>
+public sealed record Violation(string File, string Element, string Detail)
+{
+    public override string ToString() =>
+        $"{File}: field \"{Element}\": invalid (pxf.required): {Detail} (draft -01 §annotation-extensions)";
+}
 
 /// <summary>
 /// PXF directive-name reservations per draft §3.4.6.
@@ -35,4 +49,74 @@ public static class Schema
         "table" or "datasource" or "view" or "procedure" or "function" or "permissions" => true,
         _ => false,
     };
+
+    // Decoders re-check on every bind, and the closure of any annotated
+    // file reaches descriptor.proto, so the result is kept per file
+    // (draft -01 "Scope of Bind-Time Checks", non-normative note).
+    private static readonly ConditionalWeakTable<FileDescriptor, IReadOnlyList<Violation>> ClosureCache = new();
+
+    /// <summary>
+    /// The bind-time violations in the file declaring <paramref name="desc"/>
+    /// and its transitive imports. Empty means conformant.
+    /// </summary>
+    public static IReadOnlyList<Violation> ValidateDescriptor(MessageDescriptor desc) => ValidateFile(desc.File);
+
+    /// <summary>
+    /// The bind-time violations in <paramref name="file"/> and its transitive
+    /// imports, sorted by declaring file and then by element name. Each file
+    /// is checked once, however many import paths reach it, and a violation
+    /// names the file that declares it. The one rule so far is draft -01
+    /// "Required and Default": <c>(pxf.required) = true</c> and
+    /// <c>(pxf.default)</c> on one field.
+    /// </summary>
+    public static IReadOnlyList<Violation> ValidateFile(FileDescriptor file) =>
+        ClosureCache.GetValue(file, static f =>
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            var found = new List<Violation>();
+            WalkFile(f, seen, found);
+            return found
+                .OrderBy(v => v.File, StringComparer.Ordinal)
+                .ThenBy(v => v.Element, StringComparer.Ordinal)
+                .ToArray();
+        });
+
+    /// <summary>Throws if <paramref name="desc"/>'s closure has a violation.</summary>
+    internal static void EnsureBindable(MessageDescriptor desc)
+    {
+        var violations = ValidateDescriptor(desc);
+        if (violations.Count > 0)
+        {
+            throw new PxfException(Position.Empty, string.Join("; ", violations));
+        }
+    }
+
+    private const string RequiredDefaultReason =
+        "the first rejects a document where the field is absent, and the second treats it as supplied";
+
+    private static void WalkFile(FileDescriptor file, HashSet<string> seen, List<Violation> found)
+    {
+        if (!seen.Add(file.Name)) return;
+        WalkMessages(file.Name, file.MessageTypes, found);
+        foreach (var dep in file.Dependencies)
+        {
+            WalkFile(dep, seen, found);
+        }
+    }
+
+    private static void WalkMessages(string path, IEnumerable<MessageDescriptor> messages, List<Violation> found)
+    {
+        foreach (var msg in messages)
+        {
+            foreach (var fd in msg.Fields.InDeclarationOrder())
+            {
+                if (AnnotationsRuntime.IsRequired(fd) && AnnotationsRuntime.GetDefault(fd) != null)
+                {
+                    found.Add(new Violation(path, fd.FullName,
+                        "(pxf.required) and (pxf.default) are exclusive on one field: " + RequiredDefaultReason));
+                }
+            }
+            WalkMessages(path, msg.NestedTypes, found);
+        }
+    }
 }

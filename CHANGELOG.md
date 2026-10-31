@@ -41,6 +41,14 @@ format changes.
   had no branch for `uint` or `ulong`, so a generated message with either
   was rejected with `unsupported type System.UInt64`; protowire's shared
   `sbe-bench.pxf` tripped it at `order_id`.
+- **`(pxf.required)` with `(pxf.default)` on one field is refused when the
+  schema is bound** (#57, draft -01 "Required and Default"). `Decoder` used
+  to accept such a schema, and which option won depended on whether the
+  document omitted the field and on which engine read it. `Unmarshal` and
+  `UnmarshalFull` now check the file declaring the bound message and its
+  transitive imports before reading the document, and
+  `Schema.ValidateDescriptor` / `Schema.ValidateFile` report the same
+  violations. `(pxf.required) = false` beside a default stays accepted.
 
 ## [1.0.0]
 

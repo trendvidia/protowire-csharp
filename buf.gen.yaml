@@ -37,6 +37,15 @@ managed:
       value: Protowire.Pxf.Tests.Presence
       path: pxf-presence-test.proto
     - file_option: csharp_namespace
+      value: Protowire.Pxf.Tests.RequiredDefault
+      path: pxf-required-default-test.proto
+    - file_option: csharp_namespace
+      value: Protowire.Pxf.Tests.RequiredDefault
+      path: pxf-required-default-ok-test.proto
+    - file_option: csharp_namespace
+      value: Protowire.Pxf.Tests.RequiredDefault
+      path: pxf-required-default-import-test.proto
+    - file_option: csharp_namespace
       value: Protowire.DumpEnvelope.Fixtures
       path: settings.proto
 plugins:

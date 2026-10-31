@@ -75,6 +75,12 @@ public class Decoder
 
     private void ParseInto(string data, object obj)
     {
+        // The schema is refused here, before any document is read, so the
+        // outcome does not depend on which fields the document supplies.
+        if (obj is IMessage bound)
+        {
+            Schema.EnsureBindable(bound.Descriptor);
+        }
         _lex = new Lexer(data);
         Advance();
 

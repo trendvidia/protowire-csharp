@@ -1,0 +1,19 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 TrendVidia, LLC.
+// A schema draft -01 "Required and Default" forbids. Every message in this
+// file is unbindable, because the check covers the whole file: the valid
+// schemas are in the two files beside it.
+syntax = "proto3";
+package required_default.v1;
+
+import "pxf/annotations.proto";
+
+message RequiredWithDefault {
+  string f = 1 [(pxf.required) = true, (pxf.default) = "x"];
+}
+
+message Outer {
+  message Inner {
+    string empty_default = 1 [(pxf.required) = true, (pxf.default) = ""];
+  }
+}
