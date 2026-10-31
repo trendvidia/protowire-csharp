@@ -274,6 +274,13 @@ public static class Pb
             var valType = type.GetGenericArguments()[1];
             var map = (System.Collections.IDictionary?)currentVal ?? (System.Collections.IDictionary)Activator.CreateInstance(type)!;
 
+            // The entry is a descent whatever its value's type, so this
+            // cannot wait for a message value to reach the check below.
+            if (depth >= MaxNestingDepth)
+            {
+                throw new InvalidOperationException(
+                    $"PB nesting depth exceeds {MaxNestingDepth}");
+            }
             var entryData = input.ReadBytes().ToByteArray();
             var entryInput = new CodedInputStream(entryData);
             object? key = null, val = null;
@@ -281,8 +288,10 @@ public static class Pb
             while ((etag = entryInput.ReadTag()) != 0)
             {
                 var enumNum = WireFormat.GetTagFieldNumber(etag);
-                if (enumNum == 1) key = UnmarshalField(entryInput, etag, keyType, null, zigzag, depth);
-                else if (enumNum == 2) val = UnmarshalField(entryInput, etag, valType, null, zigzag, depth);
+                // HARDENING.md § Recursion: a map entry is one descent, so a
+                // message value sits two below the map field's parent.
+                if (enumNum == 1) key = UnmarshalField(entryInput, etag, keyType, null, zigzag, depth + 1);
+                else if (enumNum == 2) val = UnmarshalField(entryInput, etag, valType, null, zigzag, depth + 1);
                 else entryInput.SkipLastField();
             }
             if (key != null) map[key] = val;

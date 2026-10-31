@@ -23,6 +23,14 @@ format changes.
   has no table row for. `tool/generate.sh --check` runs in CI and fails on
   drift, a missing header, or an orphaned binding. The four committed
   stray copies are removed.
+- **A map's `{` and every PB map entry count toward the nesting limit**
+  (protowire#449, HARDENING.md § Recursion). The PXF decoder did not count
+  a map's own `{`, and PB counted neither a map entry nor anything about a
+  scalar-valued one, so maps could nest past the limit in both. This
+  narrows what decodes: a document nesting maps past 50 levels is now
+  rejected, as it is by the text parser here and by protowire-go.
+  `check-decode`'s `Tree` gains `branches` and `tags`. Without them the
+  corpus rows for this were skipped as unknown fields and tested nothing.
 
 ### Added
 

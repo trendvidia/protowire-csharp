@@ -988,6 +988,26 @@ public class Decoder
     private IDictionary DecodeMap(Type type, FieldDescriptor? fd, IDictionary? currentMap)
     {
         if (_current.Kind != TokenKind.LBRACE) throw new PxfException(_current.Pos, "expected '{'");
+        // HARDENING.md § Recursion: a map's `{` is a descent like any other,
+        // whether or not its values are messages.
+        if (_depth >= MaxNestingDepth)
+        {
+            throw new PxfException(_current.Pos,
+                $"nesting depth exceeds {MaxNestingDepth}");
+        }
+        _depth++;
+        try
+        {
+            return DecodeMapBody(type, currentMap);
+        }
+        finally
+        {
+            _depth--;
+        }
+    }
+
+    private IDictionary DecodeMapBody(Type type, IDictionary? currentMap)
+    {
         Advance();
         var keyType = type.GetGenericArguments()[0];
         var valType = type.GetGenericArguments()[1];
