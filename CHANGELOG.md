@@ -11,6 +11,19 @@ format changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`pxf.Decimal.scale` and `pxf.BigFloat.exponent` are plain varints on the
+  PB wire** (#55). `Protowire.Pb` read and wrote both with zigzag, but
+  `bignum.proto` declares them `int32`, so it disagreed with every other
+  port on every non-zero value: a wire scale of 2 read as 1, and 4096 as
+  2048. **Bytes written by earlier versions read back wrong.** This is the
+  bug protowire-go fixed in protowire-go#96 (STABILITY.md § v1.13).
+- **A zero magnitude is empty on the PB wire.** `Protowire.Pb` wrote a zero
+  `BigInt`, `Decimal.unscaled` or `BigFloat.mantissa` as one `0` byte, and
+  kept a `BigFloat` zero's exponent. A zero now has the one encoding
+  STABILITY.md § v1.13 describes. Earlier bytes still decode.
+
 ### Changed
 
 - **The vendored shared schemas are re-synced with [trendvidia/protos](https://github.com/trendvidia/protos) v0.1.2** ([trendvidia/protowire#447](https://github.com/trendvidia/protowire/issues/447)). They gain protos' file options, and `envelope.proto`'s `go_package` now names a published package. Declarations and field numbers are unchanged, and so is this port's public API.
@@ -61,6 +74,16 @@ format changes.
   had no branch for `uint` or `ulong`, so a generated message with either
   was rejected with `unsupported type System.UInt64`; protowire's shared
   `sbe-bench.pxf` tripped it at `order_id`.
+- **`(pxf.required)` with `(pxf.default)` on one field is refused when the
+  schema is bound** (#57, draft -01 "Required and Default"). `Decoder` used
+  to accept such a schema, and which option won depended on whether the
+  document omitted the field and on which engine read it. `Unmarshal` and
+  `UnmarshalFull` now check the file declaring the bound message and its
+  transitive imports before reading the document, and
+  `Schema.ValidateDescriptor` / `Schema.ValidateFile` report the same
+  violations. `(pxf.required) = false` beside a default stays accepted.
+  `[PxfRequired]` with `[PxfDefault]` on one property of a hand-written type
+  is refused the same way.
 - **Nesting depth counts every descent, from a root at depth 0** (#33,
   HARDENING.md § Recursion). The PXF decoder did not count a `[`, so
   `children = [{ … }]` nested twice as deep as the limit said, and it did

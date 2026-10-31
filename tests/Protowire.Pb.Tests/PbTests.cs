@@ -97,6 +97,57 @@ public class PbTests
         Assert.Equal(msg.Dec.Negative, got.Dec.Negative);
     }
 
+    public class ScaleMessage
+    {
+        [Protowire(1)] public Decimal Dec { get; set; } = new();
+    }
+
+    public class ExponentMessage
+    {
+        [Protowire(1)] public BigFloat Flt { get; set; } = new();
+    }
+
+    // bignum.proto declares scale and exponent int32, a plain varint. The
+    // expected bytes come from `protoc --encode`, wrapped in field 1, so the
+    // codec can't agree only with itself (#55).
+    [Theory]
+    [InlineData(2, "0a050a01051002")]
+    [InlineData(-2, "0a0e0a010510feffffffffffffffff01")]
+    [InlineData(4096, "0a060a0105108020")]
+    public void TestDecimalScaleIsAPlainVarint(int scale, string hex)
+    {
+        var wire = Convert.FromHexString(hex);
+        Assert.Equal(wire, Pb.Marshal(new ScaleMessage { Dec = new Decimal(5, scale, false) }));
+
+        var got = new ScaleMessage();
+        Pb.Unmarshal(wire, got);
+        Assert.Equal(scale, got.Dec.Scale);
+    }
+
+    [Theory]
+    [InlineData(3, "0a070a010510031835")]
+    [InlineData(-3, "0a100a010510fdffffffffffffffff011835")]
+    public void TestBigFloatExponentIsAPlainVarint(int exponent, string hex)
+    {
+        var wire = Convert.FromHexString(hex);
+        Assert.Equal(wire, Pb.Marshal(new ExponentMessage { Flt = new BigFloat(5, exponent, 53, false) }));
+
+        var got = new ExponentMessage();
+        Pb.Unmarshal(wire, got);
+        Assert.Equal(exponent, got.Flt.Exponent);
+    }
+
+    // Expected bytes from `protoc --encode`, wrapped in field 1.
+    [Fact]
+    public void TestZeroMagnitudeIsEmptyOnTheWire()
+    {
+        Assert.Equal(Convert.FromHexString("0a021002"),
+            Pb.Marshal(new ScaleMessage { Dec = new Decimal(BigInteger.Zero, 2, false) }));
+        // A BigFloat zero keeps prec and drops its exponent.
+        Assert.Equal(Convert.FromHexString("0a021835"),
+            Pb.Marshal(new ExponentMessage { Flt = new BigFloat(BigInteger.Zero, 3, 53, false) }));
+    }
+
     public class DictionaryMessage
     {
         [Protowire(1)] public Dictionary<string, string> Labels { get; set; } = new();
