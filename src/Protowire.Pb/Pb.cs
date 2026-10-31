@@ -358,7 +358,7 @@ public static class Pb
         using var ms = new MemoryStream();
         using var output = new CodedOutputStream(ms);
         var abs = BigInteger.Abs(bi);
-        var bytes = abs.ToByteArray(isUnsigned: true, isBigEndian: true);
+        var bytes = MagnitudeBytes(abs);
         if (bytes.Length > 0)
         {
             output.WriteTag(WireFormat.MakeTag(1, WireFormat.WireType.LengthDelimited));
@@ -373,11 +373,16 @@ public static class Pb
         return ms.ToArray();
     }
 
+    // BigInteger.Zero's ToByteArray is one 0 byte; on the wire a zero
+    // magnitude is empty.
+    private static byte[] MagnitudeBytes(BigInteger magnitude) =>
+        magnitude.IsZero ? [] : magnitude.ToByteArray(isUnsigned: true, isBigEndian: true);
+
     private static byte[] MarshalDecimal(Decimal dec)
     {
         using var ms = new MemoryStream();
         using var output = new CodedOutputStream(ms);
-        var bytes = dec.Unscaled.ToByteArray(isUnsigned: true, isBigEndian: true);
+        var bytes = MagnitudeBytes(dec.Unscaled);
         if (bytes.Length > 0)
         {
             output.WriteTag(WireFormat.MakeTag(1, WireFormat.WireType.LengthDelimited));
@@ -386,7 +391,7 @@ public static class Pb
         if (dec.Scale != 0)
         {
             output.WriteTag(WireFormat.MakeTag(2, WireFormat.WireType.Varint));
-            output.WriteSInt32(dec.Scale);
+            output.WriteInt32(dec.Scale);
         }
         if (dec.Negative)
         {
@@ -407,7 +412,7 @@ public static class Pb
             switch (WireFormat.GetTagFieldNumber(tag))
             {
                 case 1: dec.Unscaled = new BigInteger(input.ReadBytes().ToByteArray(), isUnsigned: true, isBigEndian: true); break;
-                case 2: dec.Scale = input.ReadSInt32(); break;
+                case 2: dec.Scale = input.ReadInt32(); break;
                 case 3: dec.Negative = input.ReadBool(); break;
                 default: input.SkipLastField(); break;
             }
@@ -419,16 +424,17 @@ public static class Pb
     {
         using var ms = new MemoryStream();
         using var output = new CodedOutputStream(ms);
-        var bytes = bf.Mantissa.ToByteArray(isUnsigned: true, isBigEndian: true);
+        var bytes = MagnitudeBytes(bf.Mantissa);
         if (bytes.Length > 0)
         {
             output.WriteTag(WireFormat.MakeTag(1, WireFormat.WireType.LengthDelimited));
             output.WriteBytes(ByteString.CopyFrom(bytes));
         }
-        if (bf.Exponent != 0)
+        // A zero has one encoding: an empty mantissa and exponent 0.
+        if (bf.Exponent != 0 && !bf.Mantissa.IsZero)
         {
             output.WriteTag(WireFormat.MakeTag(2, WireFormat.WireType.Varint));
-            output.WriteSInt32(bf.Exponent);
+            output.WriteInt32(bf.Exponent);
         }
         if (bf.Precision != 0)
         {
@@ -454,7 +460,7 @@ public static class Pb
             switch (WireFormat.GetTagFieldNumber(tag))
             {
                 case 1: bf.Mantissa = new BigInteger(input.ReadBytes().ToByteArray(), isUnsigned: true, isBigEndian: true); break;
-                case 2: bf.Exponent = input.ReadSInt32(); break;
+                case 2: bf.Exponent = input.ReadInt32(); break;
                 case 3: bf.Precision = input.ReadUInt32(); break;
                 case 4: bf.Negative = input.ReadBool(); break;
                 default: input.SkipLastField(); break;
