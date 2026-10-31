@@ -34,9 +34,9 @@ namespace Protowire.Sbe {
             "bnMYqQogASgNUgp0ZW1wbGF0ZUlkOjYKBmxlbmd0aBIdLmdvb2dsZS5wcm90",
             "b2J1Zi5GaWVsZE9wdGlvbnMYqgogASgNUgZsZW5ndGg6OgoIZW5jb2RpbmcS",
             "HS5nb29nbGUucHJvdG9idWYuRmllbGRPcHRpb25zGKsKIAEoCVIIZW5jb2Rp",
-            "bmdCUQoHY29tLnNiZUIQQW5ub3RhdGlvbnNQcm90b1ABogIDU1hYqgINUHJv",
-            "dG93aXJlLlNiZcoCA1NiZeICD1NiZVxHUEJNZXRhZGF0YeoCA1NiZWIGcHJv",
-            "dG8z"));
+            "bmdCdwoHY29tLnNiZUIQQW5ub3RhdGlvbnNQcm90b1ABWiRnaXRodWIuY29t",
+            "L3RyZW5kdmlkaWEvcHJvdG9zL3NiZTtzYmWiAgNTWFiqAg1Qcm90b3dpcmUu",
+            "U2JlygIDU2Jl4gIPU2JlXEdQQk1ldGFkYXRh6gIDU2JlYgZwcm90bzM="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::Google.Protobuf.Reflection.DescriptorReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(null, new pb::Extension[] { AnnotationsExtensions.SchemaId, AnnotationsExtensions.Version, AnnotationsExtensions.TemplateId, AnnotationsExtensions.Length, AnnotationsExtensions.Encoding }, null));
