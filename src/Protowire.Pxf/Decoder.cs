@@ -82,6 +82,16 @@ public class Decoder
 
     private void ParseInto(string data, object obj)
     {
+        // The schema is refused here, before any document is read, so the
+        // outcome does not depend on which fields the document supplies.
+        if (obj is IMessage bound)
+        {
+            Schema.EnsureBindable(bound.Descriptor);
+        }
+        else
+        {
+            Schema.EnsureBindable(obj.GetType());
+        }
         _lex = new Lexer(data);
         Advance();
 
@@ -502,14 +512,22 @@ public class Decoder
         }
     }
 
-    private void DecodeFields(object obj, bool inBlock)
+    // HARDENING.md § Recursion: the root message is depth 0 and every `{`
+    // or `[` is one descent, so a document exactly MaxNestingDepth deep is
+    // accepted and one deeper is rejected. Parser counts the same way.
+    private void EnterDescent()
     {
-        if (inBlock && _depth >= MaxNestingDepth)
+        if (_depth >= MaxNestingDepth)
         {
             throw new PxfException(_current.Pos,
                 $"nesting depth exceeds {MaxNestingDepth}");
         }
-        if (inBlock) _depth++;
+        _depth++;
+    }
+
+    private void DecodeFields(object obj, bool inBlock)
+    {
+        if (inBlock) EnterDescent();
         try
         {
             DecodeFieldsBody(obj, inBlock);
@@ -564,8 +582,10 @@ public class Decoder
                     var desc = Registry.Find(typeName);
                     if (desc == null) throw new PxfException(pos, $"type \"{typeName}\" not found in registry");
 
+                    // The body shares the Any's braces, which the enclosing
+                    // DecodeFields has already counted as one descent.
                     var unpackedMsg = desc.Parser.ParseFrom(Array.Empty<byte>());
-                    DecodeFields(unpackedMsg, true);
+                    DecodeFieldsBody(unpackedMsg, true);
 
                     var typeUrlProp = any.GetType().GetProperty("TypeUrl");
                     var valueProp = any.GetType().GetProperty("Value");
@@ -633,8 +653,7 @@ public class Decoder
                 }
                 else if (_current.Kind == TokenKind.LBRACE)
                 {
-                    Advance();
-                    SkipBraced();
+                    SkipValue();
                 }
                 continue;
             }
@@ -973,6 +992,19 @@ public class Decoder
     private object DecodeList(Type type, FieldDescriptor? fd, IEnumerable? currentList)
     {
         if (_current.Kind != TokenKind.LBRACKET) throw new PxfException(_current.Pos, "expected '['");
+        EnterDescent();
+        try
+        {
+            return DecodeListBody(type, currentList);
+        }
+        finally
+        {
+            _depth--;
+        }
+    }
+
+    private object DecodeListBody(Type type, IEnumerable? currentList)
+    {
         Advance();
 
         var itemType = type.IsArray ? type.GetElementType()! : type.GetGenericArguments()[0];
@@ -1003,6 +1035,26 @@ public class Decoder
     private IDictionary DecodeMap(Type type, FieldDescriptor? fd, IDictionary? currentMap)
     {
         if (_current.Kind != TokenKind.LBRACE) throw new PxfException(_current.Pos, "expected '{'");
+        // HARDENING.md § Recursion: a map's `{` is a descent like any other,
+        // whether or not its values are messages.
+        if (_depth >= MaxNestingDepth)
+        {
+            throw new PxfException(_current.Pos,
+                $"nesting depth exceeds {MaxNestingDepth}");
+        }
+        _depth++;
+        try
+        {
+            return DecodeMapBody(type, currentMap);
+        }
+        finally
+        {
+            _depth--;
+        }
+    }
+
+    private IDictionary DecodeMapBody(Type type, IDictionary? currentMap)
+    {
         Advance();
         var keyType = type.GetGenericArguments()[0];
         var valType = type.GetGenericArguments()[1];
@@ -1325,43 +1377,37 @@ public class Decoder
         return normalizedMember == normalizedKey;
     }
 
+    // Skips a value the target has no member for. Iterative, so a skipped
+    // value costs no stack, but it is bounded like a decoded one: the
+    // counter starts from the depth of the enclosing body and `{` and `[`
+    // count alike (HARDENING.md § Recursion).
     private void SkipValue()
     {
-        switch (_current.Kind)
+        if (_current.Kind != TokenKind.LBRACE && _current.Kind != TokenKind.LBRACKET)
         {
-            case TokenKind.LBRACE:
-                Advance();
-                SkipBraced();
-                break;
-            case TokenKind.LBRACKET:
-                Advance();
-                SkipBracketed();
-                break;
-            default:
-                Advance();
-                break;
-        }
-    }
-
-    private void SkipBraced()
-    {
-        int depth = 1;
-        while (depth > 0 && _current.Kind != TokenKind.EOF)
-        {
-            if (_current.Kind == TokenKind.LBRACE) depth++;
-            else if (_current.Kind == TokenKind.RBRACE) depth--;
             Advance();
+            return;
         }
-    }
-
-    private void SkipBracketed()
-    {
-        int depth = 1;
-        while (depth > 0 && _current.Kind != TokenKind.EOF)
+        int open = 0;
+        do
         {
-            if (_current.Kind == TokenKind.LBRACKET) depth++;
-            else if (_current.Kind == TokenKind.RBRACKET) depth--;
+            switch (_current.Kind)
+            {
+                case TokenKind.LBRACE:
+                case TokenKind.LBRACKET:
+                    if (_depth + open >= MaxNestingDepth)
+                    {
+                        throw new PxfException(_current.Pos,
+                            $"nesting depth exceeds {MaxNestingDepth}");
+                    }
+                    open++;
+                    break;
+                case TokenKind.RBRACE:
+                case TokenKind.RBRACKET:
+                    open--;
+                    break;
+            }
             Advance();
-        }
+        } while (open > 0 && _current.Kind != TokenKind.EOF);
     }
 }

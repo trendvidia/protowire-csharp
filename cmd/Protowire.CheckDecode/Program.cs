@@ -127,8 +127,11 @@ internal static class CheckDecode
 
 internal sealed class Tree
 {
+    [Protowire(4)] public Dictionary<string, Tree> Branches { get; set; } = new();
+    [Protowire(5)] public Dictionary<string, string> Tags { get; set; } = new();
     [Protowire(1)] public Tree? Child { get; set; }
     [Protowire(2)] public string Label { get; set; } = "";
+    [Protowire(3)] public List<Tree> Children { get; set; } = new();
 }
 
 internal sealed class StringHolder
