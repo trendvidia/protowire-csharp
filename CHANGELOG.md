@@ -11,6 +11,18 @@ format changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A keyed entry's name now counts as supplying the key field**
+  ([trendvidia/protowire-go#214](https://github.com/trendvidia/protowire-go/issues/214)).
+  After `kd { alpha {} }`, `Result` reports `kd[0].name` as set, where it
+  used to report it absent and leave it out of `SetFields()`. The decoded
+  value was already right: `(pxf.required)` and `(pxf.default)` are not
+  applied inside list elements yet (#52), so the wrong values protowire-go
+  saw cannot happen here. The mark is what keeps them from appearing once
+  they are. This costs `UnmarshalFull` one presence record per entry;
+  `Unmarshal` is unchanged.
+
 ## [1.1.0]
 
 ### Fixed

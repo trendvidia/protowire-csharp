@@ -829,6 +829,10 @@ public class Decoder
                 var saved = EnterElement(fd, list.Count);
                 try
                 {
+                    // The entry name supplies the key field, so presence
+                    // must say so: PostDecode and callers read nothing else
+                    // (protowire-go#214).
+                    _result?.MarkPresent(_pathPrefix + keyFd.Name);
                     DecodeFields(element, true);
                 }
                 finally

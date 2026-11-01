@@ -43,6 +43,9 @@ managed:
       value: Protowire.Pxf.Tests.KeyedFixtures
       path: pxf-key-invalid-test.proto
     - file_option: csharp_namespace
+      value: Protowire.Pxf.Tests.KeyedName
+      path: pxf-keyed-entry-name-test.proto
+    - file_option: csharp_namespace
       value: Protowire.Pxf.Tests.RequiredDefault
       path: pxf-required-default-test.proto
     - file_option: csharp_namespace
