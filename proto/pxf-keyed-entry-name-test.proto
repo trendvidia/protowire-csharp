@@ -1,0 +1,35 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 TrendVidia, LLC.
+// An entry name of a keyed block supplies the element's key field
+// (draft -01 §3.13, trendvidia/protowire-go#214).
+syntax = "proto3";
+package keyed_name.v1;
+
+import "pxf/annotations.proto";
+
+message P {
+  repeated WithDefault kd = 1 [(pxf.key) = "name"];
+  repeated WithRequired kr = 2 [(pxf.key) = "name"];
+  repeated InOneof ko = 3 [(pxf.key) = "name"];
+  repeated Nests kn = 4 [(pxf.key) = "name"];
+}
+
+message WithDefault {
+  string name = 1 [(pxf.default) = "dflt"];
+}
+
+message WithRequired {
+  string name = 1 [(pxf.required) = true];
+}
+
+message InOneof {
+  oneof pick {
+    string name = 1;
+    string other = 2 [(pxf.default) = "other-dflt"];
+  }
+}
+
+message Nests {
+  string name = 1;
+  repeated WithDefault inner = 2 [(pxf.key) = "name"];
+}

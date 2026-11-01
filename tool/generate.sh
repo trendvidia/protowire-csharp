@@ -28,6 +28,7 @@ TABLE=(
   "Pxf/Tests/Presence/PxfPresenceTest.cs tests/Protowire.Pxf.Tests/Generated/PxfPresenceTest.cs"
   "Pxf/Tests/KeyedFixtures/Keyed.cs      tests/Protowire.Pxf.Tests/Generated/Keyed.cs"
   "Pxf/Tests/KeyedFixtures/PxfKeyInvalidTest.cs tests/Protowire.Pxf.Tests/Generated/PxfKeyInvalidTest.cs"
+  "Pxf/Tests/KeyedName/PxfKeyedEntryNameTest.cs tests/Protowire.Pxf.Tests/Generated/PxfKeyedEntryNameTest.cs"
   "Pxf/Tests/RequiredDefault/PxfRequiredDefaultTest.cs       tests/Protowire.Pxf.Tests/Generated/PxfRequiredDefaultTest.cs"
   "Pxf/Tests/RequiredDefault/PxfRequiredDefaultOkTest.cs     tests/Protowire.Pxf.Tests/Generated/PxfRequiredDefaultOkTest.cs"
   "Pxf/Tests/RequiredDefault/PxfRequiredDefaultImportTest.cs tests/Protowire.Pxf.Tests/Generated/PxfRequiredDefaultImportTest.cs"
