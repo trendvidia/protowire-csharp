@@ -220,6 +220,12 @@ public static class Pb
         }
         else if (val is System.Collections.IEnumerable enumerable)
         {
+            var itemType = ElementType(val.GetType());
+            if (itemType != null && IsPackable(itemType))
+            {
+                WritePacked(output, tag, enumerable, zigzag);
+                return;
+            }
             foreach (var item in enumerable)
             {
                 if (item != null) MarshalField(output, tag, item, zigzag, depth, maxDepth);
@@ -236,6 +242,42 @@ public static class Pb
             output.WriteTag(WireFormat.MakeTag((int)tag, WireFormat.WireType.LengthDelimited));
             output.WriteBytes(ByteString.CopyFrom(ms.ToArray()));
         }
+    }
+
+    private static Type? ElementType(Type listType) =>
+        listType.IsArray ? listType.GetElementType()
+        : listType.IsGenericType ? listType.GetGenericArguments()[0]
+        : null;
+
+    // proto3 packs a repeated scalar by default, and protowire-go writes it
+    // packed: one length-delimited run, nothing when the list is empty. The
+    // decoder takes either form.
+    private static void WritePacked(CodedOutputStream output, uint tag, System.Collections.IEnumerable items, bool zigzag)
+    {
+        using var ms = new MemoryStream();
+        using var run = new CodedOutputStream(ms);
+        bool any = false;
+        foreach (var item in items)
+        {
+            if (item == null) continue;
+            any = true;
+            switch (item)
+            {
+                case bool b: run.WriteBool(b); break;
+                case int i: if (zigzag) run.WriteSInt32(i); else run.WriteInt32(i); break;
+                case long l: if (zigzag) run.WriteSInt64(l); else run.WriteInt64(l); break;
+                case uint ui: run.WriteUInt32(ui); break;
+                case ulong ul: run.WriteUInt64(ul); break;
+                case float f: run.WriteFloat(f); break;
+                case double d: run.WriteDouble(d); break;
+                case Enum: run.WriteEnum(Convert.ToInt32(item, System.Globalization.CultureInfo.InvariantCulture)); break;
+                default: throw new InvalidOperationException($"cannot pack a repeated {item.GetType().Name}");
+            }
+        }
+        if (!any) return;
+        run.Flush();
+        output.WriteTag(WireFormat.MakeTag((int)tag, WireFormat.WireType.LengthDelimited));
+        output.WriteBytes(ByteString.CopyFrom(ms.ToArray()));
     }
 
     private static bool IsZero(object? val)
