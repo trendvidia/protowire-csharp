@@ -398,4 +398,52 @@ public class DirectiveTests
         Assert.Equal("source", ProtoShape.Source.Name());
         Assert.Equal("descriptor", ProtoShape.Descriptor.Name());
     }
+
+    private static (Protowire.Pxf.Tests.Bench.Config Row, DatasetRow Parsed) Bind(string header, string row)
+    {
+        var ds = Parser.Parse($"@dataset bench.v1.Config ( {header} )\n( {row} )\n").Datasets[0];
+        var msg = new Protowire.Pxf.Tests.Bench.Config();
+        new Decoder().BindRow(msg, ds.Columns, ds.Rows[0]);
+        return (msg, ds.Rows[0]);
+    }
+
+    [Fact]
+    public void BindRow_Cells_MeanWhatABodyMeans()
+    {
+        var (row, _) = Bind("hostname, tags, tls", "\"h\", [\"a\", \"b\"], { verify = true }");
+        Assert.Equal("h", row.Hostname);
+        Assert.Equal(["a", "b"], row.Tags);
+        Assert.True(row.Tls.Verify);
+    }
+
+    [Fact]
+    public void BindRow_DottedColumns_ShareOneBlock()
+    {
+        var (row, _) = Bind("tls.verify, hostname, tls.cert_file", "true, \"h\", \"c\"");
+        Assert.True(row.Tls.Verify);
+        Assert.Equal("c", row.Tls.CertFile);
+    }
+
+    [Fact]
+    public void BindRow_EmptyCell_LeavesTheFieldAbsent()
+    {
+        var (row, _) = Bind("hostname, tls", "\"h\", ");
+        Assert.Null(row.Tls);
+    }
+
+    [Theory]
+    [InlineData("port", "\"x\"", "column port: expected integer")]
+    [InlineData("hostname", "null", "column hostname: null is not allowed on scalar field")]
+    [InlineData("hostname", "{ a = 1 }", "column hostname: expected string")]
+    [InlineData("nope", "1", "has no field \"nope\"")]
+    [InlineData("hostname.x", "1", "is not a message field")]
+    [InlineData("tags.x", "1", "is a repeated field")]
+    [InlineData("labels.x", "1", "is a map field")]
+    [InlineData("timeout.seconds", "1", "written as a literal")]
+    public void BindRow_Refuses_AtTheRow(string column, string cell, string message)
+    {
+        var e = Assert.Throws<PxfException>(() => Bind(column, cell));
+        Assert.Contains(message, e.Message);
+        Assert.Equal(2, e.Pos.Line);
+    }
 }

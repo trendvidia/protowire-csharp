@@ -36,7 +36,7 @@ format changes.
 - `PxfLimits`, set through `Decoder.Limits` or `Parser.Parse(input, limits)`, makes the draft's limits per-call.
 - The type entry of an Any block, in a singular field, a list element or a map value (#42).
 - Wrapper-typed fields take a scalar or a block (#45).
-- `@dataset` cells may be lists or blocks, and columns may be dotted paths, at the parse level (#41, #43).
+- **`Decoder.BindRow` binds a `@dataset` row to a generated message** (#41, #43). This port parsed rows but had no binder. Cells may be lists or blocks, each meaning what `c = <value>` means in a body, and columns may be dotted paths into sub-messages. A column the row type cannot reach is refused, naming it. There is no streaming reader yet.
 - Bool map keys, `+inf`, and the BigFloat precision suffix in the lexer.
 
 ### Fixed

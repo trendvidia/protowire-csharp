@@ -41,6 +41,17 @@ public static class Format
         return sb.ToString();
     }
 
+    /// <summary>
+    /// A value as its PXF source literal, the text the formatter writes for it.
+    /// A multi-line value has two-space indents and no trailing newline.
+    /// </summary>
+    public static string FormatValue(IValue value)
+    {
+        var sb = new StringBuilder();
+        FormatValue(sb, value, 0);
+        return sb.ToString();
+    }
+
     private static void FormatEntries(StringBuilder sb, IReadOnlyList<IEntry> entries, int level)
     {
         foreach (var entry in entries)
