@@ -36,6 +36,7 @@ TABLE=(
   "Sbe/Tests/Bench/SbeBench.cs           tests/Protowire.Sbe.Tests/Generated/SbeBench.cs"
   "Sbe/Tests/Bench/SbeExtra.cs           tests/Protowire.Sbe.Tests/Generated/SbeExtra.cs"
   "Sbe/Tests/Bench/SbeOneof.cs           tests/Protowire.Sbe.Tests/Generated/SbeOneof.cs"
+  "Sbe/Tests/Utf8/SbeUtf8.cs             tests/Protowire.Sbe.Tests/Generated/SbeUtf8.cs"
   "Conformance/Schemas/Any/Any.cs tests/Protowire.Conformance/Generated/Any.cs"
   "Conformance/Schemas/Bigfloat/Bigfloat.cs tests/Protowire.Conformance/Generated/Bigfloat.cs"
   "Conformance/Schemas/Blocks/Blocks.cs tests/Protowire.Conformance/Generated/Blocks.cs"

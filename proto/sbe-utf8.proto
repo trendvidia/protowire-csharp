@@ -1,0 +1,34 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 TrendVidia, LLC.
+//
+// The Cut messages of protowire-go's encoding/sbe/utf8_test.go: an overlong
+// string field is cut on a character boundary, in a root field, a composite
+// field and a group entry; a bytes field is cut at the limit (#79).
+syntax = "proto3";
+package utf8.v1;
+
+import "sbe/annotations.proto";
+
+option (sbe.schema_id) = 2;
+option (sbe.version) = 0;
+
+message CutCode {
+  string text = 1 [(sbe.length) = 8];
+}
+
+message CutRow {
+  string tag = 1 [(sbe.length) = 8];
+}
+
+message Cut {
+  option (sbe.template_id) = 2;
+  string text = 1 [(sbe.length) = 8];
+  bytes raw = 2 [(sbe.length) = 8];
+  CutCode code = 3;
+  repeated CutRow rows = 4;
+}
+
+message CutTiny {
+  option (sbe.template_id) = 3;
+  string text = 1 [(sbe.length) = 3];
+}
