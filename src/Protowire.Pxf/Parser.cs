@@ -56,13 +56,20 @@ public sealed class Parser
 
     internal IValue ParseValueHere() => ParseValue();
 
-    private void Advance()
+    private void Advance() => Advance(keepIllegal: false);
+
+    // keepIllegal leaves an ILLEGAL token current instead of throwing, for the
+    // token after a @dataset header or row: there protowire-go's parser
+    // reports what any token is doing beside the rows (DatasetBesideEntries)
+    // before what is wrong with it (#96).
+    private void Advance(bool keepIllegal)
     {
         while (true)
         {
             _current = _lex.Next();
             if (_current.Kind == TokenKind.ILLEGAL)
             {
+                if (keepIllegal) return;
                 throw new PxfException(_current.Pos, _current.Value);
             }
             if (_current.Kind == TokenKind.NEWLINE) continue;
@@ -181,6 +188,13 @@ public sealed class Parser
             {
                 throw new PxfException(_current.Pos, DatasetBesideEntries);
             }
+        }
+
+        // Only a @dataset leaves an ILLEGAL token current, and that one was
+        // reported above; anywhere else it is the lexer's error, as before.
+        if (_current.Kind == TokenKind.ILLEGAL)
+        {
+            throw new PxfException(_current.Pos, _current.Value);
         }
 
         var entries = new List<IEntry>();
@@ -326,7 +340,7 @@ public sealed class Parser
         }
         DatasetPaths.CheckHeader(columns, columnPositions);
         int endOffset = _current.Pos.Offset + 1; // past `)`
-        Advance(); // consume )
+        Advance(keepIllegal: true); // consume )
 
         var rows = new List<DatasetRow>();
         while (_current.Kind == TokenKind.LPAREN)
@@ -371,7 +385,7 @@ public sealed class Parser
         int endOffset = _current.Pos.Offset + 1;
         if (advancePastClose)
         {
-            Advance(); // consume )
+            Advance(keepIllegal: true); // consume )
         }
 
         if (cells.Count != expected)

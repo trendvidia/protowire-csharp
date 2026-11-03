@@ -84,7 +84,6 @@ public sealed class DatasetReader
     private int _scanPos;
     private int _rowStart = -1;
     private Lexer? _scanLex;
-    private Token? _stopTok;
 
     // A token the input read so far cuts (waiting) is not lexed again until
     // the characters read since could end it (MayEndToken): _waitAt is its
@@ -232,11 +231,10 @@ public sealed class DatasetReader
                     _finished = true;
                     return null;
                 case RowScan.NotRow:
-                    // Parse reports a token the lexer refuses as the lexer's
-                    // error, and anything else as an entry beside the dataset.
-                    throw _stopTok!.Kind == TokenKind.ILLEGAL
-                        ? new PxfException(PosAt(start), _stopTok.Value)
-                        : new PxfException(PosAt(start), Parser.DatasetBesideEntries);
+                    // Any token where a row could start, one the lexer refuses
+                    // included, is an entry beside the dataset, as Parse and
+                    // protowire-go's reader report it (#96).
+                    throw new PxfException(PosAt(start), Parser.DatasetBesideEntries);
             }
             // NeedMore. At the end of the source only spaces and comments may
             // remain; anything else is a row cut short.
@@ -361,7 +359,6 @@ public sealed class DatasetReader
                     case TokenKind.AT_TYPE or TokenKind.AT_DIRECTIVE or TokenKind.AT_DATASET or TokenKind.AT_PROTO:
                         return (RowScan.End, at, 0);
                     default:
-                        _stopTok = tok;
                         return (RowScan.NotRow, at, 0);
                 }
             }

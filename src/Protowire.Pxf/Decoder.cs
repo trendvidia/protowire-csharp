@@ -236,6 +236,10 @@ public partial class Decoder
                 throw new PxfException(firstDatasetPos,
                     "@dataset directive cannot coexist with top-level field entries (draft §3.4.4)");
             }
+            if (_current.Kind == TokenKind.ILLEGAL)
+            {
+                throw new PxfException(_current.Pos, _current.Value);
+            }
             return;
         }
     }
@@ -328,7 +332,7 @@ public partial class Decoder
                 $"expected ',' or ')' in @dataset column list, got {_current.Kind}");
         }
         DatasetPaths.CheckHeader(columns, columnPositions);
-        Advance(); // consume )
+        Advance(keepIllegal: true); // consume )
 
         var rows = new List<DatasetRow>();
         while (_current.Kind == TokenKind.LPAREN)
@@ -347,7 +351,7 @@ public partial class Decoder
                 throw new PxfException(_current.Pos,
                     $"expected ',' or ')' in @dataset row, got {_current.Kind}");
             }
-            Advance();
+            Advance(keepIllegal: true);
             if (cells.Count != columns.Count)
             {
                 throw new PxfException(rowPos,
@@ -476,13 +480,19 @@ public partial class Decoder
         return peeked;
     }
 
-    private void Advance()
+    private void Advance() => Advance(keepIllegal: false);
+
+    // keepIllegal leaves an ILLEGAL token current, for the token after a
+    // @dataset header or row: ConsumeDirectives then reports a token beside
+    // the rows as protowire-go does, before what is wrong with it (#96).
+    private void Advance(bool keepIllegal)
     {
         while (true)
         {
             _current = _lex.Next();
             if (_current.Kind == TokenKind.ILLEGAL)
             {
+                if (keepIllegal) return;
                 throw new PxfException(_current.Pos, _current.Value);
             }
             if (_current.Kind != TokenKind.COMMENT && _current.Kind != TokenKind.NEWLINE)
