@@ -34,6 +34,9 @@ managed:
       value: Protowire.Sbe.Tests.Bench
       path: sbe-oneof.proto
     - file_option: csharp_namespace
+      value: Protowire.Sbe.Tests.Utf8
+      path: sbe-utf8.proto
+    - file_option: csharp_namespace
       value: Protowire.Pxf.Tests.Bench
       path: bench-test.proto
     - file_option: csharp_namespace
