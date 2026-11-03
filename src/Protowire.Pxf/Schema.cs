@@ -19,10 +19,11 @@ public sealed record Violation(string File, string Element, string Detail, strin
 {
     internal string Message { get; init; } = Detail;
 
-    // What the element is called before its quoted name, with its trailing space.
-    internal string Subject { get; init; } = "field ";
+    // The whole line after "<file>: ", for a kind that protowire-go does not
+    // print as an annotation on a field.
+    internal string? Text { get; init; }
 
-    public override string ToString() => $"{File}: {Subject}\"{Element}\": {Message}";
+    public override string ToString() => Text != null ? $"{File}: {Text}" : $"{File}: field \"{Element}\": {Message}";
 }
 
 /// <summary>
@@ -137,10 +138,12 @@ public static class Schema
 
     private static bool IsReserved(string name) => name is "null" or "true" or "false";
 
+    // Printed as protowire-go prints it: "message field", "oneof" or "enum
+    // value", then the element (#88).
     private static Violation Reserved(string path, string kind, string element, string name) =>
         new(path, element, "reserved name", name)
         {
-            Message = $"{kind} uses PXF-reserved name \"{name}\" (draft §3.13)",
+            Text = $"{kind} \"{element}\" uses PXF-reserved name \"{name}\" (draft §3.13)",
         };
 
     private static void WalkMessages(string path, IEnumerable<MessageDescriptor> messages, List<Violation> found)
@@ -151,13 +154,13 @@ public static class Schema
             {
                 found.Add(new Violation(path, msg.FullName, shape)
                 {
-                    Message = $"redefines a well-known type: {shape} (draft -01 §wkt-shapes)",
+                    Text = $"message \"{msg.FullName}\" redefines a well-known type: {shape} (draft -01 §wkt-shapes)",
                 });
             }
             var oneofDefaults = new List<(OneofDescriptor Oneof, FieldDescriptor Field, AnnotationsRuntime.PxfOptions Options)>();
             foreach (var fd in msg.Fields.InDeclarationOrder())
             {
-                if (IsReserved(fd.Name)) found.Add(Reserved(path, "field", fd.FullName, fd.Name));
+                if (IsReserved(fd.Name)) found.Add(Reserved(path, "message field", fd.FullName, fd.Name));
                 var keyName = AnnotationsRuntime.GetKey(fd);
                 var keyProblem = keyName == null ? null : KeyPlacementProblem(fd, keyName);
                 if (keyProblem != null)
@@ -253,9 +256,21 @@ public static class Schema
         {
             foreach (var v in e.Values)
             {
-                if (IsReserved(v.Name)) found.Add(Reserved(path, "enum value", v.FullName, v.Name));
+                if (IsReserved(v.Name)) found.Add(Reserved(path, "enum value", EnumValueName(v), v.Name));
             }
         }
+    }
+
+    /// <summary>
+    /// An enum value's full name as protobuf scopes it, and protowire-go
+    /// names it: beside its enum, not inside it (<c>pkg.null</c>, or
+    /// <c>pkg.Msg.null</c> for an enum nested in Msg). Google.Protobuf's
+    /// <c>FullName</c> puts it inside the enum.
+    /// </summary>
+    internal static string EnumValueName(EnumValueDescriptor v)
+    {
+        string scope = v.EnumDescriptor.ContainingType?.FullName ?? v.File.Package;
+        return scope.Length == 0 ? v.Name : scope + "." + v.Name;
     }
 
     private static string? KeyPlacementProblem(FieldDescriptor fd, string keyName)
