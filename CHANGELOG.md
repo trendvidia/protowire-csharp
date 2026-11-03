@@ -41,6 +41,7 @@ format changes.
 - **`@required` and `@default(...)` are honoured** (#58), read from the 1327 carrier. A schema written that way used to get no required check, no default and no bind-time check, so it decoded differently here than in protowire-go. Two spellings of one default that disagree are refused.
 - **`Decoder.BindRow` binds a `@dataset` row to a generated message** (#41, #43). This port parsed rows but had no binder. Cells may be lists or blocks, each meaning what `c = <value>` means in a body, and columns may be dotted paths into sub-messages. A column the row type cannot reach is refused, naming it. There is no streaming reader yet.
 - Bool map keys, `+inf`, and the BigFloat precision suffix in the lexer.
+- **`Decoder.OnSecretField` hands a `pxf.Secret` value to the caller instead of the message** (#74), as `UnmarshalOptions.OnSecretField` does in protowire-go. A consumer can move the plaintext into protected memory without it ever being stored on the message. The handler gets the path and the value for the scalar and block forms, in singular, list and map positions and inside Any bodies, with the reference's paths (`db.password`, `backup_keys[0]`, `tenant_keys["acme"]`). The Secret's `value` is left unset, `hint` and `fingerprint` are still assigned, and presence still records `value`. An exception from the handler aborts the decode as a `PxfException` that names the path. With the handler set, a block-form Secret accepts only `value`, `hint` and `fingerprint` as string entries.
 
 ### Fixed
 

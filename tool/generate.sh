@@ -27,6 +27,7 @@ TABLE=(
   "Envelopes/V1/Envelope.cs              src/Protowire.Envelope/Generated/Envelope.cs"
   "Pxf/Tests/Bench/BenchTest.cs          tests/Protowire.Pxf.Tests/Generated/BenchTest.cs"
   "Pxf/Tests/Presence/PxfPresenceTest.cs tests/Protowire.Pxf.Tests/Generated/PxfPresenceTest.cs"
+  "Pxf/Tests/SecretHook/PxfSecretHookTest.cs tests/Protowire.Pxf.Tests/Generated/PxfSecretHookTest.cs"
   "Pxf/Tests/KeyedFixtures/Keyed.cs      tests/Protowire.Pxf.Tests/Generated/Keyed.cs"
   "Pxf/Tests/KeyedFixtures/PxfKeyInvalidTest.cs tests/Protowire.Pxf.Tests/Generated/PxfKeyInvalidTest.cs"
   "Pxf/Tests/KeyedName/PxfKeyedEntryNameTest.cs tests/Protowire.Pxf.Tests/Generated/PxfKeyedEntryNameTest.cs"
