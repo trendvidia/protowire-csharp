@@ -77,9 +77,29 @@ public class WriterTests
     [InlineData("1p99999999999999999999999", "not a positive bit count")]
     [InlineData("1p13604", "renders to 4097 digits")]
     [InlineData("1e646456992", "MaxBigFloatExponent")]
-    [InlineData("1e-646456992", "MaxBigFloatExponent")]
+    [InlineData("1e-646456992", "below the wire's exponent range")]
     public void BigFloat_Refused(string literal, string message) =>
         Assert.Contains(message, Assert.Throws<FormatException>(() => BigFloatText.Parse(literal, 4096, 16384)).Message);
+
+    // #100: a literal far past MaxBigFloatExponent is refused in protowire-go's
+    // words, which come from math/big: its exact binary exponent, or that it
+    // leaves big.Float's range or the wire's, or that its exponent is too long
+    // for big.Float to scan. Printed by protowire-go f8a01b1 for `bf = <literal>`.
+    [Theory]
+    [InlineData("1e49325", "big float literal 1e49325 has binary exponent 163855, and MaxBigFloatExponent=16384 bounds its magnitude")]
+    [InlineData("1e646456992", "big float literal 1e646456992 has binary exponent 2147483644, and MaxBigFloatExponent=16384 bounds its magnitude")]
+    [InlineData("1e646456993", "big float literal 1e646456993 is above big.Float's range")]
+    [InlineData("1e-646456992", "big float literal 1e-646456992 is below the wire's exponent range")]
+    [InlineData("1e-646457012", "big float literal 1e-646457012 is below big.Float's range")]
+    [InlineData("1e2147483647", "invalid big float: 1e2147483647")]
+    [InlineData("0e99999999999999999999", "invalid big float: 0e99999999999999999999")]
+    public void BigFloat_RefusedAsTheReferenceRefuses(string literal, string message) =>
+        Assert.Equal(message, Assert.Throws<FormatException>(() => BigFloatText.Parse(literal, 4096, 16384)).Message);
+
+    // A zero ignores its exponent, however large, if it scans (#100).
+    [Fact]
+    public void BigFloat_ZeroWithAHugeExponent() =>
+        Assert.True(BigFloatText.Parse("0e2147483648", 4096, 16384).Mantissa.IsZero);
 
     // protowire-go's TestPow2Digits: where a float64 is a digit high.
     [Theory]
