@@ -212,7 +212,11 @@ public static class Pb
                 using var ms = new MemoryStream();
                 using var entryOutput = new CodedOutputStream(ms);
                 if (entry.Key != null) MarshalField(entryOutput, 1, entry.Key, zigzag, depth + 1, maxDepth);
+                // A null value is the empty message: an entry always carries
+                // its value field (protowire#295), as protowire-go writes a
+                // nil *big.Float value.
                 if (entry.Value != null) MarshalField(entryOutput, 2, entry.Value, zigzag, depth + 1, maxDepth);
+                else WriteEmpty(entryOutput, 2);
                 entryOutput.Flush();
                 output.WriteTag(WireFormat.MakeTag((int)tag, WireFormat.WireType.LengthDelimited));
                 output.WriteBytes(ByteString.CopyFrom(ms.ToArray()));
@@ -220,9 +224,18 @@ public static class Pb
         }
         else if (val is System.Collections.IEnumerable enumerable)
         {
+            var itemType = ElementType(val.GetType());
+            if (itemType != null && IsPackable(itemType))
+            {
+                WritePacked(output, tag, enumerable, zigzag);
+                return;
+            }
             foreach (var item in enumerable)
             {
-                if (item != null) MarshalField(output, tag, item, zigzag, depth, maxDepth);
+                // A null element is the empty message, as protowire-go writes a
+                // nil *big.Int or *big.Rat element: the list keeps its length.
+                if (item == null) WriteEmpty(output, tag);
+                else MarshalField(output, tag, item, zigzag, depth, maxDepth);
             }
         }
         else
@@ -236,6 +249,48 @@ public static class Pb
             output.WriteTag(WireFormat.MakeTag((int)tag, WireFormat.WireType.LengthDelimited));
             output.WriteBytes(ByteString.CopyFrom(ms.ToArray()));
         }
+    }
+
+    private static void WriteEmpty(CodedOutputStream output, uint tag)
+    {
+        output.WriteTag(WireFormat.MakeTag((int)tag, WireFormat.WireType.LengthDelimited));
+        output.WriteLength(0);
+    }
+
+    private static Type? ElementType(Type listType) =>
+        listType.IsArray ? listType.GetElementType()
+        : listType.IsGenericType ? listType.GetGenericArguments()[0]
+        : null;
+
+    // proto3 packs a repeated scalar by default, and protowire-go writes it
+    // packed: one length-delimited run, nothing when the list is empty. The
+    // decoder takes either form.
+    private static void WritePacked(CodedOutputStream output, uint tag, System.Collections.IEnumerable items, bool zigzag)
+    {
+        using var ms = new MemoryStream();
+        using var run = new CodedOutputStream(ms);
+        bool any = false;
+        foreach (var item in items)
+        {
+            if (item == null) continue;
+            any = true;
+            switch (item)
+            {
+                case bool b: run.WriteBool(b); break;
+                case int i: if (zigzag) run.WriteSInt32(i); else run.WriteInt32(i); break;
+                case long l: if (zigzag) run.WriteSInt64(l); else run.WriteInt64(l); break;
+                case uint ui: run.WriteUInt32(ui); break;
+                case ulong ul: run.WriteUInt64(ul); break;
+                case float f: run.WriteFloat(f); break;
+                case double d: run.WriteDouble(d); break;
+                case Enum: run.WriteEnum(Convert.ToInt32(item, System.Globalization.CultureInfo.InvariantCulture)); break;
+                default: throw new InvalidOperationException($"cannot pack a repeated {item.GetType().Name}");
+            }
+        }
+        if (!any) return;
+        run.Flush();
+        output.WriteTag(WireFormat.MakeTag((int)tag, WireFormat.WireType.LengthDelimited));
+        output.WriteBytes(ByteString.CopyFrom(ms.ToArray()));
     }
 
     private static bool IsZero(object? val)
@@ -563,17 +618,18 @@ public static class Pb
     {
         using var ms = new MemoryStream();
         using var output = new CodedOutputStream(ms);
-        var bytes = MagnitudeBytes(bf.Mantissa);
+        var (mantissa, exponent) = WidenToPrecision(bf.Mantissa, bf.Exponent, bf.Precision);
+        var bytes = MagnitudeBytes(mantissa);
         if (bytes.Length > 0)
         {
             output.WriteTag(WireFormat.MakeTag(1, WireFormat.WireType.LengthDelimited));
             output.WriteBytes(ByteString.CopyFrom(bytes));
         }
         // A zero has one encoding: an empty mantissa and exponent 0.
-        if (bf.Exponent != 0 && !bf.Mantissa.IsZero)
+        if (exponent != 0 && !mantissa.IsZero)
         {
             output.WriteTag(WireFormat.MakeTag(2, WireFormat.WireType.Varint));
-            output.WriteInt32(bf.Exponent);
+            output.WriteInt32(exponent);
         }
         if (bf.Precision != 0)
         {
@@ -587,6 +643,43 @@ public static class Pb
         }
         output.Flush();
         return ms.ToArray();
+    }
+
+    // The wire mantissa is the value scaled to exactly prec bits, as
+    // protowire-go writes a big.Float (mant × 2^prec from MantExp): 1.5 at
+    // prec 64 is c000000000000000 × 2^-63, whatever form the BigFloat was
+    // built from, so the same value has one encoding (protowire#509's values
+    // table, #82). A mantissa wider than prec is rounded to it, half to even,
+    // as big.Float rounds on SetPrec. A zero, or prec 0, is left as it is.
+    private static (BigInteger Mantissa, int Exponent) WidenToPrecision(BigInteger mantissa, int exponent, uint precision)
+    {
+        if (mantissa.IsZero || precision == 0) return (mantissa, exponent);
+        long bits = (long)mantissa.GetBitLength();
+        long shift = precision - bits;
+        BigInteger m;
+        if (shift >= 0)
+        {
+            m = mantissa << (int)shift;
+        }
+        else
+        {
+            int drop = (int)-shift;
+            m = mantissa >> drop;
+            var rest = mantissa - (m << drop);
+            var half = BigInteger.One << (drop - 1);
+            if (rest > half || (rest == half && !m.IsEven)) m += 1;
+            if (m.GetBitLength() > precision)
+            {
+                m >>= 1;
+                shift--;
+            }
+        }
+        long adjusted = exponent - shift;
+        if (adjusted < int.MinValue || adjusted > int.MaxValue)
+        {
+            throw new InvalidOperationException($"pxf.BigFloat exponent {adjusted} does not fit int32");
+        }
+        return (m, (int)adjusted);
     }
 
     private static BigFloat UnmarshalBigFloat(byte[] data, PbLimits limits)

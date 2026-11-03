@@ -8,7 +8,7 @@
 //
 // Contract:
 //
-//     check-decode --format <pxf|pb|pb-render|pb-text|sbe|envelope> \
+//     check-decode --format <pxf|pxf-pb|pb|pb-render|pb-text|sbe|envelope> \
 //                  --schema <fully.qualified.MessageType> \
 //                  --proto  <path-to-adversarial.proto> \
 //                  --input  <path> \
@@ -22,8 +22,8 @@
 //
 // This is a codegen port, so --proto is not read: --schema names a message of
 // proto/conformance/adversarial.proto, a byte copy of the corpus's schema,
-// whose generated class the PXF, pb-render and SBE paths use. pb-text does the
-// same with text.proto. The PB codec consumes hand-written classes annotated
+// whose generated class the PXF, pb-render and SBE paths use. pb-text and
+// pxf-pb do the same with text.proto. The PB codec consumes hand-written classes annotated
 // with `[Protowire(N)]`, so the PB path has the mirrors below. Drift between
 // them and the schema is caught by the corpus: a wrong field number flips an
 // accept or reject expectation.
@@ -121,6 +121,9 @@ internal static class CheckDecode
             case "pxf":
                 PxfDecode(input, schema, limits);
                 return;
+            case "pxf-pb":
+                PxfPb(input, schema, limits);
+                return;
             case "pb":
                 PbDecode(input, schema, limits);
                 return;
@@ -144,10 +147,13 @@ internal static class CheckDecode
         Adversarial.FirstOrDefault(m => m.FullName == schema)
         ?? throw new UnknownSchemaException(schema);
 
-    private static void PxfDecode(string input, string schema, Dictionary<string, int> limits)
+    private static void PxfDecode(string input, string schema, Dictionary<string, int> limits) =>
+        PxfDecoder(limits).Unmarshal(File.ReadAllText(input), Generated(schema).Parser.ParseFrom(ByteString.Empty));
+
+    private static Decoder PxfDecoder(Dictionary<string, int> limits)
     {
         var defaults = PxfLimits.Default;
-        var decoder = new Decoder
+        return new Decoder
         {
             Limits = defaults with
             {
@@ -159,7 +165,78 @@ internal static class CheckDecode
                 MaxBigFloatExponent = limits.GetValueOrDefault("MaxBigFloatExponent", defaults.MaxBigFloatExponent),
             },
         };
-        decoder.Unmarshal(File.ReadAllText(input), Generated(schema).Parser.ParseFrom(ByteString.Empty));
+    }
+
+    private static MessageDescriptor TextMessage(string schema) =>
+        TextReflection.Descriptor.MessageTypes.FirstOrDefault(m => m.FullName == schema)
+            ?? throw new UnknownSchemaException(schema);
+
+    // pxf-pb, for the write gate (protowire/scripts/cross_write_check.sh,
+    // protowire#509): the PB bytes of a text.v1 PXF document on stdout. It
+    // decodes as protowire-go's harness does, with the full decode that checks
+    // (pxf.required) and applies (pxf.default), and writes map entries in key
+    // order, as Go's deterministic writer does. Google.Protobuf writes a map
+    // in insertion order, so the maps are rebuilt sorted before writing; the
+    // gate compares raw bytes.
+    private static void PxfPb(string input, string schema, Dictionary<string, int> limits)
+    {
+        var msg = TextMessage(schema).Parser.ParseFrom(ByteString.Empty);
+        PxfDecoder(limits).UnmarshalFull(File.ReadAllText(input), msg);
+        SortMaps(msg);
+        using var stdout = Console.OpenStandardOutput();
+        stdout.Write(msg.ToByteArray());
+    }
+
+    private static void SortMaps(IMessage msg)
+    {
+        foreach (var fd in msg.Descriptor.Fields.InFieldNumberOrder())
+        {
+            if (fd.FieldType is not (FieldType.Message or FieldType.Group)) continue;
+            var value = fd.Accessor.GetValue(msg);
+            if (fd.IsMap)
+            {
+                var map = (System.Collections.IDictionary)value;
+                var entries = new List<System.Collections.DictionaryEntry>();
+                for (var it = map.GetEnumerator(); it.MoveNext();) entries.Add(it.Entry);
+                entries.Sort((a, b) => MapKeyOrder.Instance.Compare(a.Key, b.Key));
+                map.Clear();
+                foreach (var e in entries)
+                {
+                    if (e.Value is IMessage m) SortMaps(m);
+                    map[e.Key] = e.Value;
+                }
+            }
+            else if (fd.IsRepeated)
+            {
+                foreach (var item in (System.Collections.IList)value)
+                {
+                    if (item is IMessage m) SortMaps(m);
+                }
+            }
+            else if (value is IMessage m)
+            {
+                SortMaps(m);
+            }
+        }
+    }
+
+    // Go's deterministic order: false before true, integers by value, strings
+    // by their UTF-8 bytes.
+    private sealed class MapKeyOrder : IComparer<object>
+    {
+        public static readonly MapKeyOrder Instance = new();
+
+        public int Compare(object? x, object? y) => (x, y) switch
+        {
+            (string a, string b) => System.Text.Encoding.UTF8.GetBytes(a).AsSpan()
+                .SequenceCompareTo(System.Text.Encoding.UTF8.GetBytes(b)),
+            (bool a, bool b) => a.CompareTo(b),
+            (int a, int b) => a.CompareTo(b),
+            (long a, long b) => a.CompareTo(b),
+            (uint a, uint b) => a.CompareTo(b),
+            (ulong a, ulong b) => a.CompareTo(b),
+            _ => throw new ArgumentException($"map key of type {x?.GetType()}"),
+        };
     }
 
     // pb-render tests the PXF producer, so the stock reader in front of it must
@@ -192,8 +269,7 @@ internal static class CheckDecode
 
     private static void PbText(string input, string schema)
     {
-        var desc = TextReflection.Descriptor.MessageTypes.FirstOrDefault(m => m.FullName == schema)
-            ?? throw new UnknownSchemaException(schema);
+        var desc = TextMessage(schema);
         // Bytes rather than text: the gate compares them, and Console would
         // translate the line ends on Windows.
         var text = new Encoder().Marshal(desc.Parser.ParseFrom(File.ReadAllBytes(input)));

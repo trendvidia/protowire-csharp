@@ -34,6 +34,7 @@ TABLE=(
   "Pxf/Tests/RequiredDefault/PxfRequiredDefaultTest.cs       tests/Protowire.Pxf.Tests/Generated/PxfRequiredDefaultTest.cs"
   "Pxf/Tests/RequiredDefault/PxfRequiredDefaultOkTest.cs     tests/Protowire.Pxf.Tests/Generated/PxfRequiredDefaultOkTest.cs"
   "Pxf/Tests/RequiredDefault/PxfRequiredDefaultImportTest.cs tests/Protowire.Pxf.Tests/Generated/PxfRequiredDefaultImportTest.cs"
+  "Pxf/Tests/AnyReadBack/PxfAnyReadbackTest.cs tests/Protowire.Pxf.Tests/Generated/PxfAnyReadbackTest.cs"
   "Sbe/Tests/Bench/SbeBench.cs           tests/Protowire.Sbe.Tests/Generated/SbeBench.cs"
   "Sbe/Tests/Bench/SbeExtra.cs           tests/Protowire.Sbe.Tests/Generated/SbeExtra.cs"
   "Sbe/Tests/Bench/SbeOneof.cs           tests/Protowire.Sbe.Tests/Generated/SbeOneof.cs"

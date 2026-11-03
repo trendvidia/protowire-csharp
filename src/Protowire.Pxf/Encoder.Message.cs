@@ -451,7 +451,11 @@ public partial class Encoder
         IMessage inner;
         try
         {
-            inner = desc.Parser.ParseFrom(value);
+            // The parser's own recursion limit is 100 whatever this
+            // encoder's is; under a raised MaxNestingDepth a deeper value
+            // still fits a body, so it parses to that limit instead.
+            using var stream = new MemoryStream(value.ToByteArray(), writable: false);
+            inner = desc.Parser.ParseFrom(CodedInputStream.CreateWithLimits(stream, int.MaxValue, MaxNestingDepth));
         }
         catch (InvalidProtocolBufferException)
         {
