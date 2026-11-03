@@ -1096,20 +1096,14 @@ public partial class Decoder
 
     private static Protowire.Pb.BigFloat ParseBigFloatLiteral(string s)
     {
-        CheckLiteralDigits(s, Position.Empty, PxfLimits.Default.MaxNumericLiteralDigits);
-        bool negative = s.StartsWith('-');
-        if (negative) s = s[1..];
-        int dot = s.IndexOf('.');
-        int scale = 0;
-        if (dot >= 0)
+        try
         {
-            scale = s.Length - dot - 1;
-            s = s.Remove(dot, 1);
+            return BigFloatText.Parse(s, PxfLimits.Default.MaxNumericLiteralDigits, PxfLimits.Default.MaxBigFloatExponent);
         }
-        if (s.Length == 0) s = "0";
-        return new Protowire.Pb.BigFloat(
-            System.Numerics.BigInteger.Parse(s, CultureInfo.InvariantCulture),
-            -scale, (uint)s.Length, negative);
+        catch (FormatException e)
+        {
+            throw new PxfException(Position.Empty, $"invalid default big float: {e.Message}");
+        }
     }
 
     // Rejects a literal past MaxNumericLiteralDigits before it reaches a

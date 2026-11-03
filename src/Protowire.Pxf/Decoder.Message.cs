@@ -405,9 +405,42 @@ public partial class Decoder
 
     private Protowire.Pb.BigFloat ParseBigFloatToken(Position pos)
     {
-        var s = _current.Value;
-        CheckLiteralDigits(s, pos);
-        return ParseBigFloatLiteral(s);
+        try
+        {
+            return BigFloatText.Parse(_current.Value, _lex.Prec, _limits.MaxNumericLiteralDigits, _limits.MaxBigFloatExponent);
+        }
+        catch (FormatException e)
+        {
+            throw new PxfException(pos, e.Message);
+        }
+    }
+
+    /// <summary>
+    /// Whether <paramref name="body"/>, the entries of an Any block at
+    /// <paramref name="depth"/>, decodes to exactly <paramref name="want"/>.
+    /// A reader's own check is the only complete one: a body loses what the
+    /// text cannot say at any level, and what else the reader does to it, a
+    /// default or a required rule among them, is the decoder's to know.
+    /// </summary>
+    internal static bool AnyBodyReadsBack(string body, MessageDescriptor desc, TypeRegistry registry, int depth, int maxDepth, ByteString want)
+    {
+        var d = new Decoder { Registry = registry, _limits = PxfLimits.Default with { MaxNestingDepth = maxDepth } };
+        d.ResetState();
+        d._result = new Result();
+        d._depth = depth;
+        d._lex = new Lexer(body + "}", d._limits.MaxBytesLiteralLength);
+        var inner = NewMessage(desc);
+        try
+        {
+            d.Advance();
+            d.DecodeMessage(inner, true);
+            d.PostDecode(inner, "", null);
+        }
+        catch (PxfException)
+        {
+            return false;
+        }
+        return want.Span.SequenceEqual(WellKnown.Deterministic(inner));
     }
 
     /// <summary>

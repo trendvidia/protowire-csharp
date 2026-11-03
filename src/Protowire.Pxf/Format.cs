@@ -13,11 +13,7 @@ namespace Protowire.Pxf;
 /// is <see cref="Parser.Parse(string)"/> on the way in.
 /// </para>
 ///
-/// <para>
-/// String values use the same escape set the lexer accepts: `\"` `\\` `\n`
-/// `\r` `\t` plus `\xHH` for control bytes &lt; 0x20. Code units &gt;= 0x20
-/// pass through literally so valid UTF-8 stays UTF-8.
-/// </para>
+/// <para>String values are quoted as Go's strconv.Quote does.</para>
 ///
 /// <para>
 /// This pass has no schema, so quoted entry names stay quoted. The
@@ -67,15 +63,15 @@ public static class Format
                     WriteComments(sb, t.LeadingComments, level);
                     WriteIndent(sb, level);
                     sb.Append("@type = ");
-                    Encoder.WriteQuotedString(sb, t.Url);
+                    GoFormat.Quote(sb, t.Url);
                     sb.Append('\n');
                     break;
                 case MapEntry m:
                     WriteComments(sb, m.LeadingComments, level);
                     WriteIndent(sb, level);
-                    if (NeedsQuoting(m.Key))
+                    if (MapKeyQuoted(m))
                     {
-                        Encoder.WriteQuotedString(sb, m.Key);
+                        GoFormat.Quote(sb, m.Key);
                     }
                     else
                     {
@@ -110,7 +106,7 @@ public static class Format
     {
         if (quoted)
         {
-            Encoder.WriteQuotedString(sb, name);
+            GoFormat.Quote(sb, name);
         }
         else
         {
@@ -123,7 +119,7 @@ public static class Format
         switch (val)
         {
             case StringVal s:
-                Encoder.WriteQuotedString(sb, s.Value);
+                GoFormat.Quote(sb, s.Value);
                 break;
             case IntVal i:
                 sb.Append(i.Raw);
@@ -187,22 +183,21 @@ public static class Format
     }
 
     /// <summary>
-    /// Map keys must be quoted unless they look like a plain identifier
-    /// (letter or `_`, then letters / digits / `_`). Empty strings are
-    /// always quoted.
+    /// The spelling of a map key on the way out (draft -01 § Entries and Keys).
+    /// A key the document quoted keeps its quotes unless it is identifier-safe.
+    /// A key it wrote bare stays bare, because bare <c>true</c> and <c>123</c>
+    /// denote a bool and an integer key. An entry built in code has no spelling
+    /// to keep: it is bare only if it reads back as one bare key.
     /// </summary>
-    private static bool NeedsQuoting(string s)
+    private static bool MapKeyQuoted(MapEntry e) =>
+        e.KeyQuoted ? !Keyed.IdentSafeEntryName(e.Key) : !LexesAsBareMapKey(e.Key);
+
+    private static bool LexesAsBareMapKey(string s)
     {
-        if (s.Length == 0) return true;
-        for (int i = 0; i < s.Length; i++)
-        {
-            char ch = s[i];
-            bool ok = (ch is >= 'a' and <= 'z')
-                   || (ch is >= 'A' and <= 'Z')
-                   || ch == '_'
-                   || (i > 0 && ch is >= '0' and <= '9');
-            if (!ok) return true;
-        }
-        return false;
+        var lexer = new Lexer(s);
+        var token = lexer.Next();
+        return token.Kind is TokenKind.IDENT or TokenKind.INT or TokenKind.BOOL
+            && token.Value == s
+            && lexer.Next().Kind == TokenKind.EOF;
     }
 }

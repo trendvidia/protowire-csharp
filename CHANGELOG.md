@@ -25,11 +25,14 @@ format changes.
   - A value of the wrong type, such as a string in an `int32` field, which was either coerced or failed as a raw .NET exception. Every rejection is now a `PxfException`.
   - The `@type url` spelling inside an Any block. It is `@type = "url"` (#42), and the encoder writes that.
   - An identifier outside ASCII.
+- **Generated messages are written from their descriptors**, in the reference's text. `tests/Protowire.Conformance` compares it byte for byte, and written PXF changes for existing callers in these ways: fields follow declaration order and generated plumbing such as `has_x` and `x_case` is gone, repeated and map fields of well-known types use their literals, a Timestamp has no trailing zeros, a Duration is spelled as Go's `time.Duration.String` spells it (`1.5s`, not `1s500ms`), floats use `1e+06`, and a map's keys sort by written form.
+- The formatter quotes strings as `strconv.Quote` does, so an unusual character may be escaped differently.
 - `(pxf.required)` and `(pxf.default)` now apply inside list elements and map values (#52).
 - A nesting-depth error now reads `nesting depth exceeds MaxNestingDepth=100`.
 
 ### Added
 
+- `Encoder.EmitDefaults`, `Encoder.NullFields` and `Encoder.MaxNestingDepth`. A message deeper than the limit is an error, because a reader at that limit would refuse it.
 - `PxfLimits`, set through `Decoder.Limits` or `Parser.Parse(input, limits)`, makes the draft's limits per-call.
 - The type entry of an Any block, in a singular field, a list element or a map value (#42).
 - Wrapper-typed fields take a scalar or a block (#45).
@@ -38,6 +41,10 @@ format changes.
 
 ### Fixed
 
+- **`pxf.BigFloat` is read and written as a binary floating-point value** (#47). It was stored with a decimal scale as its exponent, so a value decoded from PXF was wrong on the wire, and the encoder wrote raw fields. It now follows the spec's corpus both ways: a suffixed literal reads at its precision, an unsuffixed one at 256 bits, and `MaxBigFloatExponent` bounds the value. **A BigFloat decoded from PXF by an earlier version holds the wrong value.**
+- **A string map key is written bare exactly when it is identifier-safe** (#35, #36), dots included. `"true"`, `"null"`, `"123"` and `".e"` stay quoted, which keeps a formatted document binding to the same keys.
+- **An Any is written as a type entry and a body only when it reads back unchanged**, and otherwise as `type_url` and `value`.
+- **A Duration past the literal's 292-year range is written as a block**, and a `pxf.Secret` with metadata keeps its block form.
 - **Fractional and `µs` duration literals** (#19), such as `1.5ms` and `2µs`. Other ports write them for any measured latency. A duration now keeps every nanosecond, and a malformed one such as `5min` is rejected by the lexer.
 - **A Timestamp keeps nanoseconds**, and any RFC 3339 offset, rather than stopping at 100 ns.
 - **A `(pxf.default)` on a oneof member no longer clears the sibling the document set** (#63).
