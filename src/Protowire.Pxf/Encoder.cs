@@ -43,9 +43,13 @@ public partial class Encoder
     }
 
     // The path for a hand-written class: no descriptor, so members are written
-    // in reflection order and a zero value is omitted.
+    // in reflection order and a zero value is omitted. The indentation level is
+    // the depth a decoder counts (a block, a list and a map are each one
+    // descent), so the same MaxNestingDepth check as the descriptor path
+    // applies, and a cycle of references fails instead of overflowing the stack.
     private void EncodeMessage(object obj, int level)
     {
+        CheckDepth(level);
         var type = obj.GetType();
         foreach (var prop in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
@@ -139,6 +143,7 @@ public partial class Encoder
     private void EncodeListField(string name, IEnumerable? list, int level)
     {
         if (list == null) return;
+        CheckDepth(level + 1);
         WriteIndent(level);
         _sb.Append(name).Append(" = [\n");
         foreach (var elem in list)
@@ -170,6 +175,7 @@ public partial class Encoder
     private void EncodeMapField(string name, IDictionary? map, int level)
     {
         if (map == null) return;
+        CheckDepth(level + 1);
         WriteIndent(level);
         _sb.Append(name).Append(" = {\n");
         foreach (DictionaryEntry entry in map)
