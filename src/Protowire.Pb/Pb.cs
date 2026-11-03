@@ -238,7 +238,9 @@ public static class Pb
         if (val is byte[] bytes) return bytes.Length == 0;
         if (val is ByteString bs) return bs.Length == 0;
         if (val is BigInteger bi) return bi.IsZero;
-        if (val is Decimal dec) return dec.Unscaled.IsZero && dec.Scale == 0 && !dec.Negative;
+        // A Decimal is written reduced, so a zero at any scale or sign is the
+        // zero value, and is omitted as protowire-go omits a zero big.Rat.
+        if (val is Decimal dec) return dec.Unscaled.IsZero;
         if (val is BigFloat bf) return bf.Mantissa.IsZero && bf.Exponent == 0 && bf.Precision == 0 && !bf.Negative;
         if (val.GetType().IsEnum) return (int)val == 0;
         return false;
@@ -456,33 +458,69 @@ public static class Pb
     private static byte[] MagnitudeBytes(BigInteger magnitude) =>
         magnitude.IsZero ? [] : magnitude.ToByteArray(isUnsigned: true, isBigEndian: true);
 
+    // Writes a Decimal in reduced form: the smallest scale >= 0 that holds the
+    // same number, so unscaled 100 at scale 2 goes out as 1, and 5 at scale -2
+    // as 500 (draft -01 § PXF Annotations, trendvidia/protowire#508). This is
+    // what protowire-go writes, because its big.Rat has no scale to keep. A
+    // zero at any scale is the empty message, with no sign. The value passed
+    // in is not changed.
+    //
+    // The scale bound applies after reducing, so 100 at scale 4097 is written
+    // as 1 at scale 4095. A scale below -MaxNumericLiteralDigits is refused
+    // before reducing: it would ask for that many zero digits, and scale
+    // int.MinValue for about 900 MB.
     private static byte[] MarshalDecimal(Decimal dec)
     {
         int limit = PbLimits.Default.MaxNumericLiteralDigits;
-        if (dec.Scale > limit || dec.Scale < -limit)
+        if (dec.Scale < -limit)
         {
             throw new InvalidOperationException($"pxf.Decimal scale {dec.Scale} exceeds MaxNumericLiteralDigits={limit}");
         }
+        var (unscaled, scale) = ReduceDecimal(dec.Unscaled, dec.Scale);
+        if (scale > limit)
+        {
+            throw new InvalidOperationException($"pxf.Decimal scale {scale} exceeds MaxNumericLiteralDigits={limit}");
+        }
+        bool negative = dec.Negative && !unscaled.IsZero;
         using var ms = new MemoryStream();
         using var output = new CodedOutputStream(ms);
-        var bytes = MagnitudeBytes(dec.Unscaled);
+        var bytes = MagnitudeBytes(unscaled);
         if (bytes.Length > 0)
         {
             output.WriteTag(WireFormat.MakeTag(1, WireFormat.WireType.LengthDelimited));
             output.WriteBytes(ByteString.CopyFrom(bytes));
         }
-        if (dec.Scale != 0)
+        if (scale != 0)
         {
             output.WriteTag(WireFormat.MakeTag(2, WireFormat.WireType.Varint));
-            output.WriteInt32(dec.Scale);
+            output.WriteInt32(scale);
         }
-        if (dec.Negative)
+        if (negative)
         {
             output.WriteTag(WireFormat.MakeTag(3, WireFormat.WireType.Varint));
             output.WriteBool(true);
         }
         output.Flush();
         return ms.ToArray();
+    }
+
+    // The smallest scale >= 0 for magnitude × 10^(-scale). Removing k zeros
+    // needs 2^k to divide the magnitude, so its trailing zero bits bound k,
+    // and a binary search over that range takes a few divisions even for a
+    // long value.
+    internal static (BigInteger Unscaled, int Scale) ReduceDecimal(BigInteger magnitude, int scale)
+    {
+        if (magnitude.IsZero) return (BigInteger.Zero, 0);
+        if (scale < 0) return (magnitude * BigInteger.Pow(10, -scale), 0);
+        int hi = (int)Math.Min(scale, (long)BigInteger.TrailingZeroCount(magnitude));
+        int lo = 0;
+        while (lo < hi)
+        {
+            int mid = lo + (hi - lo + 1) / 2;
+            if ((magnitude % BigInteger.Pow(10, mid)).IsZero) lo = mid;
+            else hi = mid - 1;
+        }
+        return lo == 0 ? (magnitude, scale) : (magnitude / BigInteger.Pow(10, lo), scale - lo);
     }
 
     private static Decimal UnmarshalDecimal(byte[] data, PbLimits limits)
