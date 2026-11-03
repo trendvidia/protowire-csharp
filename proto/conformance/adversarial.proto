@@ -98,3 +98,14 @@ message SbeWithGroup {
   }
   repeated Entry entries = 2;
 }
+
+// SbeText backs the SBE UTF-8 inputs (HARDENING.md § UTF-8, issue #496).
+// `text` is a string, so a decoder validates its bytes; `raw` is a bytes
+// field of the same length, which takes any bytes, so a row with invalid
+// UTF-8 in `raw` proves the check follows the field's type. Wire layout:
+//   header(8) + text(8) + raw(8); template block_length = 16
+message SbeText {
+  option (sbe.template_id) = 9002;
+  string text = 1 [(sbe.length) = 8];
+  bytes raw = 2 [(sbe.length) = 8];
+}
