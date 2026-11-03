@@ -1,0 +1,7 @@
+@type duration.v1.Holder
+
+# A DIGIT-led token that runs past a time-unit into further letters is an
+# invalid duration, never an identifier: "5seconds" MUST be rejected as a
+# malformed duration.
+
+d = 5seconds

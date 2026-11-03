@@ -1,0 +1,6 @@
+@type duration.v1.Holder
+
+# A sign inside the literal is not a duration: "1h-30m" MUST be rejected
+# (the token ends at "1h"; "-30m" cannot follow a value).
+
+d = 1h-30m

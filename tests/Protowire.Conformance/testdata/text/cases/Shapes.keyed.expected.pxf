@@ -1,0 +1,10 @@
+keyed {
+  alpha {
+    weight = 1
+  }
+  "needs quoting" {
+    weight = 2
+  }
+  c {
+  }
+}

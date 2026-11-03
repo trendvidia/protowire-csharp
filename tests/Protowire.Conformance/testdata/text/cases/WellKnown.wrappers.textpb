@@ -1,0 +1,1 @@
+str_w { value: "x" } bytes_w { value: "\x05" } bool_w { value: true } i32_w { value: -1 } i64_w { value: -2 } u32_w { value: 4294967295 } u64_w { value: 18446744073709551615 } flt_w { value: 1.5 } dbl_w { value: 2.5 }

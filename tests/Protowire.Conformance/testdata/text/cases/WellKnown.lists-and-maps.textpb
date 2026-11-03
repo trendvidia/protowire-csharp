@@ -1,0 +1,1 @@
+durs { seconds: 60 } durs { seconds: 9500000000 } stamps { key: "b" value { seconds: 1 } } stamps { key: "a" value { seconds: 2 } } decs { key: "x" value { unscaled: "\x05" scale: 1 } }

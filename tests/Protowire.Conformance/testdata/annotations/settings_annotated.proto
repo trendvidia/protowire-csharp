@@ -1,0 +1,29 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 TrendVidia, LLC.
+//
+// settings.proto in the annotation form. @required and @default lower only to
+// the 1327 carrier (RFC-001 §8.5), so a reader of 1314/1315 alone sees no
+// annotation here and enforces nothing. It accepts the same documents as
+// settings.proto, and ok.pxf gives the same bytes.
+//
+// It needs a v1.2 compiler. settings_annotated.binpb is
+// `pxf build --null-mask=false --source-info=false
+//  -o testdata/annotations/settings_annotated.binpb
+//  testdata/annotations/settings_annotated.proto`;
+// cmd/pxf/fixture_numbers_test.go pins that the image carries 1327 and that it
+// matches this file.
+syntax = "proto3";
+
+package settings.annotated.v1;
+
+import "protowire/schema/v1/annotations.proto";
+
+option java_multiple_files = true;
+option java_package = "settings.annotated.v1";
+
+message Settings {
+  string name    = 1 @required;
+  int32  retries = 2 @default(3);
+  string region  = 3 @default("us-east-1");
+  bool   verbose = 4 @default(true);
+}

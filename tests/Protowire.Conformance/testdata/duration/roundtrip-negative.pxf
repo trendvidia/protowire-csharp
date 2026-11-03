@@ -1,0 +1,3 @@
+@type duration.v1.Holder
+
+d = -1.5s

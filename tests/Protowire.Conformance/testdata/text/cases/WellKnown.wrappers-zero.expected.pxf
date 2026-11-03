@@ -1,0 +1,9 @@
+str_w = ""
+bytes_w = b""
+bool_w = false
+i32_w = 0
+i64_w = 0
+u32_w = 0
+u64_w = 0
+flt_w = 0
+dbl_w = 0

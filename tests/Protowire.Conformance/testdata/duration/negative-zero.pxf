@@ -1,0 +1,5 @@
+@type duration.v1.Holder
+
+# "-0s" denotes zero: seconds = 0, nanos = 0.
+
+d = -0s

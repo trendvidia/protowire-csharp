@@ -1,0 +1,10 @@
+# Entries and Keys: a repeated field MAY be bound more than once with a list
+# value. The elements concatenate in document order. MUST be accepted:
+# repeated_string = ["a", "b", "c"], repeated_nested names = ["n1", "n2"].
+
+@type test.v1.AllTypes
+
+repeated_string = ["a"]
+repeated_nested = [{ name = "n1" }]
+repeated_string = ["b", "c"]
+repeated_nested = [{ name = "n2" value = 2 }]

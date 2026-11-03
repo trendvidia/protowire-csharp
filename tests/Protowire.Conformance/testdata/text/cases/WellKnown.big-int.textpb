@@ -1,0 +1,1 @@
+big_int { abs: "\x05" negative: true }

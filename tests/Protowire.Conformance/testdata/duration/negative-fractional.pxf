@@ -1,0 +1,7 @@
+@type duration.v1.Holder
+
+# A fractional segment under a leading "-" yields seconds and nanos of the
+# same sign, as google.protobuf.Duration requires: seconds = -1,
+# nanos = -500000000.
+
+d = -1.5s

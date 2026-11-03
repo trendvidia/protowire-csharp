@@ -1,0 +1,94 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 TrendVidia, LLC.
+
+// Schema for the text conformance fixtures under testdata/text/: every shape a
+// marshaller writes, so ports can be compared on the PXF they produce. See
+// testdata/text/README.md and scripts/cross_text_check.sh.
+
+syntax = "proto3";
+package text.v1;
+
+option java_package = "text.v1";
+option java_multiple_files = true;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+import "pxf/annotations.proto";
+import "pxf/bignum.proto";
+import "pxf/secret.proto";
+
+enum Color {
+  COLOR_UNSPECIFIED = 0;
+  COLOR_RED = 1;
+  COLOR_GREEN = 2;
+}
+
+message Item {
+  string name = 1;
+  int32 weight = 2;
+}
+
+message Keyed {
+  string id = 1;
+  int32 weight = 2;
+}
+
+message Scalars {
+  double f_double = 1;
+  float f_float = 2;
+  int64 f_int64 = 3;
+  uint64 f_uint64 = 4;
+  int32 f_int32 = 5;
+  fixed64 f_fixed64 = 6;
+  fixed32 f_fixed32 = 7;
+  bool f_bool = 8;
+  string f_string = 9;
+  bytes f_bytes = 12;
+  uint32 f_uint32 = 13;
+  Color f_enum = 14;
+  sfixed32 f_sfixed32 = 15;
+  sfixed64 f_sfixed64 = 16;
+  sint32 f_sint32 = 17;
+  sint64 f_sint64 = 18;
+}
+
+message Shapes {
+  Item one = 1;
+  optional string opt_string = 2;
+  optional int32 opt_int = 3;
+  repeated int32 ints = 4;
+  repeated string strings = 5;
+  repeated Item items = 6;
+  repeated Color colors = 7;
+  repeated Keyed keyed = 8 [(pxf.key) = "id"];
+  map<string, string> by_string = 9;
+  map<int32, string> by_int = 10;
+  map<bool, string> by_bool = 11;
+  map<string, Item> by_item = 12;
+  oneof choice {
+    string choice_string = 13;
+    Item choice_item = 14;
+  }
+}
+
+message WellKnown {
+  google.protobuf.Timestamp ts = 1;
+  google.protobuf.Duration dur = 2;
+  google.protobuf.StringValue str_w = 3;
+  google.protobuf.BytesValue bytes_w = 4;
+  google.protobuf.BoolValue bool_w = 5;
+  google.protobuf.Int32Value i32_w = 6;
+  google.protobuf.Int64Value i64_w = 7;
+  google.protobuf.UInt32Value u32_w = 8;
+  google.protobuf.UInt64Value u64_w = 9;
+  google.protobuf.FloatValue flt_w = 10;
+  google.protobuf.DoubleValue dbl_w = 11;
+  pxf.BigInt big_int = 12;
+  pxf.Decimal dec = 13;
+  pxf.BigFloat big_float = 14;
+  pxf.Secret secret = 15;
+  repeated google.protobuf.Duration durs = 16;
+  map<string, google.protobuf.Timestamp> stamps = 17;
+  map<string, pxf.Decimal> decs = 18;
+}

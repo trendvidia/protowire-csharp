@@ -11,6 +11,10 @@ format changes.
 
 ## [Unreleased]
 
+### Added
+
+- **CI compares this port with protowire-go** (#66). `tool/go_oracle` records what the reference does with every document in the vendored spec corpora, and `tests/Protowire.Conformance` fails on a different verdict, PB bytes, written PXF or formatted PXF. `pxf.Secret` is vendored as a generated type, because the corpora use it.
+
 ### Fixed
 
 - **A keyed entry's name now counts as supplying the key field**

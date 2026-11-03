@@ -19,6 +19,9 @@ managed:
       value: Protowire.Pxf
       path: pxf/annotations.proto
     - file_option: csharp_namespace
+      value: Protowire.Pxf
+      path: pxf/secret.proto
+    - file_option: csharp_namespace
       value: Protowire.Sbe
       path: sbe/annotations.proto
     - file_option: csharp_namespace
@@ -57,6 +60,48 @@ managed:
     - file_option: csharp_namespace
       value: Protowire.DumpEnvelope.Fixtures
       path: settings.proto
+    - file_option: csharp_namespace
+      value: Protowire.Conformance.Schemas.Any
+      path: conformance/any.proto
+    - file_option: csharp_namespace
+      value: Protowire.Conformance.Schemas.Bigfloat
+      path: conformance/bigfloat.proto
+    - file_option: csharp_namespace
+      value: Protowire.Conformance.Schemas.Blocks
+      path: conformance/blocks.proto
+    - file_option: csharp_namespace
+      value: Protowire.Conformance.Schemas.Paths
+      path: conformance/paths.proto
+    - file_option: csharp_namespace
+      value: Protowire.Conformance.Schemas.Duplicates
+      path: conformance/duplicates.proto
+    - file_option: csharp_namespace
+      value: Protowire.Conformance.Schemas.Duration
+      path: conformance/duration.proto
+    - file_option: csharp_namespace
+      value: Protowire.Conformance.Schemas.BoolKeys
+      path: conformance/bool-keys.proto
+    - file_option: csharp_namespace
+      value: Protowire.Conformance.Schemas.Nulls
+      path: conformance/nulls.proto
+    - file_option: csharp_namespace
+      value: Protowire.Conformance.Schemas.NullsProto2
+      path: conformance/nulls_proto2.proto
+    - file_option: csharp_namespace
+      value: Protowire.Conformance.Schemas.NullsEditions
+      path: conformance/nulls_editions.proto
+    - file_option: csharp_namespace
+      value: Protowire.Conformance.Schemas.Strings
+      path: conformance/strings.proto
+    - file_option: csharp_namespace
+      value: Protowire.Conformance.Schemas.Text
+      path: conformance/text.proto
+    - file_option: csharp_namespace
+      value: Protowire.Conformance.Schemas.Testv1
+      path: conformance/test.proto
+    - file_option: csharp_namespace
+      value: Protowire.Conformance.Schemas.Values
+      path: conformance/conformance.proto
 plugins:
   - remote: buf.build/protocolbuffers/csharp:v29.3
     out: .generated
