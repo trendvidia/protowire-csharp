@@ -59,13 +59,18 @@ public class KeyedEntryNameTests
     }
 
     // Only an entry name supplies the key: the anonymous form leaves it absent.
-    [Theory]
-    [InlineData("kd = [{}]", "kd[0].name")]
-    [InlineData("kr = [{}]", "kr[0].name")]
-    public void AnonymousElement_LeavesTheKeyAbsent(string doc, string mark)
+    [Fact]
+    public void AnonymousElement_TakesItsKeysDefault()
     {
-        var (_, result) = Decode(doc);
-        Assert.True(result.IsAbsent(mark));
+        var (m, _) = Decode("kd = [{}]");
+        Assert.Equal("dflt", m.Kd[0].Name);
+    }
+
+    [Fact]
+    public void AnonymousElement_MissingARequiredKey_IsRejected()
+    {
+        var e = Assert.Throws<PxfException>(() => Decode("kr = [{}]"));
+        Assert.Contains("required field \"kr[0].name\" is absent", e.Message);
     }
 
     [Fact]

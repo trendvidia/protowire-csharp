@@ -218,24 +218,33 @@ public class DirectiveTests
     }
 
     [Fact]
-    public void Dataset_DottedColumn_Rejected()
+    public void Dataset_DottedColumn_Parses() =>
+        Assert.Equal("a.b", Parser.Parse("@dataset x.Row ( a.b )\n").Datasets[0].Columns[0]);
+
+    [Theory]
+    [InlineData("( a, a )", "appears twice")]
+    [InlineData("( a, a.b )", "overlaps column")]
+    [InlineData("( a.b, a )", "overlaps column")]
+    [InlineData("( a..b )", "empty segment")]
+    [InlineData("( a. )", "empty segment")]
+    public void Dataset_BadHeader_NamesTheColumn(string header, string message)
     {
-        var ex = Assert.Throws<PxfException>(() => Parser.Parse("@dataset x.Row ( a.b )\n"));
-        Assert.Contains("dotted column", ex.Message);
+        var ex = Assert.Throws<PxfException>(() => Parser.Parse($"@dataset x.Row {header}\n"));
+        Assert.Contains(message, ex.Message);
     }
 
     [Fact]
-    public void Dataset_ListCell_Rejected()
+    public void Dataset_ListCell_Parses()
     {
-        var ex = Assert.Throws<PxfException>(() => Parser.Parse("@dataset x.Row ( a )\n( [1, 2] )\n"));
-        Assert.Contains("list values", ex.Message);
+        var row = Parser.Parse("@dataset x.Row ( a )\n( [1, 2] )\n").Datasets[0].Rows[0];
+        Assert.IsType<ListVal>(row.Cells[0]);
     }
 
     [Fact]
-    public void Dataset_BlockCell_Rejected()
+    public void Dataset_BlockCell_Parses()
     {
-        var ex = Assert.Throws<PxfException>(() => Parser.Parse("@dataset x.Row ( a )\n( { x = 1 } )\n"));
-        Assert.Contains("block values", ex.Message);
+        var row = Parser.Parse("@dataset x.Row ( a )\n( { x = 1 } )\n").Datasets[0].Rows[0];
+        Assert.IsType<BlockVal>(row.Cells[0]);
     }
 
     [Fact]

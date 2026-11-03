@@ -34,7 +34,7 @@ public class NestingDepthTests
     private static void AssertRejected(string doc)
     {
         var e = Assert.Throws<PxfException>(() => new Decoder().Unmarshal(doc, new Tree()));
-        Assert.Contains("nesting depth exceeds 100", e.Message);
+        Assert.Contains("nesting depth exceeds MaxNestingDepth=100", e.Message);
     }
 
     [Fact]
@@ -103,7 +103,7 @@ public class NestingDepthTests
     [Fact]
     public void AnyBody_SharesItsBlocksDescent()
     {
-        const string body = "details { @type type.googleapis.com/bench.v1.Endpoint\npath = \"/api\" }";
+        const string body = "details { @type = \"type.googleapis.com/bench.v1.Endpoint\"\npath = \"/api\" }";
         string Nested(int blocks) =>
             string.Concat(Enumerable.Repeat("child{", blocks)) + body + new string('}', blocks);
 
@@ -118,7 +118,7 @@ public class NestingDepthTests
         Assert.Equal("/api", got.Details!.Unpack<Endpoint>().Path);
 
         var e = Assert.Throws<PxfException>(() => dec.Unmarshal(Nested(100), new Tree()));
-        Assert.Contains("nesting depth exceeds 100", e.Message);
+        Assert.Contains("nesting depth exceeds MaxNestingDepth=100", e.Message);
     }
 
     // The text parser and the decoder agree at the edge.

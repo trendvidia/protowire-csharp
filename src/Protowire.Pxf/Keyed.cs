@@ -45,8 +45,10 @@ public sealed class KeyedException : PxfException
 /// repeated field. An explicit key assignment may not be empty and, in the
 /// named form, must agree with the entry name.
 /// </summary>
-internal sealed record KeyedElemState(string Field, string KeyName, string EntryName, bool Named)
+internal sealed record KeyedElemState(string Field, FieldDescriptor KeyFd, string EntryName, bool Named)
 {
+    public string KeyName => KeyFd.Name;
+
     public void CheckExplicitKey(string value, Position pos)
     {
         if (value.Length == 0)
@@ -59,6 +61,30 @@ internal sealed record KeyedElemState(string Field, string KeyName, string Entry
             throw new KeyedException(pos, KeyedErrorKind.KeyConflict, Field, EntryName,
                 $"key field \"{KeyName}\" = \"{value}\" conflicts with entry name \"{EntryName}\" in keyed field \"{Field}\"");
         }
+    }
+
+    /// <summary>
+    /// Refuses a binding in a named entry's body that would undo the entry
+    /// name: null on the key field, or another member of its oneof.
+    /// </summary>
+    public void CheckBinding(FieldDescriptor fd, bool isNull, Position pos)
+    {
+        if (!Named) return;
+        string message;
+        if (fd.Name == KeyName)
+        {
+            if (!isNull) return;
+            message = $"null on key field \"{KeyName}\" conflicts with entry name \"{EntryName}\" in keyed field \"{Field}\"";
+        }
+        else if (fd.RealContainingOneof != null && fd.RealContainingOneof == KeyFd.RealContainingOneof)
+        {
+            message = $"field \"{fd.Name}\" shares oneof \"{fd.RealContainingOneof.Name}\" with key field \"{KeyName}\", which entry name \"{EntryName}\" already set in keyed field \"{Field}\"";
+        }
+        else
+        {
+            return;
+        }
+        throw new KeyedException(pos, KeyedErrorKind.KeyConflict, Field, EntryName, message);
     }
 }
 
