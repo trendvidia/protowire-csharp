@@ -43,6 +43,9 @@ managed:
       value: Protowire.Pxf.Tests.Presence
       path: pxf-presence-test.proto
     - file_option: csharp_namespace
+      value: Protowire.Pxf.Tests.SecretHook
+      path: pxf-secret-hook-test.proto
+    - file_option: csharp_namespace
       value: Protowire.Pxf.Tests.KeyedFixtures
       path: keyed.proto
     - file_option: csharp_namespace
