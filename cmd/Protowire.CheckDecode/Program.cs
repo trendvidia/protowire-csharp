@@ -123,7 +123,7 @@ internal static class CheckDecode
                 PbDecode(input, schema, limits);
                 return;
             case "pb-render":
-                new Encoder().Marshal(Generated(schema).Parser.ParseFrom(File.ReadAllBytes(input)));
+                PbRender(input, schema);
                 return;
             case "pb-text":
                 PbText(input, schema);
@@ -160,12 +160,28 @@ internal static class CheckDecode
         decoder.Unmarshal(File.ReadAllText(input), Generated(schema).Parser.ParseFrom(ByteString.Empty));
     }
 
+    // pb-render tests the PXF producer, so the stock reader in front of it must
+    // not be the one that stops a deep message: Google.Protobuf's default
+    // recursion limit is 100, which would refuse the 101-deep rows before the
+    // encoder ran, and the reject would pass without testing it (#80). The
+    // limit here is protobuf-go's default, as protowire-go's harness reads.
+    private const int StockRecursionLimit = 10000;
+
+    private static void PbRender(string input, string schema)
+    {
+        var bytes = File.ReadAllBytes(input);
+        var stream = CodedInputStream.CreateWithLimits(new MemoryStream(bytes), bytes.Length, StockRecursionLimit);
+        var msg = Generated(schema).Parser.ParseFrom(stream);
+        new Encoder().Marshal(msg);
+    }
+
     private static void PbDecode(string input, string schema, Dictionary<string, int> limits)
     {
         var defaults = PbLimits.Default;
         Protowire.Pb.Pb.Unmarshal(File.ReadAllBytes(input), NewMessage(schema), defaults with
         {
             MaxMessageSize = limits.GetValueOrDefault("MaxMessageSize", defaults.MaxMessageSize),
+            MaxNestingDepth = limits.GetValueOrDefault("MaxNestingDepth", defaults.MaxNestingDepth),
             MaxNumericLiteralDigits = limits.GetValueOrDefault("MaxNumericLiteralDigits", defaults.MaxNumericLiteralDigits),
             MaxRepeatedCount = limits.GetValueOrDefault("MaxRepeatedCount", defaults.MaxRepeatedCount),
             MaxBigFloatExponent = limits.GetValueOrDefault("MaxBigFloatExponent", defaults.MaxBigFloatExponent),

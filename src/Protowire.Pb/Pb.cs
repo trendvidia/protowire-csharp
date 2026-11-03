@@ -12,13 +12,6 @@ namespace Protowire.Pb;
 /// </summary>
 public static class Pb
 {
-    // HARDENING.md § Mandatory limits — bounds native call-stack growth on
-    // attacker input. Matches the cross-port default. The depth counter
-    // must survive nested submessage construction; we thread an explicit
-    // counter rather than relying on CodedInputStream's RecursionLimit,
-    // since that resets every time a fresh stream is constructed.
-    private const int MaxNestingDepth = 100;
-
     // HARDENING.md § UTF-8: a proto3 string is valid UTF-8, and the default
     // decoder would substitute U+FFFD for what is not.
     private static readonly System.Text.UTF8Encoding StrictUtf8 = new(false, throwOnInvalidBytes: true);
@@ -30,13 +23,25 @@ public static class Pb
     /// </summary>
     /// <param name="v">The object to marshal.</param>
     /// <returns>A byte array containing the Protobuf binary-encoded data.</returns>
-    public static byte[] Marshal(object v)
+    public static byte[] Marshal(object v) => Marshal(v, PbLimits.Default);
+
+    /// <summary>
+    /// Marshals under the given limits. Only <see cref="PbLimits.MaxNestingDepth"/>
+    /// applies to writing: a value nested more deeply, counted as a decoder
+    /// counts it (the root is depth 0, and every submessage or map entry is one
+    /// descent), is an error rather than bytes a reader at that limit refuses
+    /// (HARDENING.md § Recursion). Raise it only together with every reader's.
+    /// </summary>
+    /// <param name="v">The object to marshal.</param>
+    /// <param name="limits">The limits of this call.</param>
+    /// <returns>A byte array containing the Protobuf binary-encoded data.</returns>
+    public static byte[] Marshal(object v, PbLimits limits)
     {
         var type = v.GetType();
         var info = GetStructInfo(type);
         using var stream = new MemoryStream();
         using var output = new CodedOutputStream(stream);
-        MarshalStruct(output, v, info, 0);
+        MarshalStruct(output, v, info, 0, limits.MaxNestingDepth);
         output.Flush();
         return stream.ToArray();
     }
@@ -89,13 +94,16 @@ public static class Pb
         });
     }
 
-    private static void MarshalStruct(CodedOutputStream output, object v, StructInfo info, int depth)
+    private static InvalidOperationException DepthError(int maxDepth) =>
+        new($"nesting depth exceeds MaxNestingDepth={maxDepth}");
+
+    private static void MarshalStruct(CodedOutputStream output, object v, StructInfo info, int depth, int maxDepth)
     {
         // A message a reader at the limit would refuse is an error here, not
         // bytes nobody can read.
-        if (depth > MaxNestingDepth)
+        if (depth > maxDepth)
         {
-            throw new InvalidOperationException($"PB nesting depth exceeds {MaxNestingDepth}");
+            throw DepthError(maxDepth);
         }
         var setOneofs = new HashSet<string>();
         // Process in tag order to be consistent
@@ -110,11 +118,11 @@ public static class Pb
                 setOneofs.Add(field.Oneof);
             }
 
-            MarshalField(output, (uint)field.Tag, val, field.ZigZag, depth);
+            MarshalField(output, (uint)field.Tag, val, field.ZigZag, depth, maxDepth);
         }
     }
 
-    private static void MarshalField(CodedOutputStream output, uint tag, object val, bool zigzag, int depth)
+    private static void MarshalField(CodedOutputStream output, uint tag, object val, bool zigzag, int depth, int maxDepth)
     {
         if (val is bool b)
         {
@@ -193,12 +201,18 @@ public static class Pb
         }
         else if (val is System.Collections.IDictionary dict)
         {
+            // An entry is a descent whatever its value's type, as the decoder
+            // counts it, so a map of scalars at the limit is refused too.
+            if (dict.Count > 0 && depth + 1 > maxDepth)
+            {
+                throw DepthError(maxDepth);
+            }
             foreach (System.Collections.DictionaryEntry entry in dict)
             {
                 using var ms = new MemoryStream();
                 using var entryOutput = new CodedOutputStream(ms);
-                if (entry.Key != null) MarshalField(entryOutput, 1, entry.Key, zigzag, depth + 1);
-                if (entry.Value != null) MarshalField(entryOutput, 2, entry.Value, zigzag, depth + 1);
+                if (entry.Key != null) MarshalField(entryOutput, 1, entry.Key, zigzag, depth + 1, maxDepth);
+                if (entry.Value != null) MarshalField(entryOutput, 2, entry.Value, zigzag, depth + 1, maxDepth);
                 entryOutput.Flush();
                 output.WriteTag(WireFormat.MakeTag((int)tag, WireFormat.WireType.LengthDelimited));
                 output.WriteBytes(ByteString.CopyFrom(ms.ToArray()));
@@ -208,7 +222,7 @@ public static class Pb
         {
             foreach (var item in enumerable)
             {
-                if (item != null) MarshalField(output, tag, item, zigzag, depth);
+                if (item != null) MarshalField(output, tag, item, zigzag, depth, maxDepth);
             }
         }
         else
@@ -217,7 +231,7 @@ public static class Pb
             var nestedInfo = GetStructInfo(val.GetType());
             using var ms = new MemoryStream();
             using var nestedOutput = new CodedOutputStream(ms);
-            MarshalStruct(nestedOutput, val, nestedInfo, depth + 1);
+            MarshalStruct(nestedOutput, val, nestedInfo, depth + 1, maxDepth);
             nestedOutput.Flush();
             output.WriteTag(WireFormat.MakeTag((int)tag, WireFormat.WireType.LengthDelimited));
             output.WriteBytes(ByteString.CopyFrom(ms.ToArray()));
@@ -296,10 +310,9 @@ public static class Pb
 
             // The entry is a descent whatever its value's type, so this
             // cannot wait for a message value to reach the check below.
-            if (depth >= MaxNestingDepth)
+            if (depth >= limits.MaxNestingDepth)
             {
-                throw new InvalidOperationException(
-                    $"PB nesting depth exceeds {MaxNestingDepth}");
+                throw DepthError(limits.MaxNestingDepth);
             }
             var entryData = input.ReadBytes().ToByteArray();
             var entryInput = new CodedInputStream(entryData);
@@ -350,10 +363,9 @@ public static class Pb
         // is constructed (which we do per nesting level here), so we keep
         // an explicit `depth` parameter threaded through and reject before
         // a stack overflow becomes possible.
-        if (depth >= MaxNestingDepth)
+        if (depth >= limits.MaxNestingDepth)
         {
-            throw new InvalidOperationException(
-                $"PB nesting depth exceeds {MaxNestingDepth}");
+            throw DepthError(limits.MaxNestingDepth);
         }
         var nestedData = input.ReadBytes().ToByteArray();
         var nestedVal = Activator.CreateInstance(type)!;

@@ -243,7 +243,7 @@ public class PbTests
     public void TestSubmessages_OnePast_Rejected()
     {
         var e = Assert.Throws<InvalidOperationException>(() => Pb.Unmarshal(Submessages(101), new Node()));
-        Assert.Contains("nesting depth exceeds 100", e.Message);
+        Assert.Contains("nesting depth exceeds MaxNestingDepth=100", e.Message);
     }
 
     [Fact]
@@ -255,7 +255,7 @@ public class PbTests
         // 50 map levels are 100 descents; one submessage around them is 101.
         var doc = Delimited(1, MapEntries(50));
         var e = Assert.Throws<InvalidOperationException>(() => Pb.Unmarshal(doc, new Node()));
-        Assert.Contains("nesting depth exceeds 100", e.Message);
+        Assert.Contains("nesting depth exceeds MaxNestingDepth=100", e.Message);
     }
 
     public class Packed

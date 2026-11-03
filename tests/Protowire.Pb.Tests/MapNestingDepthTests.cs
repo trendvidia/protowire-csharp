@@ -47,7 +47,7 @@ public class MapNestingDepthTests
     private static void AssertRejected(byte[] doc)
     {
         var e = Assert.Throws<InvalidOperationException>(() => Pb.Unmarshal(doc, new Node()));
-        Assert.Contains("nesting depth exceeds 100", e.Message);
+        Assert.Contains("nesting depth exceeds MaxNestingDepth=100", e.Message);
     }
 
     [Fact]
