@@ -27,6 +27,7 @@ format changes.
   - An identifier outside ASCII.
 - **Generated messages are written from their descriptors**, in the reference's text. `tests/Protowire.Conformance` compares it byte for byte, and written PXF changes for existing callers in these ways: fields follow declaration order and generated plumbing such as `has_x` and `x_case` is gone, repeated and map fields of well-known types use their literals, a Timestamp has no trailing zeros, a Duration is spelled as Go's `time.Duration.String` spells it (`1.5s`, not `1s500ms`), floats use `1e+06`, and a map's keys sort by written form.
 - The formatter quotes strings as `strconv.Quote` does, so an unusual character may be escaped differently.
+- **More schemas are refused at bind time** (#52), as they are by the reference: a field, oneof or enum value named `null`, `true` or `false`; `(pxf.default)` on a repeated, map or group field, or on a message type no literal denotes; `(pxf.required)` on a oneof member; two defaults in one oneof; and a message that takes a well-known type's name without its fields.
 - `(pxf.required)` and `(pxf.default)` now apply inside list elements and map values (#52).
 - A nesting-depth error now reads `nesting depth exceeds MaxNestingDepth=100`.
 
@@ -36,6 +37,7 @@ format changes.
 - `PxfLimits`, set through `Decoder.Limits` or `Parser.Parse(input, limits)`, makes the draft's limits per-call.
 - The type entry of an Any block, in a singular field, a list element or a map value (#42).
 - Wrapper-typed fields take a scalar or a block (#45).
+- **`@required` and `@default(...)` are honoured** (#58), read from the 1327 carrier. A schema written that way used to get no required check, no default and no bind-time check, so it decoded differently here than in protowire-go. Two spellings of one default that disagree are refused.
 - **`Decoder.BindRow` binds a `@dataset` row to a generated message** (#41, #43). This port parsed rows but had no binder. Cells may be lists or blocks, each meaning what `c = <value>` means in a body, and columns may be dotted paths into sub-messages. A column the row type cannot reach is refused, naming it. There is no streaming reader yet.
 - Bool map keys, `+inf`, and the BigFloat precision suffix in the lexer.
 

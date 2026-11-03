@@ -102,6 +102,12 @@ managed:
     - file_option: csharp_namespace
       value: Protowire.Conformance.Schemas.Values
       path: conformance/conformance.proto
+    - file_option: csharp_namespace
+      value: Protowire.Conformance.Schemas.Carrier
+      path: conformance/carrier.proto
+    - file_option: csharp_namespace
+      value: Protowire.Conformance.Schemas.SettingsAnnotated
+      path: conformance/settings_annotated.proto
 plugins:
   - remote: buf.build/protocolbuffers/csharp:v29.3
     out: .generated

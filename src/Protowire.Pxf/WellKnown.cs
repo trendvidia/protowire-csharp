@@ -29,6 +29,61 @@ internal static class WellKnown
         { "google.protobuf.BytesValue", FieldType.Bytes },
     };
 
+    private readonly record struct Shape(string Name, FieldType Type, bool Repeated = false, bool Optional = false);
+
+    private static readonly Dictionary<string, Shape[]> Shapes = BuildShapes();
+
+    private static Dictionary<string, Shape[]> BuildShapes()
+    {
+        Shape[] secondsNanos = [new("seconds", FieldType.Int64), new("nanos", FieldType.Int32)];
+        var shapes = new Dictionary<string, Shape[]>
+        {
+            ["google.protobuf.Timestamp"] = secondsNanos,
+            ["google.protobuf.Duration"] = secondsNanos,
+            ["google.protobuf.Any"] = [new("type_url", FieldType.String), new("value", FieldType.Bytes)],
+            ["google.protobuf.FieldMask"] = [new("paths", FieldType.String, Repeated: true)],
+            ["pxf.BigInt"] = [new("abs", FieldType.Bytes), new("negative", FieldType.Bool)],
+            ["pxf.Decimal"] = [new("unscaled", FieldType.Bytes), new("scale", FieldType.Int32), new("negative", FieldType.Bool)],
+            ["pxf.BigFloat"] =
+            [
+                new("mantissa", FieldType.Bytes), new("exponent", FieldType.Int32),
+                new("prec", FieldType.UInt32), new("negative", FieldType.Bool),
+            ],
+            ["pxf.Secret"] =
+            [
+                new("value", FieldType.String), new("hint", FieldType.String, Optional: true),
+                new("fingerprint", FieldType.String, Optional: true),
+            ],
+        };
+        foreach (var (name, type) in WrapperTypes) shapes[name] = [new("value", type)];
+        return shapes;
+    }
+
+    /// <summary>
+    /// What stops <paramref name="desc"/> having the fields its full name needs
+    /// (draft -01 §wkt-shapes), or null when it has them or the name needs none.
+    /// </summary>
+    public static string? ShapeProblem(MessageDescriptor desc)
+    {
+        if (!Shapes.TryGetValue(desc.FullName, out var shape)) return null;
+        foreach (var f in shape)
+        {
+            var fd = desc.FindFieldByName(f.Name);
+            if (fd == null)
+            {
+                if (f.Optional) continue;
+                return $"it has no field \"{f.Name}\"";
+            }
+            if (fd.FieldType != f.Type) return $"field \"{f.Name}\" is {fd.FieldType}, and must be {f.Type}";
+            if (fd.IsMap || fd.IsRepeated != f.Repeated) return $"field \"{f.Name}\" has the wrong cardinality";
+        }
+        return null;
+    }
+
+    /// <summary>The message types a <c>(pxf.default)</c> literal can denote.</summary>
+    public static bool Defaultable(MessageDescriptor d) =>
+        IsTimestamp(d) || IsDuration(d) || IsWrapper(d) || IsBigInt(d) || IsDecimal(d) || IsBigFloat(d);
+
     /// <summary>The scalar a generated class stores for a wrapper message.</summary>
     public static object Unwrap(IMessage wrapper) =>
         wrapper.Descriptor.FindFieldByName("value").Accessor.GetValue(wrapper);

@@ -50,6 +50,8 @@ TABLE=(
   "Conformance/Schemas/Text/Text.cs tests/Protowire.Conformance/Generated/Text.cs"
   "Conformance/Schemas/Testv1/Test.cs tests/Protowire.Conformance/Generated/Test.cs"
   "Conformance/Schemas/Values/Conformance.cs tests/Protowire.Conformance/Generated/Conformance.cs"
+  "Conformance/Schemas/Carrier/Carrier.cs tests/Protowire.Conformance/Generated/Carrier.cs"
+  "Conformance/Schemas/SettingsAnnotated/SettingsAnnotated.cs tests/Protowire.Conformance/Generated/SettingsAnnotated.cs"
   "DumpEnvelope/Fixtures/Settings.cs     cmd/Protowire.DumpEnvelope/Generated/Settings.cs"
 )
 HEADER=$'// SPDX-License-Identifier: MIT\n// Copyright (c) 2026 TrendVidia, LLC.\n'

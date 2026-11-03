@@ -69,9 +69,9 @@ public static class Schema
     /// The bind-time violations in <paramref name="file"/> and its transitive
     /// imports, sorted by declaring file and then by element name. Each file
     /// is checked once, however many import paths reach it, and a violation
-    /// names the file that declares it. Two rules so far: draft -01 "Required
-    /// and Default" (<c>(pxf.required) = true</c> and <c>(pxf.default)</c> on
-    /// one field) and <c>(pxf.key)</c> placement (draft -01 "Schema Placement").
+    /// names the file that declares it. Checks the reserved names, the shape of
+    /// a well-known type, and the placement of <c>(pxf.key)</c>,
+    /// <c>(pxf.required)</c> and <c>(pxf.default)</c>, in either spelling.
     /// </summary>
     public static IReadOnlyList<Violation> ValidateFile(FileDescriptor file) =>
         ClosureCache.GetValue(file, static f =>
@@ -119,18 +119,36 @@ public static class Schema
     {
         if (!seen.Add(file.Name)) return;
         WalkMessages(file.Name, file.MessageTypes, found);
+        WalkEnums(file.Name, file.EnumTypes, found);
         foreach (var dep in file.Dependencies)
         {
             WalkFile(dep, seen, found);
         }
     }
 
+    private static bool IsReserved(string name) => name is "null" or "true" or "false";
+
+    private static Violation Reserved(string path, string kind, string element, string name) =>
+        new(path, element, "reserved name", name)
+        {
+            Message = $"{kind} uses PXF-reserved name \"{name}\" (draft §3.13)",
+        };
+
     private static void WalkMessages(string path, IEnumerable<MessageDescriptor> messages, List<Violation> found)
     {
         foreach (var msg in messages)
         {
+            if (WellKnown.ShapeProblem(msg) is { } shape)
+            {
+                found.Add(new Violation(path, msg.FullName, shape)
+                {
+                    Message = $"redefines a well-known type: {shape} (draft -01 §wkt-shapes)",
+                });
+            }
+            var oneofDefaults = new List<(OneofDescriptor Oneof, FieldDescriptor Field, AnnotationsRuntime.PxfOptions Options)>();
             foreach (var fd in msg.Fields.InDeclarationOrder())
             {
+                if (IsReserved(fd.Name)) found.Add(Reserved(path, "field", fd.FullName, fd.Name));
                 var keyName = AnnotationsRuntime.GetKey(fd);
                 var keyProblem = keyName == null ? null : KeyPlacementProblem(fd, keyName);
                 if (keyProblem != null)
@@ -140,16 +158,94 @@ public static class Schema
                         Message = $"invalid (pxf.key) = \"{keyName}\": {keyProblem} (draft -01 §3.13)",
                     });
                 }
-                if (AnnotationsRuntime.IsRequired(fd) && AnnotationsRuntime.GetDefault(fd) != null)
+
+                var opts = AnnotationsRuntime.Options(fd);
+                string defaultName = opts.DefaultInCarrier ? "@default" : "(pxf.default)";
+                string requiredName = opts.RequiredInCarrier ? "@required" : "(pxf.required)";
+                if (opts.DefaultProblem != null)
                 {
-                    var detail = "(pxf.required) and (pxf.default) are exclusive on one field: " + RequiredDefaultReason;
-                    found.Add(new Violation(path, fd.FullName, detail)
+                    found.Add(new Violation(path, fd.FullName, opts.DefaultProblem)
                     {
-                        Message = $"invalid (pxf.required): {detail} (draft -01 §annotation-extensions)",
+                        Message = $"invalid {defaultName}: {opts.DefaultProblem} (draft -01 §annotation-extensions)",
                     });
                 }
+                if (opts.Default != null && DefaultPlacementProblem(fd, defaultName) is { } placement)
+                {
+                    found.Add(new Violation(path, fd.FullName, placement, opts.Default)
+                    {
+                        Message = $"invalid {defaultName} = \"{opts.Default}\": {placement} (draft -01 §annotation-extensions)",
+                    });
+                }
+                if (opts.Required && opts.Default != null)
+                {
+                    var detail = $"{requiredName} and {defaultName} are exclusive on one field: " + RequiredDefaultReason;
+                    found.Add(new Violation(path, fd.FullName, detail)
+                    {
+                        Message = $"invalid {requiredName}: {detail} (draft -01 §annotation-extensions)",
+                    });
+                }
+                if (fd.RealContainingOneof is { } oneof)
+                {
+                    if (opts.Required)
+                    {
+                        var detail = $"{requiredName} is not valid on a member of oneof \"{oneof.Name}\": read per field it demands that one arm always be chosen, which makes every other arm undecodable";
+                        found.Add(new Violation(path, fd.FullName, detail, oneof.Name)
+                        {
+                            Message = $"invalid {requiredName}: {detail} (draft -01 §annotation-extensions)",
+                        });
+                    }
+                    if (opts.Default != null) oneofDefaults.Add((oneof, fd, opts));
+                }
+            }
+            CheckOneofDefaults(path, oneofDefaults, found);
+            foreach (var oneof in msg.Oneofs)
+            {
+                if (!oneof.IsSynthetic && IsReserved(oneof.Name)) found.Add(Reserved(path, "oneof", oneof.FullName, oneof.Name));
             }
             WalkMessages(path, msg.NestedTypes, found);
+            WalkEnums(path, msg.EnumTypes, found);
+        }
+    }
+
+    // With two defaults on one oneof some default must win, and deciding by
+    // declaration order would give meaning to a detail authors may change.
+    private static void CheckOneofDefaults(string path, List<(OneofDescriptor Oneof, FieldDescriptor Field, AnnotationsRuntime.PxfOptions Options)> annotated, List<Violation> found)
+    {
+        foreach (var group in annotated.GroupBy(a => a.Oneof).Where(g => g.Count() > 1))
+        {
+            string names = string.Join(", ", group.Select(m => m.Field.Name));
+            string detail = $"at most one member of oneof \"{group.Key.Name}\" may carry a default; {group.Count()} do ({names})";
+            foreach (var (_, field, opts) in group)
+            {
+                string spelling = opts.DefaultInCarrier ? "@default" : "(pxf.default)";
+                found.Add(new Violation(path, field.FullName, detail, opts.Default)
+                {
+                    Message = $"invalid {spelling} = \"{opts.Default}\": {detail} (draft -01 §annotation-extensions)",
+                });
+            }
+        }
+    }
+
+    private static string? DefaultPlacementProblem(FieldDescriptor fd, string name)
+    {
+        if (fd.IsMap) return $"{name} is not valid on map fields: one literal cannot denote a map";
+        if (fd.IsRepeated) return $"{name} is not valid on repeated fields: one literal cannot denote a list";
+        if (fd.FieldType == FieldType.Group) return $"{name} is not valid on group fields";
+        if (fd.FieldType == FieldType.Message && !WellKnown.Defaultable(fd.MessageType))
+        {
+            return $"{name} is not valid on message type {fd.MessageType.FullName}: no PXF literal denotes it";
+        }
+        return null;
+    }
+
+    private static void WalkEnums(string path, IEnumerable<EnumDescriptor> enums, List<Violation> found)
+    {
+        foreach (var e in enums)
+        {
+            foreach (var v in e.Values)
+            {
+                if (IsReserved(v.Name)) found.Add(Reserved(path, "enum value", v.FullName, v.Name));
+            }
         }
     }
 
