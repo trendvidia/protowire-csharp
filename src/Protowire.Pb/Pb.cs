@@ -212,7 +212,11 @@ public static class Pb
                 using var ms = new MemoryStream();
                 using var entryOutput = new CodedOutputStream(ms);
                 if (entry.Key != null) MarshalField(entryOutput, 1, entry.Key, zigzag, depth + 1, maxDepth);
+                // A null value is the empty message: an entry always carries
+                // its value field (protowire#295), as protowire-go writes a
+                // nil *big.Float value.
                 if (entry.Value != null) MarshalField(entryOutput, 2, entry.Value, zigzag, depth + 1, maxDepth);
+                else WriteEmpty(entryOutput, 2);
                 entryOutput.Flush();
                 output.WriteTag(WireFormat.MakeTag((int)tag, WireFormat.WireType.LengthDelimited));
                 output.WriteBytes(ByteString.CopyFrom(ms.ToArray()));
@@ -228,7 +232,10 @@ public static class Pb
             }
             foreach (var item in enumerable)
             {
-                if (item != null) MarshalField(output, tag, item, zigzag, depth, maxDepth);
+                // A null element is the empty message, as protowire-go writes a
+                // nil *big.Int or *big.Rat element: the list keeps its length.
+                if (item == null) WriteEmpty(output, tag);
+                else MarshalField(output, tag, item, zigzag, depth, maxDepth);
             }
         }
         else
@@ -242,6 +249,12 @@ public static class Pb
             output.WriteTag(WireFormat.MakeTag((int)tag, WireFormat.WireType.LengthDelimited));
             output.WriteBytes(ByteString.CopyFrom(ms.ToArray()));
         }
+    }
+
+    private static void WriteEmpty(CodedOutputStream output, uint tag)
+    {
+        output.WriteTag(WireFormat.MakeTag((int)tag, WireFormat.WireType.LengthDelimited));
+        output.WriteLength(0);
     }
 
     private static Type? ElementType(Type listType) =>
