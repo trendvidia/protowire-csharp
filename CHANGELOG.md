@@ -35,6 +35,7 @@ format changes.
 
 - `Encoder.EmitDefaults`, `Encoder.NullFields` and `Encoder.MaxNestingDepth`. A message deeper than the limit is an error, because a reader at that limit would refuse it.
 - **The draft's mandatory limits are enforced and configurable per call** (#32), on PXF, PB and SBE. `MaxMessageSize` is checked before any allocation proportional to the input, `MaxBytesLiteralLength` from a literal's length before it is decoded, and `MaxRepeatedCount` on an SBE group's `numInGroup` and as a counter on repeated and map elements. Use `PxfLimits`, `PbLimits` and `Codec`'s init properties. `check-decode` takes `--limit NAME=VALUE`, and runs `pb-render`, `pb-text` and `sbe`.
+- `check-decode` runs the corpus's SBE UTF-8 rows (`adversarial.v1.SbeText`, #78), and exits 1 with `reject: unknown schema: <name>` for a schema it does not know, as protowire-go's harness does, instead of crashing.
 - `PxfLimits`, set through `Decoder.Limits` or `Parser.Parse(input, limits)`, makes the draft's limits per-call.
 - The type entry of an Any block, in a singular field, a list element or a map value (#42).
 - Wrapper-typed fields take a scalar or a block (#45).
