@@ -345,11 +345,33 @@ public class Codec
             case "float": BinaryPrimitives.WriteSingleLittleEndian(block[off..], Convert.ToSingle(val)); break;
             case "double": BinaryPrimitives.WriteDoubleLittleEndian(block[off..], Convert.ToDouble(val)); break;
             case "char":
-                var target = block[off..(off + ft.Size)];
-                target.Clear();
-                if (val is string s) System.Text.Encoding.UTF8.GetBytes(s, target);
-                else if (val is ByteString bs) bs.Span.CopyTo(target);
+                WriteChar(block[off..(off + ft.Size)], val);
                 break;
+        }
+    }
+
+    // Writes a fixed-length char field (draft -01 § SBE Annotations). An
+    // overlong string is cut at the last whole UTF-8 character at or before
+    // the limit, because a byte-exact cut can leave half a character and a
+    // strict decoder then rejects the whole message; the rest stays NUL. A
+    // bytes field is cut at the limit. Mirrors protowire-go's cutString.
+    private static void WriteChar(Span<byte> target, object val)
+    {
+        target.Clear();
+        if (val is string s)
+        {
+            byte[] utf8 = System.Text.Encoding.UTF8.GetBytes(s);
+            int n = Math.Min(utf8.Length, target.Length);
+            if (n < utf8.Length)
+            {
+                // Back up over continuation bytes (10xxxxxx) to a lead byte.
+                while (n > 0 && (utf8[n] & 0xC0) == 0x80) n--;
+            }
+            utf8.AsSpan(0, n).CopyTo(target);
+        }
+        else if (val is ByteString bs)
+        {
+            bs.Span[..Math.Min(bs.Length, target.Length)].CopyTo(target);
         }
     }
 
@@ -416,10 +438,7 @@ public class Codec
             case "float": BinaryPrimitives.WriteSingleLittleEndian(block[off..], Convert.ToSingle(val)); break;
             case "double": BinaryPrimitives.WriteDoubleLittleEndian(block[off..], Convert.ToDouble(val)); break;
             case "char":
-                var target = block[off..(off + ft.Size)];
-                target.Clear();
-                if (val is string s) System.Text.Encoding.UTF8.GetBytes(s, target);
-                else if (val is ByteString bs) bs.Span.CopyTo(target);
+                WriteChar(block[off..(off + ft.Size)], val);
                 break;
         }
     }
