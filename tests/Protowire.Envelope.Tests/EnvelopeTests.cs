@@ -56,4 +56,15 @@ public class EnvelopeTests
         Assert.Equal(orig.Error?.Metadata?["request_id"], got.Error?.Metadata?["request_id"]);
         Assert.True(got.IsAppError);
     }
+
+    // testdata/envelope/zero-map-entry.expected.hex in the spec repo, which
+    // protoc --encode and protobuf-go both produce (protowire#295). Omitting
+    // both fields gives 22022a00; writing the value alone gives 22042a021200.
+    [Fact]
+    public void ZeroMapEntry_CarriesKeyAndValue()
+    {
+        var env = new Protowire.Envelopes.Envelope { Error = new AppError().WithMeta("", "") };
+
+        Assert.Equal("22062a040a001200", Convert.ToHexString(Pb.Pb.Marshal(env)).ToLowerInvariant());
+    }
 }

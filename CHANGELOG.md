@@ -17,6 +17,7 @@ format changes.
 
 ### Fixed
 
+- **A PB map entry missing its key or value is no longer dropped** (#60). A missing field is now its type's default, as protobuf says, so such an entry stays in the map, and a `string` or message value is never null. `dump-envelope --vector zero-map-entry` prints the wire vector the spec checks (#31); the writer already produced it.
 - **A keyed entry's name now counts as supplying the key field**
   ([trendvidia/protowire-go#214](https://github.com/trendvidia/protowire-go/issues/214)).
   After `kd { alpha {} }`, `Result` reports `kd[0].name` as set, where it
