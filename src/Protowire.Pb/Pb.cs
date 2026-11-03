@@ -294,7 +294,9 @@ public static class Pb
                 else if (enumNum == 2) val = UnmarshalField(entryInput, etag, valType, null, zigzag, depth + 1);
                 else entryInput.SkipLastField();
             }
-            if (key != null) map[key] = val;
+            // Protobuf: a field missing from a map entry is its type's
+            // default, so an entry is never dropped and a value never null.
+            map[key ?? DefaultOf(keyType)] = val ?? DefaultOf(valType);
             return map;
         }
 
@@ -331,6 +333,16 @@ public static class Pb
         var nestedInput = new CodedInputStream(nestedData);
         UnmarshalStruct(nestedInput, nestedVal, GetStructInfo(type), depth + 1);
         return nestedVal;
+    }
+
+    // What a field of this type holds when the wire omits it. A message is an
+    // empty instance rather than null: a map entry's value is always present.
+    private static object DefaultOf(Type type)
+    {
+        if (type == typeof(string)) return "";
+        if (type == typeof(byte[])) return Array.Empty<byte>();
+        if (type == typeof(ByteString)) return ByteString.Empty;
+        return Activator.CreateInstance(type)!;
     }
 
     private static BigInteger UnmarshalBigInt(byte[] data)

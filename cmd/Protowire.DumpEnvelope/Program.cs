@@ -8,6 +8,7 @@
 //   dump-envelope                        canonical Envelope → pb hex
 //   dump-envelope --pb  FDS MESSAGE DOC  PXF DOC decoded against MESSAGE → pb hex
 //   dump-envelope --sbe FDS MESSAGE DOC  PXF DOC decoded against MESSAGE → SBE hex
+//   dump-envelope --vector NAME          a wire vector with a golden in the spec
 //
 // The fixture modes are how the gate proves this port reads (pxf.required)
 // = 1314, (pxf.default) = 1315 and the SBE numbers 1319–1323 from a schema
@@ -45,8 +46,26 @@ if (args.Length == 4 && (args[0] == "--pb" || args[0] == "--sbe"))
 {
     return DumpFixture(args[0], args[1], args[2], args[3]);
 }
-Console.Error.WriteLine("usage: dump-envelope [--pb|--sbe FDS MESSAGE DOC]");
+if (args.Length == 2 && args[0] == "--vector")
+{
+    return DumpVector(args[1]);
+}
+Console.Error.WriteLine("usage: dump-envelope [--pb|--sbe FDS MESSAGE DOC | --vector NAME]");
 return 2;
+
+// A vector is checked against a golden, not against the other ports, so a
+// layout every port shares still cannot pass unless it is the right one.
+static int DumpVector(string name)
+{
+    if (name != "zero-map-entry")
+    {
+        Console.Error.WriteLine($"not-implemented: {name}");
+        return 3;
+    }
+    var env = new Envelope { Error = new AppError().WithMeta("", "") };
+    Console.WriteLine(Convert.ToHexString(Protowire.Pb.Pb.Marshal(env)).ToLowerInvariant());
+    return 0;
+}
 
 static void DumpEnvelope()
 {
