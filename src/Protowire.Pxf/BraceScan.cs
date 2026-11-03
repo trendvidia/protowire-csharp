@@ -14,8 +14,16 @@ internal static class BraceScan
     /// Returns the offset of the <c>}</c> matching the <c>{</c> at
     /// <paramref name="openOffset"/>, or -1 on unterminated input.
     /// </summary>
-    public static int FindMatchingBrace(string input, int openOffset)
+    public static int FindMatchingBrace(string input, int openOffset) => FindMatchingBrace(input, openOffset, out _);
+
+    /// <summary>
+    /// <see cref="FindMatchingBrace(string, int)"/>, and on -1 whether the
+    /// body can never close however much input follows: a simple string or
+    /// a bytes literal in it met a newline. Otherwise the input ended first.
+    /// </summary>
+    public static int FindMatchingBrace(string input, int openOffset, out bool failed)
     {
+        failed = false;
         int depth = 1;
         int i = openOffset + 1;
         while (i < input.Length)
@@ -35,13 +43,21 @@ internal static class BraceScan
             else if (ch == '"')
             {
                 int j = SkipString(input, i);
-                if (j < 0) return -1;
+                if (j < 0)
+                {
+                    failed = j == NewlineInLiteral;
+                    return -1;
+                }
                 i = j;
             }
             else if (ch == 'b' && i + 1 < input.Length && input[i + 1] == '"')
             {
                 int j = SkipBytes(input, i);
-                if (j < 0) return -1;
+                if (j < 0)
+                {
+                    failed = j == NewlineInLiteral;
+                    return -1;
+                }
                 i = j;
             }
             else if (ch == '#')
@@ -72,6 +88,10 @@ internal static class BraceScan
         return -1;
     }
 
+    // What the Skip helpers return for a literal that met a newline, which
+    // no more input can close; -1 is a literal the input ended in.
+    private const int NewlineInLiteral = -2;
+
     private static int SkipString(string input, int i)
     {
         if (i + 2 < input.Length && input[i + 1] == '"' && input[i + 2] == '"')
@@ -94,7 +114,7 @@ internal static class BraceScan
                 continue;
             }
             if (input[k] == '"') return k + 1;
-            if (input[k] == '\n') return -1;
+            if (input[k] == '\n') return NewlineInLiteral;
             k++;
         }
         return -1;
@@ -106,7 +126,7 @@ internal static class BraceScan
         while (j < input.Length)
         {
             if (input[j] == '"') return j + 1;
-            if (input[j] == '\n') return -1;
+            if (input[j] == '\n') return NewlineInLiteral;
             j++;
         }
         return -1;

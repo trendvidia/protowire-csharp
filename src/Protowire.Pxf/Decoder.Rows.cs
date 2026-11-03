@@ -46,6 +46,22 @@ public partial class Decoder
         }
     }
 
+    /// <summary>
+    /// Reads the leading directives and the <c>@dataset TYPE ( cols )</c>
+    /// header from <paramref name="source"/>, and returns a reader positioned
+    /// at the first row, which yields the rows one at a time rather than
+    /// holding the document. The header and every row are read under
+    /// <see cref="Limits"/>, the bytes held while a row boundary is sought
+    /// being capped at its MaxMessageSize, and <see cref="DatasetReader.Scan"/>
+    /// binds with <see cref="Registry"/>.
+    /// </summary>
+    /// <exception cref="NoDatasetException">The stream is a well-formed document with no @dataset.</exception>
+    /// <exception cref="PxfException">
+    /// The header is malformed, a header cut short included: the error Parse
+    /// reports for it. A read failure is thrown as it is.
+    /// </exception>
+    public DatasetReader NewDatasetReader(Stream source) => new(source, _limits, Registry);
+
     // The body opens with an empty line, so an error reported at 1:1, a
     // missing required field, falls in no column.
     private sealed class RowBodyWriter(DatasetRow row)

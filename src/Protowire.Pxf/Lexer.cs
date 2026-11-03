@@ -14,6 +14,8 @@ internal class Lexer
         encoderShouldEmitUTF8Identifier: false,
         throwOnInvalidBytes: true);
     private readonly string _input;
+    private readonly int _end;
+    private readonly int _base;
     private int _pos;
     private int _line = 1;
     private int _col = 1;
@@ -22,7 +24,57 @@ internal class Lexer
     public Lexer(string input, int maxBytesLiteral = 64 << 20)
     {
         _input = input;
+        _end = input.Length;
         _maxBytesLiteral = maxBytesLiteral;
+    }
+
+    /// <summary>
+    /// A lexer over <c>input[start..end]</c> whose first character sits at
+    /// document position <paramref name="at"/>, so its tokens carry the
+    /// positions Parse gives them in the whole document. The streaming
+    /// @dataset reader lexes one row of its buffer this way.
+    /// </summary>
+    internal Lexer(string input, int start, int end, Position at, int maxBytesLiteral)
+    {
+        _input = input;
+        _pos = start;
+        _end = end;
+        _base = at.Offset - start;
+        _line = at.Line;
+        _col = at.Column;
+        _maxBytesLiteral = maxBytesLiteral;
+    }
+
+    /// <summary>
+    /// Whether the last token's lexing looked for a character at or past the
+    /// end of the input: more input could still change, or unmake, the
+    /// token. The streaming @dataset reader treats such a token as not yet
+    /// read. Mirrors <c>sawEnd</c> in protowire-go's lexer.
+    /// </summary>
+    internal bool SawEnd { get; private set; }
+
+    /// <summary>
+    /// What a token's offset adds to an index into <see cref="Input"/>: zero
+    /// unless the lexer started inside a document.
+    /// </summary>
+    internal int Base => _base;
+
+    /// <summary>
+    /// Moves the lexer to <paramref name="start"/> for the next token. The
+    /// scan of the streaming reader lexes one token at a time this way.
+    /// </summary>
+    internal void ResetTo(int start)
+    {
+        _pos = start;
+        SawEnd = false;
+    }
+
+    // Whether input[i] exists; looking past the end is recorded in SawEnd.
+    private bool At(int i)
+    {
+        if (i < _end) return true;
+        SawEnd = true;
+        return false;
     }
 
     /// <summary>
@@ -67,23 +119,23 @@ internal class Lexer
             throw new InvalidOperationException(
                 $"lexer cannot reposition backwards (have {_pos}, want {target})");
         }
-        while (_pos < target && _pos < _input.Length)
+        while (_pos < target && At(_pos))
         {
             Advance();
         }
     }
 
-    private char Peek() => _pos >= _input.Length ? '\0' : _input[_pos];
+    private char Peek() => At(_pos) ? _input[_pos] : '\0';
 
     private char PeekAt(int offset)
     {
         int i = _pos + offset;
-        return i >= _input.Length ? '\0' : _input[i];
+        return At(i) ? _input[i] : '\0';
     }
 
     private char Advance()
     {
-        if (_pos >= _input.Length) return '\0';
+        if (!At(_pos)) return '\0';
         char ch = _input[_pos++];
         if (ch == '\n')
         {
@@ -97,11 +149,11 @@ internal class Lexer
         return ch;
     }
 
-    private Position CurrentPos => new(_line, _col, _pos);
+    private Position CurrentPos => new(_line, _col, _base + _pos);
 
     private void SkipSpaces()
     {
-        while (_pos < _input.Length)
+        while (At(_pos))
         {
             char ch = _input[_pos];
             if (ch == ' ' || ch == '\t' || ch == '\r')
@@ -117,8 +169,9 @@ internal class Lexer
 
     public Token Next()
     {
+        SawEnd = false;
         SkipSpaces();
-        if (_pos >= _input.Length)
+        if (!At(_pos))
         {
             return new Token(TokenKind.EOF, string.Empty, CurrentPos);
         }
@@ -204,7 +257,7 @@ internal class Lexer
     private Token LexLineComment(Position pos)
     {
         int start = _pos;
-        while (_pos < _input.Length && _input[_pos] != '\n')
+        while (At(_pos) && _input[_pos] != '\n')
         {
             Advance();
         }
@@ -216,7 +269,7 @@ internal class Lexer
         int start = _pos;
         Advance(); // /
         Advance(); // *
-        while (_pos + 1 < _input.Length)
+        while (At(_pos + 1))
         {
             if (_input[_pos] == '*' && _input[_pos + 1] == '/')
             {
@@ -239,7 +292,7 @@ internal class Lexer
         // begin with. See HARDENING.md § UTF-8.
         var buf = new List<byte>();
         Span<char> charBuf = stackalloc char[2];
-        while (_pos < _input.Length)
+        while (At(_pos))
         {
             if (Peek() == '\n')
             {
@@ -265,7 +318,7 @@ internal class Lexer
             {
                 charBuf[0] = ch;
                 int charLen = 1;
-                if (char.IsHighSurrogate(ch) && _pos < _input.Length && char.IsLowSurrogate(_input[_pos]))
+                if (char.IsHighSurrogate(ch) && At(_pos) && char.IsLowSurrogate(_input[_pos]))
                 {
                     charBuf[1] = Advance();
                     charLen = 2;
@@ -279,7 +332,7 @@ internal class Lexer
                 AppendChars(buf, charBuf[..charLen]);
                 continue;
             }
-            if (_pos >= _input.Length)
+            if (!At(_pos))
             {
                 return new Token(TokenKind.ILLEGAL, "unterminated escape sequence", pos);
             }
@@ -359,7 +412,7 @@ internal class Lexer
     /// <summary>Reads exactly 2 hex digits and returns the assembled byte, or null on error.</summary>
     private int? ReadHexByte()
     {
-        if (_pos + 1 >= _input.Length) return null;
+        if (!At(_pos + 1)) return null;
         if (HexVal(_input[_pos]) is not int hi) return null;
         if (HexVal(_input[_pos + 1]) is not int lo) return null;
         Advance(); Advance();
@@ -369,7 +422,7 @@ internal class Lexer
     /// <summary>Reads exactly N hex digits and returns the assembled codepoint, or null on error.</summary>
     private int? ReadHexRune(int n)
     {
-        if (_pos + n > _input.Length) return null;
+        if (!At(_pos + n - 1)) return null;
         int r = 0;
         for (int i = 0; i < n; i++)
         {
@@ -387,7 +440,7 @@ internal class Lexer
     /// </summary>
     private int? ReadOctRest(char first)
     {
-        if (_pos + 1 >= _input.Length) return null;
+        if (!At(_pos + 1)) return null;
         if (OctVal(_input[_pos]) is not int d1) return null;
         if (OctVal(_input[_pos + 1]) is not int d2) return null;
         Advance(); Advance();
@@ -413,7 +466,7 @@ internal class Lexer
         Advance(); // "
         Advance(); // "
         int start = _pos;
-        while (_pos + 2 < _input.Length)
+        while (At(_pos + 2))
         {
             if (_input[_pos] == '"' && _input[_pos + 1] == '"' && _input[_pos + 2] == '"')
             {
@@ -457,13 +510,13 @@ internal class Lexer
     private Token LexBytes(Position pos)
     {
         Advance(); // b
-        if (_pos >= _input.Length || _input[_pos] != '"')
+        if (!At(_pos) || _input[_pos] != '"')
         {
             return new Token(TokenKind.ILLEGAL, "expected '\"' after b", pos);
         }
         Advance(); // opening "
         int start = _pos;
-        while (_pos < _input.Length)
+        while (At(_pos))
         {
             char ch = _input[_pos];
             // Judged from the length, three bytes per four characters, so the
@@ -496,7 +549,7 @@ internal class Lexer
     {
         Advance(); // @
         int start = _pos;
-        while (_pos < _input.Length && IsIdentPart(_input[_pos]))
+        while (At(_pos) && IsIdentPart(_input[_pos]))
         {
             Advance();
         }
@@ -533,7 +586,7 @@ internal class Lexer
             {
                 return new Token(TokenKind.ILLEGAL, "\"+\" is valid only in \"+inf\"", pos);
             }
-            if (_pos >= _input.Length || !char.IsAsciiDigit(Peek()))
+            if (!At(_pos) || !char.IsAsciiDigit(Peek()))
             {
                 return new Token(TokenKind.ILLEGAL, "\"-\" must be followed by a digit or \"inf\"", pos);
             }
@@ -541,14 +594,14 @@ internal class Lexer
         }
 
         int digitStart = _pos;
-        while (_pos < _input.Length && char.IsAsciiDigit(Peek()))
+        while (At(_pos) && char.IsAsciiDigit(Peek()))
         {
             Advance();
         }
         int digitCount = _pos - digitStart;
 
         // Timestamp: exactly 4 digits followed by '-', only non-negative
-        if (!neg && digitCount == 4 && _pos < _input.Length && Peek() == '-')
+        if (!neg && digitCount == 4 && At(_pos) && Peek() == '-')
         {
             return LexTimestamp(pos, start);
         }
@@ -559,18 +612,18 @@ internal class Lexer
         {
             frac = true;
             Advance();
-            while (_pos < _input.Length && char.IsAsciiDigit(Peek()))
+            while (At(_pos) && char.IsAsciiDigit(Peek()))
             {
                 Advance();
             }
         }
         // Before the float branch, so "1.5ms" is one token and not FLOAT then IDENT.
-        if (_pos < _input.Length && IsDurationUnit(Peek()))
+        if (At(_pos) && IsDurationUnit(Peek()))
         {
             return LexDuration(pos, start);
         }
         // Float: fraction, or 'e'/'E' exponent, or a bare trailing '.'
-        if (frac || (_pos < _input.Length && Peek() is '.' or 'e' or 'E'))
+        if (frac || (At(_pos) && Peek() is '.' or 'e' or 'E'))
         {
             return LexFloat(pos, start);
         }
@@ -585,19 +638,19 @@ internal class Lexer
         if (Peek() == '.')
         {
             Advance();
-            while (_pos < _input.Length && char.IsAsciiDigit(Peek()))
+            while (At(_pos) && char.IsAsciiDigit(Peek()))
             {
                 Advance();
             }
         }
-        if (_pos < _input.Length && Peek() is 'e' or 'E')
+        if (At(_pos) && Peek() is 'e' or 'E')
         {
             Advance();
-            if (_pos < _input.Length && Peek() is '+' or '-')
+            if (At(_pos) && Peek() is '+' or '-')
             {
                 Advance();
             }
-            while (_pos < _input.Length && char.IsAsciiDigit(Peek()))
+            while (At(_pos) && char.IsAsciiDigit(Peek()))
             {
                 Advance();
             }
@@ -615,7 +668,7 @@ internal class Lexer
         if (Peek() != 'p' || !char.IsAsciiDigit(PeekAt(1))) return;
         Advance();
         int start = _pos;
-        while (_pos < _input.Length && char.IsAsciiDigit(Peek()))
+        while (At(_pos) && char.IsAsciiDigit(Peek()))
         {
             Advance();
         }
@@ -625,13 +678,13 @@ internal class Lexer
     private bool HasIdent(string word)
     {
         int end = _pos + word.Length;
-        if (end > _input.Length || string.CompareOrdinal(_input, _pos, word, 0, word.Length) != 0) return false;
-        return end == _input.Length || !IsIdentPart(_input[end]);
+        if (!At(end - 1) || string.CompareOrdinal(_input, _pos, word, 0, word.Length) != 0) return false;
+        return !At(end) || !IsIdentPart(_input[end]);
     }
 
     private Token LexTimestamp(Position pos, int start)
     {
-        while (_pos < _input.Length)
+        while (At(_pos))
         {
             char ch = Peek();
             if (ch is ' ' or '\n' or '\t' or '\r' or ',' or ']' or '}' or ')' or '#')
@@ -656,7 +709,7 @@ internal class Lexer
     // as a duration and an identifier; TryParseNanos decides what it was.
     private Token LexDuration(Position pos, int start)
     {
-        while (_pos < _input.Length)
+        while (At(_pos))
         {
             char ch = Peek();
             bool part = char.IsAsciiDigit(ch) || ch is >= 'a' and <= 'z' or MicroSign
@@ -675,7 +728,7 @@ internal class Lexer
     private Token LexIdent(Position pos)
     {
         int start = _pos;
-        while (_pos < _input.Length && IsIdentPart(_input[_pos]))
+        while (At(_pos) && IsIdentPart(_input[_pos]))
         {
             Advance();
         }

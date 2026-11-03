@@ -22,7 +22,7 @@ public class MutationTests
         "0000-01-01T00:00:00Z", "9999-12-31T23:59:59.999999999-23:59", "b\"\"", "b\"!\"", "\\", "\n", "µ", "𝕏",
     ];
 
-    private static string Mutate(string text, Random rng)
+    internal static string Mutate(string text, Random rng)
     {
         int at = rng.Next(text.Length + 1);
         return rng.Next(3) switch

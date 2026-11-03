@@ -24,10 +24,14 @@ public sealed class Parser
     private List<Comment> _comments = [];
     private int _depth;
 
-    private Parser(string input, PxfLimits limits)
+    private Parser(string input, PxfLimits limits) : this(new Lexer(input, limits.MaxBytesLiteralLength), limits)
+    {
+    }
+
+    private Parser(Lexer lex, PxfLimits limits)
     {
         _maxDepth = limits.MaxNestingDepth;
-        _lex = new Lexer(input, limits.MaxBytesLiteralLength);
+        _lex = lex;
         // Prime _current with an EOF sentinel so the nullable-reference-types
         // analysis is satisfied without `null!`; the very next Advance() call
         // overwrites it with the real first token.
@@ -80,6 +84,28 @@ public sealed class Parser
     }
 
     public static Document Parse(string input) => Parse(input, PxfLimits.Default);
+
+    internal const string DatasetBesideEntries =
+        "@dataset directive cannot coexist with top-level field entries; the document's payload is the @dataset rows (draft §3.4.4)";
+
+    /// <summary>
+    /// A parser over <c>input[start..end]</c> whose first character sits at
+    /// document position <paramref name="at"/>: what it reports carries the
+    /// positions Parse reports for the whole document. MaxMessageSize is the
+    /// caller's to apply. Mirrors <c>newParserAt</c> in protowire-go.
+    /// </summary>
+    internal static Parser At(string input, int start, int end, Position at, PxfLimits limits) =>
+        new(new Lexer(input, start, end, at, limits.MaxBytesLiteralLength), limits);
+
+    /// <summary>Parses the input as a document, as <see cref="Parse(string, PxfLimits)"/> does.</summary>
+    internal Document ParseDocumentHere() => ParseDocument();
+
+    /// <summary>
+    /// Parses the @dataset row the current '(' opens, stopping on its ')'
+    /// rather than reading past it. Returns the row and the document offset
+    /// just past the ')'.
+    /// </summary>
+    internal (DatasetRow, int) ParseRowHere(int expected) => ParseDatasetRow(expected, advancePastClose: false);
 
     /// <summary>Parses under the given limits.</summary>
     public static Document Parse(string input, PxfLimits limits)
@@ -153,8 +179,7 @@ public sealed class Parser
             }
             if (_current.Kind != TokenKind.EOF)
             {
-                throw new PxfException(_current.Pos,
-                    "@dataset directive cannot coexist with top-level field entries; the document's payload is the @dataset rows (draft §3.4.4)");
+                throw new PxfException(_current.Pos, DatasetBesideEntries);
             }
         }
 
@@ -217,7 +242,7 @@ public sealed class Parser
         bool hasBody = false;
         if (_current.Kind == TokenKind.LBRACE)
         {
-            int open = _current.Pos.Offset;
+            int open = _current.Pos.Offset - _lex.Base;
             // Parse the block to validate inner well-formedness. ParseBlockVal
             // counts this `{` as the one descent it is.
             ParseBlockVal();
@@ -228,7 +253,7 @@ public sealed class Parser
             }
             body = System.Text.Encoding.UTF8.GetBytes(_lex.Input[(open + 1)..close]);
             hasBody = true;
-            endOffset = close + 1;
+            endOffset = _lex.Base + close + 1;
         }
 
         string typeField = prefixes.Count == 1 ? prefixes[0] : string.Empty;
@@ -326,7 +351,7 @@ public sealed class Parser
     /// Parses <c>( cell ( ',' cell )* )</c> with an arity check against
     /// <paramref name="expected"/>. LPAREN is current on entry.
     /// </summary>
-    private (DatasetRow, int) ParseDatasetRow(int expected)
+    private (DatasetRow, int) ParseDatasetRow(int expected, bool advancePastClose = true)
     {
         var pos = _current.Pos;
         Advance(); // consume (
@@ -344,7 +369,10 @@ public sealed class Parser
                 $"expected ',' or ')' in @dataset row, got {_current.Kind}");
         }
         int endOffset = _current.Pos.Offset + 1;
-        Advance(); // consume )
+        if (advancePastClose)
+        {
+            Advance(); // consume )
+        }
 
         if (cells.Count != expected)
         {
@@ -418,7 +446,7 @@ public sealed class Parser
                 {
                     // Lexer already applied triple-quote dedent and unescaped.
                     byte[] bytes = System.Text.Encoding.UTF8.GetBytes(_current.Value);
-                    int endOffset = _lex.Pos;
+                    int endOffset = _lex.Base + _lex.Pos;
                     Advance();
                     return (new ProtoDirective
                     {
@@ -436,7 +464,7 @@ public sealed class Parser
                     {
                         throw new PxfException(_current.Pos, "@proto descriptor body: invalid base64");
                     }
-                    int endOffset = _lex.Pos;
+                    int endOffset = _lex.Base + _lex.Pos;
                     Advance();
                     return (new ProtoDirective
                     {
@@ -461,7 +489,7 @@ public sealed class Parser
     /// </summary>
     private (byte[], int) CaptureBraceBody(string label)
     {
-        int open = _current.Pos.Offset;
+        int open = _current.Pos.Offset - _lex.Base;
         int close = BraceScan.FindMatchingBrace(_lex.Input, open);
         if (close < 0)
         {
@@ -470,7 +498,7 @@ public sealed class Parser
         var body = System.Text.Encoding.UTF8.GetBytes(_lex.Input[(open + 1)..close]);
         _lex.RepositionTo(close + 1);
         Advance(); // prime current token past `}`
-        return (body, close + 1);
+        return (body, _lex.Base + close + 1);
     }
 
     /// <summary>
