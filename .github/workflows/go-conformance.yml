@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 TrendVidia, LLC.
+
+name: Go conformance
+
+# Runs protowire-go, the reference, over every PXF document this repo holds and
+# fails when this port's verdict, PB bytes, written PXF or formatted PXF differ.
+# A pull request runs against the protowire-go version in tool/go_oracle/go.mod,
+# so it fails only for what it changed. The daily run moves to protowire-go's
+# main and compares the vendored corpora with the spec, because a change on
+# either side is otherwise invisible here until someone looks.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '47 6 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  conformance:
+    name: C# against protowire-go
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: tool/go_oracle/go.mod
+          cache-dependency-path: tool/go_oracle/go.sum
+
+      - name: Move to protowire-go main
+        if: github.event_name == 'schedule'
+        working-directory: tool/go_oracle
+        run: |
+          go get github.com/trendvidia/protowire-go@main
+          go mod tidy
+
+      - name: Run the reference
+        working-directory: tool/go_oracle
+        run: go run . -root ../.. -out "$RUNNER_TEMP/oracle.json"
+
+      - name: Compare
+        env:
+          GO_ORACLE: ${{ runner.temp }}/oracle.json
+          REQUIRE_GO_ORACLE: '1'
+        run: dotnet test tests/Protowire.Conformance --configuration Release
+
+      - uses: actions/checkout@v7
+        if: github.event_name == 'schedule'
+        with:
+          repository: trendvidia/protowire
+          path: spec
+
+      - name: Compare the vendored corpora with the spec
+        if: github.event_name == 'schedule'
+        run: |
+          # Only files both sides hold: each keeps some the other does not.
+          if diff -rq tests/Protowire.Conformance/testdata spec/testdata | grep -v '^Only in'; then
+            exit 1
+          fi

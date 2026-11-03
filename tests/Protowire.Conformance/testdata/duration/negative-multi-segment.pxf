@@ -1,0 +1,6 @@
+@type duration.v1.Holder
+
+# The sign applies to the whole literal, not to its first segment:
+# -1h30m is minus ninety minutes, seconds = -5400.
+
+d = -1h30m

@@ -1,0 +1,4 @@
+// `name` carries (pxf.required) = true and is absent: a conformant port
+// rejects this document at decode time. A port that does not read field
+// number 1314 accepts it and emits bytes.
+retries = 5

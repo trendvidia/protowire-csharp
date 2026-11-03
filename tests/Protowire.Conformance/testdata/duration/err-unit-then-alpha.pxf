@@ -1,0 +1,6 @@
+@type duration.v1.Holder
+
+# Same rule at the shortest distance: "5sx" is not "5s" followed by an
+# identifier; it is one malformed duration token and MUST be rejected.
+
+d = 5sx

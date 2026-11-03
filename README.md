@@ -141,6 +141,10 @@ Built on `Google.Protobuf` reflection (`MessageDescriptor`, `IFieldAccessor`) â€
 - **No async API on the codec surface.** All decode / encode is synchronous in-memory. For very large PXF documents an async streaming surface would be welcome.
 - **The CLI lives in [trendvidia/protowire/cmd/protowire](https://github.com/trendvidia/protowire/tree/main/cmd/protowire), not here.** This repo ships only the library + cross-port harnesses.
 
+## Conformance with protowire-go
+
+`tool/conformance.sh` runs protowire-go, the reference, over the spec's corpora and this repo's own documents, and fails if this port's accept or reject, PB bytes, written PXF or formatted PXF differ. It needs Go and runs on every pull request (`.github/workflows/go-conformance.yml`). What still differs is listed in `tests/Protowire.Conformance/known-divergences.txt`, each line naming its issue. That file can only shrink, because an entry that stops differing fails the test.
+
 ## Contributing & governance
 
 This repository is part of the `protowire-*` family and is governed by [**Steward**](https://github.com/trendvidia/steward) â€” the meritocratic, AI-driven governance engine that runs all of the ports. Voting weight is per-directory expertise, the constitution is public in [`governance.pxf`](https://github.com/trendvidia/steward/blob/main/governance.pxf), and Steward routes draft / first-time PRs through a [private mentorship pipeline](https://github.com/trendvidia/steward#-private-mentorship-mode) so initial contributions get private feedback rather than public-review friction.

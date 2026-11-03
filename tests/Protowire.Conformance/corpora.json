@@ -1,0 +1,150 @@
+[
+  {
+    "dir": "testdata/any",
+    "protos": [
+      "any.proto"
+    ],
+    "message": "any.v1.Holder"
+  },
+  {
+    "dir": "testdata/annotations",
+    "message": "settings.annotated.v1.Settings",
+    "descriptorSets": [
+      "settings_annotated.binpb"
+    ]
+  },
+  {
+    "dir": "testdata/bigfloat",
+    "protos": [
+      "bigfloat.proto"
+    ],
+    "message": "bf.v1.H"
+  },
+  {
+    "dir": "testdata/bigfloat",
+    "protos": [
+      "bigfloat.proto"
+    ],
+    "message": "bf.v1.H",
+    "binaries": "enc-*.binpb"
+  },
+  {
+    "dir": "testdata/blocks",
+    "protos": [
+      "blocks.proto"
+    ],
+    "message": "blocks.v1.Doc"
+  },
+  {
+    "dir": "testdata/duplicates",
+    "protos": [
+      "duplicates.proto"
+    ],
+    "message": "dup.v1.Holder"
+  },
+  {
+    "dir": "testdata/duration",
+    "protos": [
+      "duration.proto"
+    ],
+    "message": "duration.v1.Holder"
+  },
+  {
+    "dir": "testdata/keyed",
+    "protos": [
+      "keyed.proto"
+    ],
+    "message": "keyed.v1.Node",
+    "named": [
+      "keyed.v1.Catalog",
+      "keyed.v1.Deployment",
+      "keyed.v1.Doc",
+      "keyed.v1.Node"
+    ]
+  },
+  {
+    "dir": "testdata/map-keys",
+    "protos": [
+      "bool-keys.proto"
+    ],
+    "message": "mapkeys.v1.Flags",
+    "named": [
+      "mapkeys.v1.Labels"
+    ]
+  },
+  {
+    "dir": "testdata/map-keys/invalid",
+    "protos": [
+      "bool-keys.proto"
+    ],
+    "include": "..",
+    "message": "mapkeys.v1.Flags",
+    "named": [
+      "mapkeys.v1.Labels"
+    ]
+  },
+  {
+    "dir": "testdata/nulls",
+    "protos": [
+      "nulls.proto",
+      "nulls_proto2.proto",
+      "nulls_editions.proto"
+    ],
+    "message": "nulls.v1.Holder",
+    "messages": {
+      "err-proto2-required.pxf": "nulls.v1.Strict",
+      "proto2-scalar.pxf": "nulls.v1.Legacy",
+      "required-optional.pxf": "nulls.v1.Required",
+      "default-optional.pxf": "nulls.v1.Defaulted",
+      "editions-explicit.pxf": "nulls.ed.v1.Ed",
+      "err-editions-implicit.pxf": "nulls.ed.v1.Ed"
+    }
+  },
+  {
+    "dir": "testdata/repeated",
+    "protos": [
+      "test.proto"
+    ],
+    "include": "..",
+    "message": "test.v1.AllTypes"
+  },
+  {
+    "dir": "testdata/strings",
+    "protos": [
+      "strings.proto"
+    ],
+    "message": "strings.v1.Holder"
+  },
+  {
+    "dir": "testdata/dataset",
+    "dataset": true,
+    "protos": [
+      "paths.proto",
+      "test.proto"
+    ],
+    "include": ".."
+  },
+  {
+    "dir": "testdata/text/cases",
+    "descriptorSets": [
+      "../text.binpb"
+    ],
+    "binaries": "*.binpb",
+    "prefix": "text.v1."
+  },
+  {
+    "dir": "docs",
+    "protos": [
+      "conformance.proto"
+    ],
+    "message": "conformance.v1.Values",
+    "include": "../../../proto/conformance"
+  },
+  {
+    "dir": "annotated",
+    "descriptorSets": [
+      "../testdata/annotations/settings_annotated.binpb"
+    ],
+    "message": "settings.annotated.v1.Settings"
+  }
+]

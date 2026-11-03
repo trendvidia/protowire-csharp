@@ -1,0 +1,32 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 TrendVidia, LLC.
+//
+// Cross-port conformance fixture for the PXF annotation extension numbers
+// (STABILITY.md promise 3; issue #244): `(pxf.required) = 1314` and
+// `(pxf.default) = 1315` on google.protobuf.FieldOptions.
+//
+// scripts/cross_envelope_check.sh decodes ok.pxf against settings.v1.Settings
+// in settings.binpb through every port's `dump-envelope --pb` and compares
+// the pb bytes with ok.expected.hex. Those bytes contain `retries`, `region`
+// and `verbose` only if the port read the default from field number 1315.
+// missing-required.pxf must be rejected, which happens only if the port read
+// `required` from field number 1314. A port whose reader still looks at the
+// retired 50000/50001 numbers passes its own unit tests (they compile its own
+// vendored annotations.proto) and fails here.
+//
+// settings.binpb is `protoc -I testdata/annotations -I proto --include_imports
+// --descriptor_set_out=testdata/annotations/settings.binpb settings.proto`;
+// cmd/pxf/fixture_numbers_test.go pins that it carries 1314/1315 and no
+// retired number.
+syntax = "proto3";
+
+package settings.v1;
+
+import "pxf/annotations.proto";
+
+message Settings {
+  string name    = 1 [(pxf.required) = true];
+  int32  retries = 2 [(pxf.default) = "3"];
+  string region  = 3 [(pxf.default) = "us-east-1"];
+  bool   verbose = 4 [(pxf.default) = "true"];
+}

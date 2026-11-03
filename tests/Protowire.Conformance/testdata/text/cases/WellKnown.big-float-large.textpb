@@ -1,0 +1,1 @@
+big_float { mantissa: "\x01" exponent: 100 prec: 256 }

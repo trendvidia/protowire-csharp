@@ -1,0 +1,19 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 TrendVidia, LLC.
+
+// Schema for the duration-literal conformance fixtures under
+// testdata/duration/ (issue #234; IETF draft -01 §3.3 "duration" and
+// §"Timestamps and Durations").
+//
+// Holder.d is the one field every fixture binds; a fixture that decodes
+// asserts the (seconds, nanos) it must bind to in its leading comment.
+
+syntax = "proto3";
+
+package duration.v1;
+
+import "google/protobuf/duration.proto";
+
+message Holder {
+  google.protobuf.Duration d = 1;
+}

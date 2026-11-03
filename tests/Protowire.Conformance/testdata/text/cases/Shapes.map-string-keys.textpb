@@ -1,0 +1,1 @@
+by_string { key: "b" value: "2" } by_string { key: "a" value: "1" } by_string { key: "with space" value: "3" } by_string { key: "true" value: "4" } by_string { key: "12" value: "5" } by_string { key: "" value: "6" } by_string { key: "a.b" value: "7" }

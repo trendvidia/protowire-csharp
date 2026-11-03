@@ -1,0 +1,29 @@
+<!--
+SPDX-License-Identifier: MIT
+Copyright (c) 2026 TrendVidia, LLC.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="10.1.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Protowire.Pxf\Protowire.Pxf.csproj" />
+  </ItemGroup>
+
+  <!-- keyed.proto's bindings live with the tests that came first. -->
+  <ItemGroup>
+    <Compile Include="..\Protowire.Pxf.Tests\Generated\Keyed.cs" Link="Generated\Keyed.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="testdata\**;docs\**;annotated\**;corpora.json;known-divergences.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

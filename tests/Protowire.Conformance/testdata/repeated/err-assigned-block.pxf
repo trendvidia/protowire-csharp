@@ -1,0 +1,7 @@
+# Entries and Keys: a repeated message field assigned a single block. MUST be
+# rejected, like the block-tail form it abbreviates — the element goes in a
+# list: repeated_nested = [{ name = "n1" }].
+
+@type test.v1.AllTypes
+
+repeated_nested = { name = "n1" }

@@ -1,0 +1,12 @@
+ints = [
+  1,
+  2
+]
+strings = [
+  "a",
+  "b"
+]
+colors = [
+  COLOR_RED,
+  COLOR_GREEN
+]

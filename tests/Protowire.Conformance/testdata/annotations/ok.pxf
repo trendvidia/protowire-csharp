@@ -1,0 +1,4 @@
+// Only the required field is written. Every other field is absent and takes
+// its (pxf.default): retries = 3, region = "us-east-1", verbose = true. The
+// pb bytes in ok.expected.hex carry all four fields.
+name = "svc"

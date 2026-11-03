@@ -1,0 +1,9 @@
+# Entries and Keys: a repeated message field written as repeated blocks.
+# MUST be rejected — outside the keyed surface form of a keyed repeated
+# field, a block on a repeated field is an error. The list form is
+# repeated_nested = [{ name = "n1" }, { name = "n2" }].
+
+@type test.v1.AllTypes
+
+repeated_nested { name = "n1" }
+repeated_nested { name = "n2" }

@@ -1,0 +1,1 @@
+by_int { key: 10 value: "ten" } by_int { key: 9 value: "nine" } by_int { key: -1 value: "neg" } by_int { key: 0 value: "zero" }

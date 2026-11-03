@@ -1,0 +1,39 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 TrendVidia, LLC.
+//
+// Value shapes the spec corpora do not reach, run through tool/go_oracle.
+syntax = "proto3";
+
+package conformance.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+import "pxf/bignum.proto";
+
+message Inner {
+  int32 n = 1;
+  string s = 2;
+}
+
+message Values {
+  int32 i = 1;
+  string s = 2;
+  bool b = 3;
+  bytes y = 4;
+  double d = 5;
+  Inner m = 6;
+  optional int32 oi = 7;
+  google.protobuf.Timestamp ts = 8;
+  google.protobuf.Duration du = 9;
+  google.protobuf.Int32Value w = 10;
+  map<string, google.protobuf.Duration> md = 11;
+  map<string, google.protobuf.Timestamp> mt = 12;
+  map<int32, string> mi = 13;
+  map<string, google.protobuf.Int32Value> mw = 14;
+  map<string, Inner> mm = 15;
+  repeated google.protobuf.Duration rd = 16;
+  pxf.BigInt bi = 17;
+  pxf.Decimal de = 18;
+  map<string, string> ms = 19;
+}

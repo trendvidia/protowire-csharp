@@ -1,0 +1,6 @@
+@type duration.v1.Holder
+
+# A negative Duration is written with one leading "-" before the first
+# segment. Binds to seconds = -30, nanos = 0.
+
+d = -30s

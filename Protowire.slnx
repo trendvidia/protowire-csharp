@@ -6,6 +6,7 @@
     <Project Path="src/Protowire.Sbe/Protowire.Sbe.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Protowire.Conformance/Protowire.Conformance.csproj" />
     <Project Path="tests/Protowire.Envelope.Tests/Protowire.Envelope.Tests.csproj" />
     <Project Path="tests/Protowire.Pb.Tests/Protowire.Pb.Tests.csproj" />
     <Project Path="tests/Protowire.Pxf.Tests/Protowire.Pxf.Tests.csproj" />

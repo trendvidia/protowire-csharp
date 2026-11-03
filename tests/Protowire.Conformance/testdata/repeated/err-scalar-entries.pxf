@@ -1,0 +1,7 @@
+# Entries and Keys: a repeated field bound to a scalar. MUST be rejected —
+# a repeated field is written with a list value: repeated_string = ["a", "b"].
+
+@type test.v1.AllTypes
+
+repeated_string = "a"
+repeated_string = "b"
