@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 TrendVidia, LLC.
 using System.Collections;
+using System.Runtime.CompilerServices;
 using Google.Protobuf;
 using Google.Protobuf.Reflection;
 using Google.Protobuf.WellKnownTypes;
@@ -22,24 +23,55 @@ namespace Protowire.Pxf;
 /// </summary>
 internal static class AnnotationsRuntime
 {
-    /// <summary>True if the field carries <c>(pxf.required) = true</c>.</summary>
-    public static bool IsRequired(FieldDescriptor fd)
+    /// <summary>
+    /// Every PXF annotation on one field, from both spellings: the bracket
+    /// options and the 1327 carrier. Neither is synthesized from the other.
+    /// </summary>
+    internal sealed record PxfOptions(
+        bool Required, string? Default, bool RequiredInCarrier, bool DefaultInCarrier, string? DefaultProblem);
+
+    // Per field, because a decode reads these on every body.
+    private static readonly ConditionalWeakTable<FieldDescriptor, PxfOptions> Cache = new();
+
+    public static PxfOptions Options(FieldDescriptor fd) => Cache.GetValue(fd, Read);
+
+    private static PxfOptions Read(FieldDescriptor fd)
     {
         var opts = fd.GetOptions();
-        return opts != null && opts.GetExtension(AnnotationsExtensions.Required);
+        bool required = opts != null && opts.GetExtension(AnnotationsExtensions.Required);
+        string? def = opts != null && opts.HasExtension(AnnotationsExtensions.Default)
+            ? opts.GetExtension(AnnotationsExtensions.Default)
+            : null;
+        var payload = Carrier.Payload(opts);
+        if (payload == null) return new PxfOptions(required, def, false, false, null);
+
+        // required is one boolean: either spelling asserting it is enough. A
+        // default has a value, so two spellings can disagree, and picking one
+        // would give meaning to which an author migrated first. RFC-001 §8.5
+        // forbids reconciling them, so the schema is refused instead.
+        var c = Carrier.Parse(payload, fd);
+        string? problem = c.DefaultProblem;
+        bool fromCarrier = problem != null;
+        if (problem == null && c.Default != null)
+        {
+            if (def == null)
+            {
+                def = c.Default;
+                fromCarrier = true;
+            }
+            else if (def != c.Default)
+            {
+                problem = $"(pxf.default) = \"{def}\" and @default = \"{c.Default}\" carry different values, and the two surfaces must not be reconciled (RFC-001 §8.5)";
+            }
+        }
+        return new PxfOptions(required || c.Required, def, c.Required && !required, fromCarrier, problem);
     }
 
-    /// <summary>
-    /// The field's <c>(pxf.default)</c> string, or null if the option is
-    /// absent.
-    /// </summary>
-    public static string? GetDefault(FieldDescriptor fd)
-    {
-        var opts = fd.GetOptions();
-        if (opts == null) return null;
-        if (!opts.HasExtension(AnnotationsExtensions.Default)) return null;
-        return opts.GetExtension(AnnotationsExtensions.Default);
-    }
+    /// <summary>True if the field is required, in either spelling.</summary>
+    public static bool IsRequired(FieldDescriptor fd) => Options(fd).Required;
+
+    /// <summary>The field's default literal in either spelling, or null for none.</summary>
+    public static string? GetDefault(FieldDescriptor fd) => Options(fd).Default;
 
     /// <summary>
     /// The field's <c>(pxf.key)</c> string, or null if the option is absent.

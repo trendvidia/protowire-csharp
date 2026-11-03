@@ -345,6 +345,7 @@ internal static class Corpus
         Protowire.Conformance.Schemas.Text.TextReflection.Descriptor,
         Protowire.Conformance.Schemas.Testv1.TestReflection.Descriptor,
         Protowire.Conformance.Schemas.Values.ConformanceReflection.Descriptor,
+        Protowire.Conformance.Schemas.SettingsAnnotated.SettingsAnnotatedReflection.Descriptor,
         Protowire.Pxf.Tests.KeyedFixtures.KeyedReflection.Descriptor,
     ];
 

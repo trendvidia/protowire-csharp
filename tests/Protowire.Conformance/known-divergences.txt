@@ -1,6 +1,3 @@
 # Where this port still differs from protowire-go, one aspect of one document
 # per line: <document> <aspect> <issue>. An entry that stops differing fails
 # GoConformanceTests, so this file can only shrink.
-annotated/zero-over-default.pxf binding #58
-testdata/annotations/missing-required.pxf binding #58
-testdata/annotations/ok.pxf binding #58

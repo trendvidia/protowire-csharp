@@ -1,0 +1,35 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 TrendVidia, LLC.
+//
+// The part of protowire/schema/v1/descriptor.proto a stock compiler needs to
+// write the 1327 carrier, so settings_annotated.proto can carry `@required` and
+// `@default` without a v1.2 compiler. The port's reader needs none of this: it
+// reads the option's bytes.
+syntax = "proto3";
+
+package protowire.schema.v1;
+
+import "google/protobuf/descriptor.proto";
+
+message AnnotationArg {
+  string name = 1;
+  oneof value {
+    string string_value = 10;
+    int64 int_value = 11;
+    double double_value = 12;
+    bool bool_value = 13;
+  }
+}
+
+message Annotation {
+  string name = 1;
+  repeated AnnotationArg args = 2;
+}
+
+message AnnotationList {
+  repeated Annotation entries = 1;
+}
+
+extend google.protobuf.FieldOptions {
+  AnnotationList field_annotations = 1327;
+}

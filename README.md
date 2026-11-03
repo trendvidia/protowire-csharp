@@ -143,7 +143,7 @@ Built on `Google.Protobuf` reflection (`MessageDescriptor`, `IFieldAccessor`) â€
 
 ## Conformance with protowire-go
 
-`tool/conformance.sh` runs protowire-go, the reference, over the spec's corpora and this repo's own documents, and fails if this port's accept or reject, PB bytes, written PXF or formatted PXF differ. It needs Go and runs on every pull request (`.github/workflows/go-conformance.yml`). What still differs is listed in `tests/Protowire.Conformance/known-divergences.txt`, each line naming its issue. That file can only shrink, because an entry that stops differing fails the test.
+`tool/conformance.sh` runs protowire-go, the reference, over the spec's corpora and this repo's own documents, and fails if this port's accept or reject, PB bytes, written PXF or formatted PXF differ. It needs Go and runs on every pull request (`.github/workflows/go-conformance.yml`). Anything that differs and has to wait for its fix goes in `tests/Protowire.Conformance/known-divergences.txt`, naming its issue. That file is empty today, and it can only shrink, because an entry that stops differing fails the test.
 
 ## Contributing & governance
 

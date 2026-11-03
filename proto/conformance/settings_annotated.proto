@@ -1,0 +1,26 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 TrendVidia, LLC.
+//
+// testdata/annotations/settings_annotated.proto, written so a stock compiler
+// takes it. CarrierTests pins that each field says what the compiled form in
+// settings_annotated.binpb says.
+syntax = "proto3";
+
+package settings.annotated.v1;
+
+import "conformance/carrier.proto";
+
+message Settings {
+  string name = 1 [(protowire.schema.v1.field_annotations) = {
+    entries: [{name: "protowire.schema.v1.required"}]
+  }];
+  int32 retries = 2 [(protowire.schema.v1.field_annotations) = {
+    entries: [{name: "protowire.schema.v1.default", args: [{int_value: 3}]}]
+  }];
+  string region = 3 [(protowire.schema.v1.field_annotations) = {
+    entries: [{name: "protowire.schema.v1.default", args: [{string_value: "us-east-1"}]}]
+  }];
+  bool verbose = 4 [(protowire.schema.v1.field_annotations) = {
+    entries: [{name: "protowire.schema.v1.default", args: [{bool_value: true}]}]
+  }];
+}
