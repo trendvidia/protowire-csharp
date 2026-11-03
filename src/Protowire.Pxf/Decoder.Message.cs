@@ -242,6 +242,17 @@ public partial class Decoder
     private void DecodeSingularMessage(IMessage msg, FieldDescriptor fd)
     {
         var mdesc = fd.MessageType;
+        if (OnSecretField != null && WellKnown.IsSecret(mdesc) && _current.Kind == TokenKind.STRING)
+        {
+            string path = _pathPrefix + fd.Name;
+            CallSecretHook(path);
+            Advance();
+            // The Secret is set, so presence and its metadata read as usual,
+            // but its value is left to the hook.
+            fd.Accessor.SetValue(msg, fd.Accessor.GetValue(msg) as IMessage ?? NewMessage(mdesc));
+            _result?.MarkPresent(path + ".value");
+            return;
+        }
         if (TryShorthand(mdesc, fd, out var value, out var inner))
         {
             fd.Accessor.SetValue(msg, value!);
@@ -264,6 +275,13 @@ public partial class Decoder
     // under its parent, where it would satisfy the parent's (pxf.required).
     private void DecodeSingularBody(IMessage msg, FieldDescriptor fd)
     {
+        if (OnSecretField != null && WellKnown.IsSecret(fd.MessageType))
+        {
+            var secret = fd.Accessor.GetValue(msg) as IMessage ?? NewMessage(fd.MessageType);
+            fd.Accessor.SetValue(msg, secret);
+            DecodeSecretBlock(secret, _pathPrefix + fd.Name);
+            return;
+        }
         bool wrapper = WellKnown.IsWrapper(fd.MessageType);
         var sub = wrapper ? NewMessage(fd.MessageType) : (fd.Accessor.GetValue(msg) as IMessage ?? NewMessage(fd.MessageType));
         if (!wrapper) fd.Accessor.SetValue(msg, sub);
@@ -412,6 +430,117 @@ public partial class Decoder
         catch (FormatException e)
         {
             throw new PxfException(pos, e.Message);
+        }
+    }
+
+    // Whether the current token starts a list element or map value that
+    // OnSecretField takes: either form of a pxf.Secret.
+    private bool HooksSecret(MessageDescriptor mdesc) =>
+        OnSecretField != null && WellKnown.IsSecret(mdesc) && _current.Kind is TokenKind.STRING or TokenKind.LBRACE;
+
+    // A list element or map value HooksSecret accepted, reported at path: the
+    // Secret it stands for, its value given to the hook rather than stored.
+    private IMessage HookedSecret(MessageDescriptor mdesc, string path)
+    {
+        var secret = NewMessage(mdesc);
+        if (_current.Kind == TokenKind.STRING)
+        {
+            CallSecretHook(path);
+            Advance();
+            return secret;
+        }
+        Advance();
+        DecodeSecretBlock(secret, path);
+        return secret;
+    }
+
+    // Hands the current string token to OnSecretField. An exception from the
+    // hook aborts the decode at the value's position, naming the path.
+    private void CallSecretHook(string path)
+    {
+        var pos = _current.Pos;
+        try
+        {
+            OnSecretField!(path, _current.Value);
+        }
+        catch (Exception e)
+        {
+            throw new PxfException(pos, $"pxf.Secret hook for {GoQuote(path)}: {e.Message}", e);
+        }
+    }
+
+    /// <summary>
+    /// The block form of a pxf.Secret under <see cref="OnSecretField"/>, its
+    /// <c>{</c> consumed: <c>value</c> goes to the hook, <c>hint</c> and
+    /// <c>fingerprint</c> onto <paramref name="secret"/>. The Secret is a
+    /// closed shape of string fields, each bound at most once, so anything
+    /// else is an error. Mirrors <c>decodeSecretBlockInto</c> in
+    /// <c>protowire-go/encoding/pxf/decode_fast.go</c>.
+    /// </summary>
+    private void DecodeSecretBlock(IMessage secret, string path)
+    {
+        EnterDescent();
+        try
+        {
+            var desc = secret.Descriptor;
+            var valueFd = desc.FindFieldByName("value");
+            var hintFd = desc.FindFieldByName("hint");
+            var fingerprintFd = desc.FindFieldByName("fingerprint");
+            var bound = new HashSet<int>();
+            while (true)
+            {
+                switch (_current.Kind)
+                {
+                    case TokenKind.RBRACE:
+                        Advance();
+                        return;
+                    case TokenKind.EOF:
+                        throw new PxfException(_current.Pos, "expected '}' to close pxf.Secret block, got EOF");
+                    case TokenKind.IDENT:
+                        break;
+                    default:
+                        throw new PxfException(_current.Pos,
+                            $"expected pxf.Secret field name (value/hint/fingerprint), got {_current.Kind} (\"{_current.Value}\")");
+                }
+                string name = _current.Value;
+                var namePos = _current.Pos;
+                Advance();
+                if (_current.Kind != TokenKind.EQUALS)
+                {
+                    throw new PxfException(_current.Pos, $"expected '=' after pxf.Secret field \"{name}\", got {_current.Kind}");
+                }
+                Advance();
+                if (_current.Kind != TokenKind.STRING)
+                {
+                    throw new PxfException(_current.Pos, $"expected string value for pxf.Secret {name}, got {_current.Kind}");
+                }
+                FieldDescriptor? fd = name switch
+                {
+                    "value" => valueFd,
+                    "hint" => hintFd,
+                    "fingerprint" => fingerprintFd,
+                    _ => throw new PxfException(namePos, $"unknown pxf.Secret field \"{name}\" (expected value/hint/fingerprint)"),
+                };
+                if (fd == null)
+                {
+                    throw new PxfException(namePos, $"unknown pxf.Secret field \"{name}\": this schema does not declare it");
+                }
+                Bind(fd, bound, namePos);
+                if (name == "value")
+                {
+                    CallSecretHook(path);
+                }
+                else
+                {
+                    fd.Accessor.SetValue(secret, _current.Value);
+                }
+                _result?.MarkPresent($"{path}.{name}");
+                Advance();
+            }
+        }
+        finally
+        {
+            _depth--;
         }
     }
 
@@ -606,6 +735,7 @@ public partial class Decoder
     private object ConsumeListMessage(FieldDescriptor fd, IList list, FieldDescriptor? keyFd)
     {
         var mdesc = fd.MessageType;
+        if (HooksSecret(mdesc)) return HookedSecret(mdesc, $"{_pathPrefix}{fd.Name}[{list.Count}]");
         if (TryShorthand(mdesc, fd, out var value, out _)) return value!;
         if (_current.Kind != TokenKind.LBRACE)
         {
@@ -763,6 +893,7 @@ public partial class Decoder
 
     private object ConsumeMapMessage(FieldDescriptor fd, MessageDescriptor mdesc, object key)
     {
+        if (HooksSecret(mdesc)) return HookedSecret(mdesc, $"{_pathPrefix}{fd.Name}{KeySuffix(key)}");
         if (TryShorthand(mdesc, fd, out var value, out _)) return value!;
         if (_current.Kind != TokenKind.LBRACE)
         {

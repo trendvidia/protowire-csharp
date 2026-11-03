@@ -9,6 +9,11 @@ public class PxfException : Exception
     {
         Pos = pos;
     }
+
+    public PxfException(Position pos, string message, Exception inner) : base($"{pos.Line}:{pos.Column}: {message}", inner)
+    {
+        Pos = pos;
+    }
 }
 
 public sealed class Parser
