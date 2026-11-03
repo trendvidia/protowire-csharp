@@ -18,6 +18,15 @@ public class Codec
     private const int HeaderSize = 8;
     private const int GroupHeaderSize = 4;
 
+    /// <summary>
+    /// Largest input to one decode call, in bytes (HARDENING.md § Mandatory
+    /// limits). A stream's frame cap may be lower.
+    /// </summary>
+    public int MaxMessageSize { get; init; } = 64 << 20;
+
+    /// <summary>Largest numInGroup a repeating group may declare.</summary>
+    public int MaxRepeatedCount { get; init; } = 64 << 20;
+
     // HARDENING.md § UTF-8: proto3 string fields are valid UTF-8.
     // Encoding.UTF8 silently substitutes U+FFFD on invalid bytes; use a
     // throwing decoder for string-typed fields.
@@ -422,6 +431,7 @@ public class Codec
     /// <param name="msg">The message to populate.</param>
     public void Unmarshal(byte[] data, IMessage msg)
     {
+        CheckMessageSize(data);
         if (data.Length < HeaderSize) throw new Exception("SBE: data too short for header");
 
         var span = data.AsSpan();
@@ -434,6 +444,12 @@ public class Codec
         int end = HeaderSize + blockLength;
         if (data.Length < end) throw new Exception("SBE: data too short for root block");
 
+        // A header can declare a block shorter than its template: an older
+        // schema has fewer fields, so this is not out of bounds in itself, but
+        // this codec reads every field the template has.
+        int needed = tmpl.Fields.Count == 0 ? 0 : tmpl.Fields.Max(f => f.Offset + f.Size);
+        if (blockLength < needed) throw new Exception($"SBE: root block of {blockLength} bytes is shorter than its template's {needed}");
+
         var rootBlock = span[HeaderSize..end];
         foreach (var ft in tmpl.Fields)
         {
@@ -444,6 +460,14 @@ public class Codec
         foreach (var gt in tmpl.Groups)
         {
             pos += UnmarshalGroup(span[pos..], msg, gt);
+        }
+    }
+
+    private void CheckMessageSize(byte[] data)
+    {
+        if (data.Length > MaxMessageSize)
+        {
+            throw new Exception($"SBE: input of {data.Length} bytes exceeds MaxMessageSize={MaxMessageSize}");
         }
     }
 
@@ -527,6 +551,9 @@ public class Codec
         ushort blockLength = BinaryPrimitives.ReadUInt16LittleEndian(buf[0..]);
         ushort numInGroup = BinaryPrimitives.ReadUInt16LittleEndian(buf[2..]);
 
+        if (numInGroup > MaxRepeatedCount)
+            throw new Exception($"SBE: group of {numInGroup} entries exceeds MaxRepeatedCount={MaxRepeatedCount}");
+
         // HARDENING.md § SBE step 3-4: count * blockLength must be checked in
         // 64-bit before allocating; reject blockLength==0 with count>0 to
         // foreclose unbounded writer-state allocation that consumes no input.
@@ -537,6 +564,9 @@ public class Codec
         if (totalSizeChecked > (ulong)buf.Length)
             throw new Exception("SBE: data too short for group entries");
         int totalSize = (int)totalSizeChecked;
+        int entryNeeded = gt.Fields.Count == 0 ? 0 : gt.Fields.Max(f => f.Offset + f.Size);
+        if (numInGroup > 0 && blockLength < entryNeeded)
+            throw new Exception($"SBE: group block of {blockLength} bytes is shorter than its template's {entryNeeded}");
 
         var val = gt.Fd.Accessor.GetValue(msg);
         for (int i = 0; i < numInGroup; i++)
@@ -601,7 +631,11 @@ public class Codec
     /// </summary>
     /// <param name="data">The SBE binary data.</param>
     /// <returns>A View instance for reading fields directly from the buffer.</returns>
-    public View CreateView(byte[] data) => new(data, _byID);
+    public View CreateView(byte[] data)
+    {
+        CheckMessageSize(data);
+        return new View(data, _byID, MaxRepeatedCount);
+    }
 }
 
 internal partial class MessageTemplate

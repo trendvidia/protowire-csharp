@@ -34,6 +34,7 @@ format changes.
 ### Added
 
 - `Encoder.EmitDefaults`, `Encoder.NullFields` and `Encoder.MaxNestingDepth`. A message deeper than the limit is an error, because a reader at that limit would refuse it.
+- **The draft's mandatory limits are enforced and configurable per call** (#32), on PXF, PB and SBE. `MaxMessageSize` is checked before any allocation proportional to the input, `MaxBytesLiteralLength` from a literal's length before it is decoded, and `MaxRepeatedCount` on an SBE group's `numInGroup` and as a counter on repeated and map elements. Use `PxfLimits`, `PbLimits` and `Codec`'s init properties. `check-decode` takes `--limit NAME=VALUE`, and runs `pb-render`, `pb-text` and `sbe`.
 - `PxfLimits`, set through `Decoder.Limits` or `Parser.Parse(input, limits)`, makes the draft's limits per-call.
 - The type entry of an Any block, in a singular field, a list element or a map value (#42).
 - Wrapper-typed fields take a scalar or a block (#45).
@@ -52,6 +53,10 @@ format changes.
 - **A `(pxf.default)` on a oneof member no longer clears the sibling the document set** (#63).
 - **A keyed entry body cannot undo its entry name** (#65): `null` on the key, or another member of the key's oneof, is a key conflict.
 - **A block on an unkeyed repeated field is rejected** (#52), where `items { a { } }` used to decode to nothing.
+- **PB reads a packed repeated field** (found by the limit corpus). It read the run's length as one element and the rest as tags, and packed is what proto3 writes by default.
+- **PB rejects invalid UTF-8 in a string, a Decimal scale past `MaxNumericLiteralDigits` and a BigFloat past `MaxBigFloatExponent`**, and refuses to marshal a message past `MaxNestingDepth` or with such a scale.
+- **A lone surrogate in a string passed to the decoder is a `PxfException`**, not a raw `EncoderFallbackException`.
+- **An SBE root or group block shorter than its template is rejected** rather than crashing the decoder with a slice exception.
 - **A PB map entry missing its key or value is no longer dropped** (#60). A missing field is now its type's default, as protobuf says, so such an entry stays in the map, and a `string` or message value is never null. `dump-envelope --vector zero-map-entry` prints the wire vector the spec checks (#31); the writer already produced it.
 - **A keyed entry's name now counts as supplying the key field**
   ([trendvidia/protowire-go#214](https://github.com/trendvidia/protowire-go/issues/214)).

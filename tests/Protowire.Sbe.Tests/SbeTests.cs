@@ -123,4 +123,57 @@ public class SbeTests
         Assert.Equal(123, got.Code);
         Assert.Equal(SbeOneof.ChoiceOneofCase.Code, got.ChoiceCase);
     }
+
+    private static byte[] OrderWithTwoFills()
+    {
+        var order = new Order { OrderId = 1, Symbol = "A" };
+        order.Fills.Add(new Order.Types.Fill { FillId = 1 });
+        order.Fills.Add(new Order.Types.Fill { FillId = 2 });
+        return new Codec(SbeBenchReflection.Descriptor).Marshal(order);
+    }
+
+    [Fact]
+    public void Limit_MaxMessageSize()
+    {
+        var data = OrderWithTwoFills();
+        new Codec(SbeBenchReflection.Descriptor) { MaxMessageSize = data.Length }.Unmarshal(data, new Order());
+        var e = Assert.Throws<Exception>(() =>
+            new Codec(SbeBenchReflection.Descriptor) { MaxMessageSize = data.Length - 1 }.Unmarshal(data, new Order()));
+        Assert.Contains("MaxMessageSize", e.Message);
+    }
+
+    [Fact]
+    public void Limit_MaxMessageSize_DefaultRefusesOnePast()
+    {
+        var e = Assert.Throws<Exception>(() =>
+            new Codec(SbeBenchReflection.Descriptor).Unmarshal(new byte[(64 << 20) + 1], new Order()));
+        Assert.Contains("MaxMessageSize", e.Message);
+    }
+
+    [Fact]
+    public void Limit_MaxRepeatedCount()
+    {
+        var data = OrderWithTwoFills();
+        new Codec(SbeBenchReflection.Descriptor) { MaxRepeatedCount = 2 }.Unmarshal(data, new Order());
+        var e = Assert.Throws<Exception>(() =>
+            new Codec(SbeBenchReflection.Descriptor) { MaxRepeatedCount = 1 }.Unmarshal(data, new Order()));
+        Assert.Contains("MaxRepeatedCount=1", e.Message);
+    }
+
+    [Fact]
+    public void Limit_MaxRepeatedCount_BindsTheView()
+    {
+        var view = new Codec(SbeBenchReflection.Descriptor) { MaxRepeatedCount = 1 }.CreateView(OrderWithTwoFills());
+        Assert.Contains("MaxRepeatedCount=1", Assert.Throws<Exception>(() => view.Group("fills")).Message);
+    }
+
+    [Fact]
+    public void RootBlock_ShorterThanItsTemplate_IsRefused()
+    {
+        var data = OrderWithTwoFills();
+        data[0] = 4;
+        data[1] = 0;
+        var e = Assert.Throws<Exception>(() => new Codec(SbeBenchReflection.Descriptor).Unmarshal(data, new Order()));
+        Assert.Contains("shorter than its template", e.Message);
+    }
 }

@@ -14,6 +14,7 @@ public class View
     private readonly byte[] _data;
     private readonly ReadOnlyMemory<byte> _block;
     private readonly ViewSchema _schema;
+    private readonly int _maxRepeated = int.MaxValue;
 
     private const int HeaderSize = 8;
     private const int GroupHeaderSize = 4;
@@ -26,9 +27,10 @@ public class View
         encoderShouldEmitUTF8Identifier: false,
         throwOnInvalidBytes: true);
 
-    internal View(byte[] data, Dictionary<ushort, MessageTemplate> byID)
+    internal View(byte[] data, Dictionary<ushort, MessageTemplate> byID, int maxRepeated)
     {
         _data = data;
+        _maxRepeated = maxRepeated;
         var span = data.AsSpan();
         ushort blockLength = BinaryPrimitives.ReadUInt16LittleEndian(span[0..]);
         ushort templateID = BinaryPrimitives.ReadUInt16LittleEndian(span[2..]);
@@ -190,6 +192,8 @@ public class View
                 throw new Exception("SBE: group header out of bounds");
             ushort bl = BinaryPrimitives.ReadUInt16LittleEndian(_data.AsSpan((int)pos));
             ushort n = BinaryPrimitives.ReadUInt16LittleEndian(_data.AsSpan((int)pos + 2));
+            if (n > _maxRepeated)
+                throw new Exception($"SBE: group of {n} entries exceeds MaxRepeatedCount={_maxRepeated}");
             // HARDENING.md § SBE step 3-4: 64-bit checked arithmetic before
             // narrowing; reject blockLength==0 with count>0 (otherwise the
             // group walk would loop or allocate without consuming input).

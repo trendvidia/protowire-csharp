@@ -52,6 +52,7 @@ TABLE=(
   "Conformance/Schemas/Values/Conformance.cs tests/Protowire.Conformance/Generated/Conformance.cs"
   "Conformance/Schemas/Carrier/Carrier.cs tests/Protowire.Conformance/Generated/Carrier.cs"
   "Conformance/Schemas/SettingsAnnotated/SettingsAnnotated.cs tests/Protowire.Conformance/Generated/SettingsAnnotated.cs"
+  "CheckDecode/Schemas/Adversarial.cs   cmd/Protowire.CheckDecode/Generated/Adversarial.cs"
   "DumpEnvelope/Fixtures/Settings.cs     cmd/Protowire.DumpEnvelope/Generated/Settings.cs"
 )
 HEADER=$'// SPDX-License-Identifier: MIT\n// Copyright (c) 2026 TrendVidia, LLC.\n'
