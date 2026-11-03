@@ -563,17 +563,18 @@ public static class Pb
     {
         using var ms = new MemoryStream();
         using var output = new CodedOutputStream(ms);
-        var bytes = MagnitudeBytes(bf.Mantissa);
+        var (mantissa, exponent) = WidenToPrecision(bf.Mantissa, bf.Exponent, bf.Precision);
+        var bytes = MagnitudeBytes(mantissa);
         if (bytes.Length > 0)
         {
             output.WriteTag(WireFormat.MakeTag(1, WireFormat.WireType.LengthDelimited));
             output.WriteBytes(ByteString.CopyFrom(bytes));
         }
         // A zero has one encoding: an empty mantissa and exponent 0.
-        if (bf.Exponent != 0 && !bf.Mantissa.IsZero)
+        if (exponent != 0 && !mantissa.IsZero)
         {
             output.WriteTag(WireFormat.MakeTag(2, WireFormat.WireType.Varint));
-            output.WriteInt32(bf.Exponent);
+            output.WriteInt32(exponent);
         }
         if (bf.Precision != 0)
         {
@@ -587,6 +588,43 @@ public static class Pb
         }
         output.Flush();
         return ms.ToArray();
+    }
+
+    // The wire mantissa is the value scaled to exactly prec bits, as
+    // protowire-go writes a big.Float (mant × 2^prec from MantExp): 1.5 at
+    // prec 64 is c000000000000000 × 2^-63, whatever form the BigFloat was
+    // built from, so the same value has one encoding (protowire#509's values
+    // table, #82). A mantissa wider than prec is rounded to it, half to even,
+    // as big.Float rounds on SetPrec. A zero, or prec 0, is left as it is.
+    private static (BigInteger Mantissa, int Exponent) WidenToPrecision(BigInteger mantissa, int exponent, uint precision)
+    {
+        if (mantissa.IsZero || precision == 0) return (mantissa, exponent);
+        long bits = (long)mantissa.GetBitLength();
+        long shift = precision - bits;
+        BigInteger m;
+        if (shift >= 0)
+        {
+            m = mantissa << (int)shift;
+        }
+        else
+        {
+            int drop = (int)-shift;
+            m = mantissa >> drop;
+            var rest = mantissa - (m << drop);
+            var half = BigInteger.One << (drop - 1);
+            if (rest > half || (rest == half && !m.IsEven)) m += 1;
+            if (m.GetBitLength() > precision)
+            {
+                m >>= 1;
+                shift--;
+            }
+        }
+        long adjusted = exponent - shift;
+        if (adjusted < int.MinValue || adjusted > int.MaxValue)
+        {
+            throw new InvalidOperationException($"pxf.BigFloat exponent {adjusted} does not fit int32");
+        }
+        return (m, (int)adjusted);
     }
 
     private static BigFloat UnmarshalBigFloat(byte[] data, PbLimits limits)
