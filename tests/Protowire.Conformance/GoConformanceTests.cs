@@ -177,15 +177,48 @@ public class GoConformanceTests(ITestOutputHelper output)
 
     private static void CompareRows(string text, JsonElement r, Dictionary<string, string> d)
     {
+        var want = r.TryGetProperty("rows", out var rows) ? rows.EnumerateArray().ToArray() : [];
+        var got = new List<IMessage>();
+        Exception? rejection = null;
         try
         {
-            Parser.Parse(text);
+            foreach (var ds in Parser.Parse(text).Datasets)
+            {
+                var desc = Corpus.ByName[ds.Type];
+                foreach (var row in ds.Rows)
+                {
+                    var msg = desc.Parser.ParseFrom(ByteString.Empty);
+                    new Decoder().BindRow(msg, ds.Columns, row);
+                    got.Add(msg);
+                }
+            }
         }
-        catch (PxfException)
+        catch (Exception e)
         {
-            if (!Get(r, "parsed", false)) return;
+            rejection = e;
         }
-        d["rows"] = "no row binder";
+        var accepted = Get(r, "accepted", false);
+        if (accepted != (rejection == null))
+        {
+            d["verdict"] = accepted ? $"Go accepts, C# refuses: {Line(rejection)}" : $"C# accepts, Go: {Get(r, "error", "")}";
+            return;
+        }
+        if (rejection != null)
+        {
+            if (rejection is not PxfException) d["crash"] = Line(rejection);
+            return;
+        }
+        if (got.Count != want.Length)
+        {
+            d["rows"] = $"C# bound {got.Count} rows, Go {want.Length}";
+            return;
+        }
+        for (int i = 0; i < got.Count; i++)
+        {
+            ComparePb(got[i], Bytes(want[i], "pb"), d);
+            // The oracle writes rows with no resolver, so an Any stays as its fields.
+            CompareText(got[i], Get(want[i], "text", ""), d, TypeRegistry.Empty);
+        }
     }
 
     private static void CompareBinary(string path, JsonElement r, Dictionary<string, string> d)
@@ -223,12 +256,12 @@ public class GoConformanceTests(ITestOutputHelper output)
         }
     }
 
-    private static void CompareText(IMessage msg, string want, Dictionary<string, string> d)
+    private static void CompareText(IMessage msg, string want, Dictionary<string, string> d, TypeRegistry? registry = null)
     {
         string got;
         try
         {
-            got = new Encoder { Registry = Corpus.Registry }.Marshal(msg);
+            got = new Encoder { Registry = registry ?? Corpus.Registry }.Marshal(msg);
         }
         catch (Exception e)
         {
