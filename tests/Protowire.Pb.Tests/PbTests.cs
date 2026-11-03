@@ -187,17 +187,39 @@ public class PbTests
             Pb.Marshal(new ScaleMessage { Dec = new Decimal(5, int.MinValue, false) }));
     }
 
+    // Precision 3 is 5's own width, so the mantissa is written as it is
+    // rather than widened to the precision (#82).
     [Theory]
-    [InlineData(3, "0a070a010510031835")]
-    [InlineData(-3, "0a100a010510fdffffffffffffffff011835")]
+    [InlineData(3, "0a070a010510031803")]
+    [InlineData(-3, "0a100a010510fdffffffffffffffff011803")]
     public void TestBigFloatExponentIsAPlainVarint(int exponent, string hex)
     {
         var wire = Convert.FromHexString(hex);
-        Assert.Equal(wire, Pb.Marshal(new ExponentMessage { Flt = new BigFloat(5, exponent, 53, false) }));
+        Assert.Equal(wire, Pb.Marshal(new ExponentMessage { Flt = new BigFloat(5, exponent, 3, false) }));
 
         var got = new ExponentMessage();
         Pb.Unmarshal(wire, got);
         Assert.Equal(exponent, got.Flt.Exponent);
+    }
+
+    // The mantissa is written scaled to exactly prec bits, as protowire-go
+    // writes a big.Float, so one value has one encoding whatever form it was
+    // built from (spec testdata/values: BigFloatPrec64). A wider mantissa is
+    // rounded half to even.
+    [Theory]
+    [InlineData(3, -1, 64u, 0xC000000000000000UL, -63)]
+    [InlineData(0xC000000000000000UL, -63, 64u, 0xC000000000000000UL, -63)]
+    [InlineData(3, -1, 53u, 0x18000000000000UL, -52)]
+    [InlineData(0b10110, 0, 3u, 0b110, 2)]
+    [InlineData(0b10101, 0, 3u, 0b101, 2)]
+    [InlineData(0b11110, 0, 3u, 0b100, 3)]
+    public void TestBigFloatMantissaIsWidenedToItsPrecision(ulong mantissa, int exponent, uint prec, ulong wantMantissa, int wantExponent)
+    {
+        var got = new ExponentMessage();
+        Pb.Unmarshal(Pb.Marshal(new ExponentMessage { Flt = new BigFloat(mantissa, exponent, prec, false) }), got);
+        Assert.Equal(new BigInteger(wantMantissa), got.Flt.Mantissa);
+        Assert.Equal(wantExponent, got.Flt.Exponent);
+        Assert.Equal(prec, got.Flt.Precision);
     }
 
     // Expected bytes from `protoc --encode`, wrapped in field 1.
