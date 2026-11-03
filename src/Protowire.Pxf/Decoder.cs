@@ -198,7 +198,7 @@ public partial class Decoder
                     if (_current.Kind != TokenKind.IDENT)
                     {
                         throw new PxfException(_current.Pos,
-                            $"expected type name after @type, got {_current.Kind}");
+                            $"expected type name after @type, got {TokenText.Describe(_current)}");
                     }
                     Advance();
                     continue;
@@ -235,10 +235,6 @@ public partial class Decoder
             {
                 throw new PxfException(firstDatasetPos,
                     "@dataset directive cannot coexist with top-level field entries (draft §3.4.4)");
-            }
-            if (_current.Kind == TokenKind.ILLEGAL)
-            {
-                throw new PxfException(_current.Pos, _current.Value);
             }
             return;
         }
@@ -307,13 +303,13 @@ public partial class Decoder
         if (_current.Kind != TokenKind.LPAREN)
         {
             throw new PxfException(_current.Pos,
-                $"expected '(' to start @dataset column list, got {_current.Kind}");
+                $"expected '(' to start @dataset column list, got {TokenText.Describe(_current)}");
         }
         Advance();
         if (_current.Kind != TokenKind.IDENT)
         {
             throw new PxfException(_current.Pos,
-                $"@dataset column list must contain at least one field name, got {_current.Kind}");
+                $"@dataset column list must contain at least one field name, got {TokenText.Describe(_current)}");
         }
         var columns = new List<string>();
         var columnPositions = new List<Position>();
@@ -321,7 +317,7 @@ public partial class Decoder
         {
             if (_current.Kind != TokenKind.IDENT)
             {
-                throw new PxfException(_current.Pos, $"expected column field name, got {_current.Kind}");
+                throw new PxfException(_current.Pos, $"expected column field name, got {TokenText.Describe(_current)}");
             }
             columns.Add(_current.Value);
             columnPositions.Add(_current.Pos);
@@ -329,10 +325,10 @@ public partial class Decoder
             if (_current.Kind == TokenKind.COMMA) { Advance(); continue; }
             if (_current.Kind == TokenKind.RPAREN) break;
             throw new PxfException(_current.Pos,
-                $"expected ',' or ')' in @dataset column list, got {_current.Kind}");
+                $"expected ',' or ')' in @dataset column list, got {TokenText.Describe(_current)}");
         }
         DatasetPaths.CheckHeader(columns, columnPositions);
-        Advance(keepIllegal: true); // consume )
+        Advance(); // consume )
 
         var rows = new List<DatasetRow>();
         while (_current.Kind == TokenKind.LPAREN)
@@ -349,9 +345,9 @@ public partial class Decoder
             if (_current.Kind != TokenKind.RPAREN)
             {
                 throw new PxfException(_current.Pos,
-                    $"expected ',' or ')' in @dataset row, got {_current.Kind}");
+                    $"expected ',' or ')' in @dataset row, got {TokenText.Describe(_current)}");
             }
-            Advance(keepIllegal: true);
+            Advance();
             if (cells.Count != columns.Count)
             {
                 throw new PxfException(rowPos,
@@ -406,7 +402,7 @@ public partial class Decoder
                     if (_current.Kind != TokenKind.LBRACE)
                     {
                         throw new PxfException(_current.Pos,
-                            $"expected '{{' after @proto {typeName}, got {_current.Kind}");
+                            $"expected '{{' after @proto {typeName}, got {TokenText.Describe(_current)}");
                     }
                     var body = CaptureBraceBody("@proto " + typeName);
                     return new ProtoDirective
@@ -445,7 +441,7 @@ public partial class Decoder
                 }
             default:
                 throw new PxfException(_current.Pos,
-                    $"expected '{{', dotted identifier, triple-quoted string, or b\"...\" after @proto, got {_current.Kind}");
+                    $"expected '{{', dotted identifier, triple-quoted string, or b\"...\" after @proto, got {TokenText.Name(_current.Kind)}");
         }
     }
 
@@ -480,27 +476,31 @@ public partial class Decoder
         return peeked;
     }
 
-    private void Advance() => Advance(keepIllegal: false);
-
-    // keepIllegal leaves an ILLEGAL token current, for the token after a
-    // @dataset header or row: ConsumeDirectives then reports a token beside
-    // the rows as protowire-go does, before what is wrong with it (#96).
-    private void Advance(bool keepIllegal)
+    // A token the lexer rejected becomes current like any other, and the
+    // site expecting something reports it, as protowire-go does (#99). A
+    // value position reports it through IllegalError.
+    private void Advance()
     {
         while (true)
         {
             _current = _lex.Next();
-            if (_current.Kind == TokenKind.ILLEGAL)
-            {
-                if (keepIllegal) return;
-                throw new PxfException(_current.Pos, _current.Value);
-            }
             if (_current.Kind != TokenKind.COMMENT && _current.Kind != TokenKind.NEWLINE)
             {
                 return;
             }
         }
     }
+
+    /// <summary>
+    /// The lexer's diagnostic when the current token is one it rejected,
+    /// and null otherwise. A value position checks it before deciding what
+    /// it wanted instead, because "expected '{' for message field" says less
+    /// than "invalid duration: 5seconds". Mirrors protowire-go's illegalErr,
+    /// and sits where it does: at the entry of a field value, a list element
+    /// and a map value, never in front of a schema check.
+    /// </summary>
+    private PxfException? IllegalError() =>
+        _current.Kind == TokenKind.ILLEGAL ? new PxfException(_current.Pos, _current.Value) : null;
 
     // HARDENING.md § Recursion: the root message is depth 0 and every `{`
     // or `[` is one descent, so a document exactly MaxNestingDepth deep is
@@ -560,7 +560,7 @@ public partial class Decoder
             if (_current.Kind == TokenKind.AT_TYPE) throw new PxfException(pos, TypeEntryMisplaced);
             if (_current.Kind is not (TokenKind.IDENT or TokenKind.STRING or TokenKind.INT or TokenKind.BOOL))
             {
-                throw new PxfException(pos, $"expected identifier, string, integer, or bool, got {_current.Kind}");
+                throw new PxfException(pos, $"expected identifier, string, integer, or bool, got {TokenText.Describe(_current)}");
             }
             var keyKind = _current.Kind;
             string key = _current.Value;
@@ -635,7 +635,7 @@ public partial class Decoder
                     break;
 
                 default:
-                    throw new PxfException(_current.Pos, $"expected '=' or '{{' after \"{key}\"");
+                    throw new PxfException(_current.Pos, $"expected '=' or '{{' after {TokenText.Quote(key)}, got {TokenText.Describe(_current)}");
             }
         }
     }
@@ -662,6 +662,7 @@ public partial class Decoder
 
     private object? DecodeValue(Type type, object? currentVal)
     {
+        if (IllegalError() is { } illegal) throw illegal;
         var pos = _current.Pos;
         var underlying = System.Nullable.GetUnderlyingType(type);
         if (underlying != null) type = underlying;
@@ -853,7 +854,7 @@ public partial class Decoder
             }
             if (_current.Kind is not (TokenKind.IDENT or TokenKind.STRING or TokenKind.INT or TokenKind.BOOL))
             {
-                throw new PxfException(pos, $"expected map key, got {_current.Kind}");
+                throw new PxfException(pos, $"expected map key, got {TokenText.Describe(_current)}");
             }
             var keyStr = _current.Value;
             Advance();
