@@ -34,11 +34,17 @@ managed:
       value: Protowire.Sbe.Tests.Bench
       path: sbe-oneof.proto
     - file_option: csharp_namespace
+      value: Protowire.Sbe.Tests.Utf8
+      path: sbe-utf8.proto
+    - file_option: csharp_namespace
       value: Protowire.Pxf.Tests.Bench
       path: bench-test.proto
     - file_option: csharp_namespace
       value: Protowire.Pxf.Tests.Presence
       path: pxf-presence-test.proto
+    - file_option: csharp_namespace
+      value: Protowire.Pxf.Tests.SecretHook
+      path: pxf-secret-hook-test.proto
     - file_option: csharp_namespace
       value: Protowire.Pxf.Tests.KeyedFixtures
       path: keyed.proto

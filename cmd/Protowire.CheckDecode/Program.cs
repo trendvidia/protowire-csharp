@@ -30,7 +30,9 @@
 //
 // A rejection that is not one of this port's exceptions is exit 2. That is the
 // contract's "bug in the decoder", and it is why a format this harness does not
-// run cannot pass as a clean rejection.
+// run cannot pass as a clean rejection. A --schema the harness does not know is
+// exit 1, as protowire-go's harness reports it: a corpus row naming a new
+// message then fails as a wrong verdict, with the message, not as a crash.
 
 using Google.Protobuf;
 using Google.Protobuf.Reflection;
@@ -96,7 +98,7 @@ internal static class CheckDecode
     // The exception types a decode rejects with. SBE's are plain Exception.
     private static bool IsRejection(Exception e) =>
         e is PxfException or InvalidProtocolBufferException or InvalidOperationException
-            or FormatException or System.Text.DecoderFallbackException
+            or FormatException or System.Text.DecoderFallbackException or UnknownSchemaException
         || e.GetType() == typeof(Exception);
 
     private static bool TryLimit(string? spec, Dictionary<string, int> limits)
@@ -140,7 +142,7 @@ internal static class CheckDecode
 
     private static MessageDescriptor Generated(string schema) =>
         Adversarial.FirstOrDefault(m => m.FullName == schema)
-        ?? throw new ArgumentException($"unknown schema: {schema}");
+        ?? throw new UnknownSchemaException(schema);
 
     private static void PxfDecode(string input, string schema, Dictionary<string, int> limits)
     {
@@ -191,7 +193,7 @@ internal static class CheckDecode
     private static void PbText(string input, string schema)
     {
         var desc = TextReflection.Descriptor.MessageTypes.FirstOrDefault(m => m.FullName == schema)
-            ?? throw new ArgumentException($"unknown schema: {schema}");
+            ?? throw new UnknownSchemaException(schema);
         // Bytes rather than text: the gate compares them, and Console would
         // translate the line ends on Windows.
         var text = new Encoder().Marshal(desc.Parser.ParseFrom(File.ReadAllBytes(input)));
@@ -217,9 +219,12 @@ internal static class CheckDecode
         "adversarial.v1.BigIntHolder" => new BigIntHolder(),
         "adversarial.v1.BigNumHolder" => new BigNumHolder(),
         "adversarial.v1.ListHolder" => new ListHolder(),
-        _ => throw new ArgumentException($"unknown schema: {schema}"),
+        _ => throw new UnknownSchemaException(schema),
     };
 }
+
+internal sealed class UnknownSchemaException(string schema)
+    : Exception($"unknown schema: {schema}");
 
 // Hand-mirrored from protowire/testdata/adversarial/adversarial.proto.
 // The C# Pb decoder reads `[Protowire(N)]` attributes for field numbers.

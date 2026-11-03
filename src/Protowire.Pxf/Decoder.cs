@@ -40,6 +40,47 @@ public partial class Decoder
     public bool DiscardUnknown { get; set; }
 
     /// <summary>
+    /// If set, called with the value of each <c>pxf.Secret</c> in a generated
+    /// message, in every form it can be written: the scalar shorthand
+    /// (<c>pw = "x"</c>), a list element (<c>["a", "b"]</c>), a map value
+    /// (<c>{ "acme": "k" }</c>), and the block form
+    /// (<c>pw { value = "x" hint = "h" }</c> or <c>pw = { value = "x" }</c>).
+    /// The handler receives the field's path and the value. The decoder then
+    /// leaves the Secret's <c>value</c> unset, so the caller can move the
+    /// plaintext into whatever store honours its own memory contract. The
+    /// Secret message itself is still set on its field, presence still
+    /// records <c>value</c> as set for <see cref="UnmarshalFull"/>, and
+    /// <c>hint</c> and <c>fingerprint</c> are assigned as usual: they are
+    /// diagnostic, not sensitive. A block with no <c>value</c> does not call
+    /// the handler.
+    /// <para>Paths name the body a Secret sits in:</para>
+    /// <code>
+    /// pw = "x"                              → pw
+    /// db { password = "x" }                 → db.password
+    /// pw { value = "x" hint = "h" }         → pw
+    /// servers = [{ password = "x" }]        → servers[0].password
+    /// by_host = { "a": { password = "x" } } → by_host["a"].password
+    /// payload { @type = "..." pw = "x" }    → payload.pw
+    /// backup_keys = ["a", "b"]              → backup_keys[0], backup_keys[1]
+    /// tenant_keys = { "acme": "k" }         → tenant_keys["acme"]
+    /// </code>
+    /// <para>
+    /// An exception thrown by the handler aborts the decode. It is rethrown
+    /// as a <see cref="PxfException"/> that names the path and carries it as
+    /// <see cref="Exception.InnerException"/>.
+    /// </para>
+    /// <para>
+    /// The handler keeps the plaintext off the message, not out of managed
+    /// memory: the input string and the lexer's token both hold it until they
+    /// are collected. Mirrors <c>UnmarshalOptions.OnSecretField</c> in
+    /// protowire-go, which has no hand-written classes. Here a Secret member
+    /// of one decodes as a plain message without calling the handler, and a
+    /// generated message held by one reports paths from that message.
+    /// </para>
+    /// </summary>
+    public Action<string, string>? OnSecretField { get; set; }
+
+    /// <summary>
     /// Unmarshals a PXF-formatted string into the specified object.
     /// </summary>
     /// <param name="data">The PXF-formatted string.</param>

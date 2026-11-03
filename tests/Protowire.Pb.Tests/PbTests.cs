@@ -109,10 +109,10 @@ public class PbTests
 
     // bignum.proto declares scale and exponent int32, a plain varint. The
     // expected bytes come from `protoc --encode`, wrapped in field 1, so the
-    // codec can't agree only with itself (#55).
+    // codec can't agree only with itself (#55). 5 has no zero to remove, so
+    // reducing (#77) leaves a positive scale as it is.
     [Theory]
     [InlineData(2, "0a050a01051002")]
-    [InlineData(-2, "0a0e0a010510feffffffffffffffff01")]
     [InlineData(4096, "0a060a0105108020")]
     public void TestDecimalScaleIsAPlainVarint(int scale, string hex)
     {
@@ -122,6 +122,69 @@ public class PbTests
         var got = new ScaleMessage();
         Pb.Unmarshal(wire, got);
         Assert.Equal(scale, got.Dec.Scale);
+    }
+
+    // Marshal never writes a negative scale (#77), but a reader takes one:
+    // a plain varint, sign-extended to ten bytes.
+    [Fact]
+    public void TestNegativeDecimalScaleIsReadAsAPlainVarint()
+    {
+        var got = new ScaleMessage();
+        Pb.Unmarshal(Convert.FromHexString("0a0e0a010510feffffffffffffffff01"), got);
+        Assert.Equal(-2, got.Dec.Scale);
+        Assert.Equal(5, got.Dec.Unscaled);
+    }
+
+    // A Decimal is written reduced, as protowire-go writes a big.Rat (#77,
+    // trendvidia/protowire#508). Expected bytes measured on protowire-go
+    // f8a01b1 with pb.Marshal of struct{ D *big.Rat `protowire:"1"` }.
+    [Theory]
+    [InlineData(100, 2, false, "0a030a0101")]
+    [InlineData(5, -2, false, "0a040a0201f4")]
+    [InlineData(1500, 2, false, "0a030a010f")]
+    [InlineData(0, 2, false, "")]
+    [InlineData(0, 2, true, "")]
+    [InlineData(1500, 3, true, "0a070a010f10011801")]
+    [InlineData(123, 2, false, "0a050a017b1002")]
+    public void TestDecimalIsWrittenReduced(int unscaled, int scale, bool negative, string hex)
+    {
+        var dec = new Decimal(unscaled, scale, negative);
+        Assert.Equal(Convert.FromHexString(hex), Pb.Marshal(new ScaleMessage { Dec = dec }));
+        // The caller's value keeps its form.
+        Assert.Equal(new BigInteger(unscaled), dec.Unscaled);
+        Assert.Equal(scale, dec.Scale);
+    }
+
+    public class DecimalListMessage
+    {
+        [Protowire(2)] public List<Decimal> Decs { get; set; } = new();
+    }
+
+    // A list element is written even when zero, as an empty message.
+    // Measured on protowire-go f8a01b1: []big.Rat{0, 1.00, -1.500}.
+    [Fact]
+    public void TestDecimalListIsWrittenReduced()
+    {
+        var msg = new DecimalListMessage
+        {
+            Decs = { new Decimal(0, 2, false), new Decimal(100, 2, false), new Decimal(1500, 3, true) },
+        };
+        Assert.Equal(Convert.FromHexString("120012030a010112070a010f10011801"), Pb.Marshal(msg));
+    }
+
+    // The scale bound applies after reducing; below -bound it is refused
+    // before any work, since reducing would write that many zero digits.
+    [Fact]
+    public void TestDecimalScaleBoundAppliesAfterReducing()
+    {
+        Assert.Equal(Convert.FromHexString("0a060a010110ff1f"),
+            Pb.Marshal(new ScaleMessage { Dec = new Decimal(100, 4097, false) }));
+        Assert.Throws<InvalidOperationException>(() =>
+            Pb.Marshal(new ScaleMessage { Dec = new Decimal(5, 4097, false) }));
+        Assert.Throws<InvalidOperationException>(() =>
+            Pb.Marshal(new ScaleMessage { Dec = new Decimal(5, -4097, false) }));
+        Assert.Throws<InvalidOperationException>(() =>
+            Pb.Marshal(new ScaleMessage { Dec = new Decimal(5, int.MinValue, false) }));
     }
 
     [Theory]
@@ -141,8 +204,8 @@ public class PbTests
     [Fact]
     public void TestZeroMagnitudeIsEmptyOnTheWire()
     {
-        Assert.Equal(Convert.FromHexString("0a021002"),
-            Pb.Marshal(new ScaleMessage { Dec = new Decimal(BigInteger.Zero, 2, false) }));
+        // A Decimal zero is zero at any scale (#77), so the field is omitted.
+        Assert.Empty(Pb.Marshal(new ScaleMessage { Dec = new Decimal(BigInteger.Zero, 2, false) }));
         // A BigFloat zero keeps prec and drops its exponent.
         Assert.Equal(Convert.FromHexString("0a021835"),
             Pb.Marshal(new ExponentMessage { Flt = new BigFloat(BigInteger.Zero, 3, 53, false) }));
