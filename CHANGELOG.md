@@ -30,6 +30,7 @@ format changes.
 - **SBE: an overlong `(sbe.length)` value is cut instead of failing** (#79). `Codec.Marshal` threw `ArgumentException` for a string or bytes value longer than its field. A string is now cut at the last whole UTF-8 character that fits and NUL-padded, so a strict decoder still reads it, and a bytes value is cut at the limit, as the draft and protowire-go do.
 - The formatter quotes strings as `strconv.Quote` does, so an unusual character may be escaped differently.
 - **More schemas are refused at bind time** (#52), as they are by the reference: a field, oneof or enum value named `null`, `true` or `false`; `(pxf.default)` on a repeated, map or group field, or on a message type no literal denotes; `(pxf.required)` on a oneof member; two defaults in one oneof; and a message that takes a well-known type's name without its fields.
+- **A descriptor compiled before protowire v1.12.0 is refused at bind time** (#76), as the reference refuses it (STABILITY.md promise 3). In a file that imports protowire's annotations, an option at one of the retired numbers 50000–51002, on the Options kind that number was allocated on, is a violation naming the number, what it was, its registered number now, and that the descriptor must be recompiled. Such a schema used to bind with none of its annotations enforced.
 - `(pxf.required)` and `(pxf.default)` now apply inside list elements and map values (#52).
 - A nesting-depth error now reads `nesting depth exceeds MaxNestingDepth=100`.
 
