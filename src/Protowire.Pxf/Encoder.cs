@@ -11,11 +11,11 @@ namespace Protowire.Pxf;
 /// <summary>
 /// Provides methods for encoding C# objects into PXF (Protowire Exchange Format) text format.
 /// </summary>
-public class Encoder
+public partial class Encoder
 {
-    private readonly StringBuilder _sb = new();
+    private StringBuilder _sb = new();
     private readonly string _indent = "  ";
-    private readonly bool _emitDefaults = false;
+    private bool _emitDefaults;
     public TypeRegistry Registry { get; set; } = TypeRegistry.Empty;
 
     /// <summary>
@@ -26,54 +26,15 @@ public class Encoder
     public string Marshal(object obj)
     {
         _sb.Clear();
-        EncodeMessage(obj, 0);
+        if (obj is IMessage message)
+        {
+            WriteRoot(message);
+        }
+        else
+        {
+            EncodeMessage(obj, 0);
+        }
         return _sb.ToString();
-    }
-
-    private void EncodeAny(string name, object any, int level)
-    {
-        var typeUrl = (string)any.GetType().GetProperty("TypeUrl")?.GetValue(any)!;
-        var typeName = typeUrl;
-        if (typeName.Contains("/")) typeName = typeName[(typeName.LastIndexOf('/') + 1)..];
-        
-        var desc = Registry.Find(typeName);
-        if (desc == null)
-        {
-            // If not in registry, we can't unpack it easily to PXF.
-            // Fallback to regular message encoding which might show TypeUrl and Value fields.
-            WriteIndent(level);
-            _sb.Append(name).Append(" {\n");
-            EncodeMessage(any, level + 1);
-            WriteIndent(level);
-            _sb.Append("}\n");
-            return;
-        }
-
-        var msg = desc.Parser.ParseFrom(Array.Empty<byte>());
-        var unpackMethod = any.GetType().GetMethod("Unpack", new[] { typeof(MessageDescriptor) });
-        // Wait, Unpack in Google.Protobuf returns IMessage.
-        var unpacked = any.GetType().GetMethod("Unpack", new Type[] { })?.MakeGenericMethod(msg.GetType()).Invoke(any, null) as IMessage;
-        
-        if (unpacked == null)
-        {
-             // Fallback
-            WriteIndent(level);
-            _sb.Append(name).Append(" {\n");
-            EncodeMessage(any, level + 1);
-            WriteIndent(level);
-            _sb.Append("}\n");
-            return;
-        }
-
-        WriteIndent(level);
-        _sb.Append(name).Append(" {\n");
-        WriteIndent(level + 1);
-        _sb.Append("@type = ");
-        WriteQuotedString(_sb, typeUrl);
-        _sb.Append('\n');
-        EncodeMessage(unpacked, level + 1);
-        WriteIndent(level);
-        _sb.Append("}\n");
     }
 
     private void WriteIndent(int level)
@@ -81,65 +42,20 @@ public class Encoder
         for (int i = 0; i < level; i++) _sb.Append(_indent);
     }
 
-    /// <param name="obj">The message to write.</param>
-    /// <param name="level">Indent level.</param>
-    /// <param name="skipKey">
-    /// The key field of a keyed-block entry: the entry name already carries
-    /// its value, so the field is not written again inside the block.
-    /// </param>
-    private void EncodeMessage(object obj, int level, FieldDescriptor? skipKey = null)
+    // The path for a hand-written class: no descriptor, so members are written
+    // in reflection order and a zero value is omitted.
+    private void EncodeMessage(object obj, int level)
     {
         var type = obj.GetType();
-        var desc = (obj as IMessage)?.Descriptor;
-        var props = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
-        var fields = type.GetFields(BindingFlags.Public | BindingFlags.Instance);
-
-        // Check for _null FieldMask
-        var nullMaskProp = props.FirstOrDefault(p => p.Name == "_null" || p.Name == "Null");
-        var nullFields = new HashSet<string>();
-        if (nullMaskProp != null && nullMaskProp.GetValue(obj) is IMessage mask)
+        foreach (var prop in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
-             var paths = mask.GetType().GetProperty("Paths")?.GetValue(mask) as IList;
-             if (paths != null)
-             {
-                 foreach (var path in paths) nullFields.Add(path?.ToString() ?? "");
-             }
-        }
-
-        foreach (var prop in props)
-        {
-            if (prop.Name == "_null" || prop.Name == "Null") continue;
-            if (skipKey != null && prop.Name == skipKey.PropertyName) continue;
             var val = prop.GetValue(obj);
-            
-            if (nullFields.Contains(prop.Name.ToLowerInvariant()) || nullFields.Contains(ToSnakeCase(prop.Name)))
-            {
-                WriteIndent(level);
-                _sb.Append(ToSnakeCase(prop.Name)).Append(" = null\n");
-                continue;
-            }
-
             if (!_emitDefaults && IsDefault(prop.PropertyType, val)) continue;
-            if (val is IList list && KeyedFieldOf(desc, prop.Name) is { } keyed && KeyedFormEligible(list, keyed.KeyField))
-            {
-                EncodeKeyedList(keyed.Field, list, keyed.KeyField, level);
-                continue;
-            }
             EncodeMember(ToSnakeCase(prop.Name), prop.PropertyType, val, level);
         }
-
-        foreach (var field in fields)
+        foreach (var field in type.GetFields(BindingFlags.Public | BindingFlags.Instance))
         {
-            if (field.Name == "_null" || field.Name == "Null") continue;
             var val = field.GetValue(obj);
-
-            if (nullFields.Contains(field.Name.ToLowerInvariant()) || nullFields.Contains(ToSnakeCase(field.Name)))
-            {
-                WriteIndent(level);
-                _sb.Append(ToSnakeCase(field.Name)).Append(" = null\n");
-                continue;
-            }
-
             if (!_emitDefaults && IsDefault(field.FieldType, val)) continue;
             EncodeMember(ToSnakeCase(field.Name), field.FieldType, val, level);
         }
@@ -147,29 +63,28 @@ public class Encoder
 
     private void EncodeMember(string name, Type type, object? val, int level)
     {
-        // Handle WKT
-        if (val != null)
+        if (val is IMessage message)
         {
-            var typeName = val.GetType().FullName;
-            if (typeName == "Google.Protobuf.WellKnownTypes.Timestamp" || val is DateTime)
-            {
-                var dt = val is DateTime d ? d : ReadTimestamp(val);
-                WriteIndent(level);
-                _sb.Append(name).Append(" = ").Append(dt.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffffffZ")).Append('\n');
-                return;
-            }
-            if (typeName == "Google.Protobuf.WellKnownTypes.Duration" || val is TimeSpan)
-            {
-                var ts = val is TimeSpan t ? t : ReadDuration(val);
-                WriteIndent(level);
-                _sb.Append(name).Append(" = ").Append(DurationParser.Format(ts)).Append('\n');
-                return;
-            }
-            if (typeName == "Google.Protobuf.WellKnownTypes.Any")
-            {
-                EncodeAny(name, val, level);
-                return;
-            }
+            WriteNamedMessage(name, message, level);
+            return;
+        }
+        if (val is DateTime dt)
+        {
+            WriteIndent(level);
+            _sb.Append(name).Append(" = ").Append(dt.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffffffZ")).Append('\n');
+            return;
+        }
+        if (val is TimeSpan ts)
+        {
+            WriteIndent(level);
+            _sb.Append(name).Append(" = ").Append(GoFormat.Duration(ts.Ticks * 100)).Append('\n');
+            return;
+        }
+        if (val is System.Numerics.BigInteger or Protowire.Pb.Decimal or Protowire.Pb.BigFloat)
+        {
+            WriteIndent(level);
+            _sb.Append(name).Append(" = ").Append(BigNumberLiteral(val)).Append('\n');
+            return;
         }
 
         if (typeof(IDictionary).IsAssignableFrom(type))
@@ -201,20 +116,6 @@ public class Encoder
         _sb.Append('\n');
     }
 
-    private DateTime ReadTimestamp(object obj)
-    {
-        long seconds = (long)(obj.GetType().GetProperty("Seconds")?.GetValue(obj) ?? 0L);
-        int nanos = (int)(obj.GetType().GetProperty("Nanos")?.GetValue(obj) ?? 0);
-        return DateTime.UnixEpoch.AddSeconds(seconds).AddTicks(nanos / 100);
-    }
-
-    private TimeSpan ReadDuration(object obj)
-    {
-        long seconds = (long)(obj.GetType().GetProperty("Seconds")?.GetValue(obj) ?? 0L);
-        int nanos = (int)(obj.GetType().GetProperty("Nanos")?.GetValue(obj) ?? 0);
-        return TimeSpan.FromSeconds(seconds).Add(TimeSpan.FromTicks(nanos / 100));
-    }
-
     private bool IsDefault(Type type, object? val)
     {
         if (val == null) return true;
@@ -235,63 +136,6 @@ public class Encoder
         return false;
     }
 
-    /// <summary>
-    /// The keyed repeated field behind the generated property
-    /// <paramref name="propertyName"/>, if it is one.
-    /// </summary>
-    private static (FieldDescriptor Field, FieldDescriptor KeyField)? KeyedFieldOf(MessageDescriptor? desc, string propertyName)
-    {
-        var fd = desc?.Fields.InDeclarationOrder().FirstOrDefault(f => f.PropertyName == propertyName);
-        if (fd == null) return null;
-        return Keyed.KeyField(fd) is { } keyFd ? (fd, keyFd) : null;
-    }
-
-    /// <summary>
-    /// The draft -01 condition for the keyed block form: every element's
-    /// key is present, non-empty, and distinct. Anything else can only be
-    /// represented in the anonymous list form.
-    /// </summary>
-    private static bool KeyedFormEligible(IList list, FieldDescriptor keyFd)
-    {
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var elem in list)
-        {
-            var key = (string?)keyFd.Accessor.GetValue((IMessage)elem!);
-            if (string.IsNullOrEmpty(key) || !seen.Add(key)) return false;
-        }
-        return true;
-    }
-
-    /// <summary>
-    /// Writes a keyed repeated field as a block of named blocks, in list
-    /// order. An entry name is bare when identifier-safe and quoted
-    /// otherwise; the key field is not repeated inside the entry.
-    /// </summary>
-    private void EncodeKeyedList(FieldDescriptor fd, IList list, FieldDescriptor keyFd, int level)
-    {
-        WriteIndent(level);
-        _sb.Append(fd.Name).Append(" {\n");
-        foreach (var elem in list)
-        {
-            var key = (string)keyFd.Accessor.GetValue((IMessage)elem!);
-            WriteIndent(level + 1);
-            if (Keyed.IdentSafeEntryName(key))
-            {
-                _sb.Append(key);
-            }
-            else
-            {
-                WriteQuotedString(_sb, key);
-            }
-            _sb.Append(" {\n");
-            EncodeMessage(elem!, level + 2, keyFd);
-            WriteIndent(level + 1);
-            _sb.Append("}\n");
-        }
-        WriteIndent(level);
-        _sb.Append("}\n");
-    }
-
     private void EncodeListField(string name, IEnumerable? list, int level)
     {
         if (list == null) return;
@@ -301,7 +145,11 @@ public class Encoder
         {
             if (elem == null) continue;
             WriteIndent(level + 1);
-            if (!elem.GetType().IsValueType && elem is not string && elem is not byte[] && elem is not ByteString)
+            if (elem is System.Numerics.BigInteger or Protowire.Pb.Decimal or Protowire.Pb.BigFloat)
+            {
+                _sb.Append(BigNumberLiteral(elem));
+            }
+            else if (!elem.GetType().IsValueType && elem is not string && elem is not byte[] && elem is not ByteString)
             {
                 _sb.Append("{\n");
                 EncodeMessage(elem, level + 2);
@@ -327,7 +175,10 @@ public class Encoder
         foreach (DictionaryEntry entry in map)
         {
             WriteIndent(level + 1);
-            _sb.Append(entry.Key).Append(": ");
+            if (entry.Key is string key && !Keyed.IdentSafeEntryName(key)) GoFormat.Quote(_sb, key);
+            else if (entry.Key is bool flag) _sb.Append(flag ? "true" : "false");
+            else _sb.Append(entry.Key);
+            _sb.Append(": ");
             if (entry.Value != null && !entry.Value.GetType().IsValueType && entry.Value is not string && entry.Value is not byte[] && entry.Value is not ByteString)
             {
                 _sb.Append("{\n");
@@ -368,20 +219,19 @@ public class Encoder
         {
             _sb.Append("b\"").Append(bs.ToBase64()).Append('"');
         }
-        else if (val is Enum e)
-        {
-            // Generated enums keep the proto name in an attribute; the CLR
-            // member name is not a PXF spelling.
-            var member = e.GetType().GetField(e.ToString());
-            var original = member?.GetCustomAttribute<OriginalNameAttribute>();
-            if (original != null) _sb.Append(original.Name);
-            else _sb.Append(Convert.ToInt32(e, System.Globalization.CultureInfo.InvariantCulture));
-        }
         else
         {
-            _sb.Append(val);
+            _sb.Append(Convert.ToString(val, System.Globalization.CultureInfo.InvariantCulture));
         }
     }
+
+    private static string BigNumberLiteral(object val) => val switch
+    {
+        System.Numerics.BigInteger bi => bi.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        Protowire.Pb.Decimal dec => WellKnown.DecimalLiteral(dec.Unscaled, dec.Scale, dec.Negative, PxfLimits.Default.MaxNumericLiteralDigits),
+        Protowire.Pb.BigFloat bf => BigFloatText.Format(bf, PxfLimits.Default.MaxNumericLiteralDigits, PxfLimits.Default.MaxBigFloatExponent),
+        _ => throw new ArgumentException(val.GetType().Name),
+    };
 
     private string ToSnakeCase(string name)
     {

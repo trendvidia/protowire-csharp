@@ -87,8 +87,11 @@ float = 0.00123
         Assert.Equal(System.Numerics.BigInteger.Parse("12345"), got.Dec.Unscaled);
         Assert.Equal(2, got.Dec.Scale);
         Assert.True(got.Dec.Negative);
-        Assert.Equal(System.Numerics.BigInteger.Parse("123"), got.Float.Mantissa);
-        Assert.Equal(-5, got.Float.Exponent);
+        // Read at 256 bits, as a literal with no suffix is (protowire#406): a
+        // binary floating-point value, not a decimal scale.
+        Assert.Equal(256u, got.Float.Precision);
+        Assert.Equal(256, (int)got.Float.Mantissa.GetBitLength());
+        Assert.Equal(-265, got.Float.Exponent);
     }
 
     public class DurationMsg

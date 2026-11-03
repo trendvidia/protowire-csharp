@@ -102,4 +102,46 @@ internal static class WellKnown
     // On the wire a zero magnitude is empty, not one 0 byte.
     private static byte[] Magnitude(System.Numerics.BigInteger magnitude) =>
         magnitude.IsZero ? [] : magnitude.ToByteArray(isUnsigned: true, isBigEndian: true);
+
+    /// <summary>
+    /// A Decimal as its positional literal. value = unscaled × 10^-scale, so a
+    /// negative scale is trailing zeros. The scale is bounded before anything
+    /// is built, because it is four bytes whoever wrote the message chose.
+    /// </summary>
+    public static string DecimalLiteral(System.Numerics.BigInteger unscaled, int scale, bool negative, int maxDigits)
+    {
+        if (scale > maxDigits || scale < -maxDigits)
+        {
+            throw new FormatException($"pxf.Decimal scale {scale} exceeds MaxNumericLiteralDigits={maxDigits}");
+        }
+        if (scale < 0)
+        {
+            unscaled *= System.Numerics.BigInteger.Pow(10, -scale);
+            scale = 0;
+        }
+        string digits = unscaled.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        string sign = negative ? "-" : "";
+        string literal;
+        if (scale == 0)
+        {
+            literal = sign + digits;
+        }
+        else
+        {
+            if (digits.Length <= scale) digits = digits.PadLeft(scale + 1, '0');
+            literal = $"{sign}{digits[..^scale]}.{digits[^scale..]}";
+        }
+        return BoundLiteral("pxf.Decimal", literal, maxDigits);
+    }
+
+    /// <summary>A literal this package's own decoder would refuse is an error, not a document.</summary>
+    public static string BoundLiteral(string kind, string literal, int maxDigits)
+    {
+        if (literal.Length > maxDigits)
+        {
+            int n = Decoder.CountDigits(literal);
+            if (n > maxDigits) throw new FormatException($"{kind} renders to {n} digits; MaxNumericLiteralDigits={maxDigits}");
+        }
+        return literal;
+    }
 }
