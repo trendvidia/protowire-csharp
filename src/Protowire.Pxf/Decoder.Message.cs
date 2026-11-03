@@ -652,11 +652,18 @@ public partial class Decoder
     private static PxfException Expected(string what, FieldDescriptor named, Position pos) =>
         new(pos, $"expected {what} for field \"{named.Name}\"");
 
+    // The NaN Go's strconv.ParseFloat gives for "nan": positive, quiet, no
+    // payload (0x7FF8000000000000). .NET's double.NaN has the sign bit set
+    // (0xFFF8000000000000), and the bits reach the wire, where the write gate
+    // compares them with protowire-go's (#82). As a float it narrows to
+    // 0x7FC00000, Go's float32 NaN.
+    private static readonly double QuietNaN = BitConverter.Int64BitsToDouble(0x7FF8000000000000);
+
     private double ParseFloat(string text, FieldDescriptor named, Position pos, bool single)
     {
         if (_current.Kind == TokenKind.IDENT && text is "inf" or "nan")
         {
-            return text == "inf" ? double.PositiveInfinity : double.NaN;
+            return text == "inf" ? double.PositiveInfinity : QuietNaN;
         }
         if (_current.Kind is not (TokenKind.FLOAT or TokenKind.INT)) throw Expected("number", named, pos);
         if (text is "+inf" or "-inf") return text[0] == '-' ? double.NegativeInfinity : double.PositiveInfinity;
