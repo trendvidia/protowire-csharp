@@ -270,6 +270,12 @@ internal class Lexer
                     charBuf[1] = Advance();
                     charLen = 2;
                 }
+                // Only a string handed in by .NET code can hold a lone
+                // surrogate; decoded UTF-8 cannot.
+                if (charLen == 1 && char.IsSurrogate(ch))
+                {
+                    return new Token(TokenKind.ILLEGAL, "invalid UTF-8 in string literal (use b\"…\" for raw bytes)", pos);
+                }
                 AppendChars(buf, charBuf[..charLen]);
                 continue;
             }

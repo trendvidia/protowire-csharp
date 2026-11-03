@@ -55,6 +55,7 @@ format changes.
 - **A block on an unkeyed repeated field is rejected** (#52), where `items { a { } }` used to decode to nothing.
 - **PB reads a packed repeated field** (found by the limit corpus). It read the run's length as one element and the rest as tags, and packed is what proto3 writes by default.
 - **PB rejects invalid UTF-8 in a string, a Decimal scale past `MaxNumericLiteralDigits` and a BigFloat past `MaxBigFloatExponent`**, and refuses to marshal a message past `MaxNestingDepth` or with such a scale.
+- **A lone surrogate in a string passed to the decoder is a `PxfException`**, not a raw `EncoderFallbackException`.
 - **An SBE root or group block shorter than its template is rejected** rather than crashing the decoder with a slice exception.
 - **A PB map entry missing its key or value is no longer dropped** (#60). A missing field is now its type's default, as protobuf says, so such an entry stays in the map, and a `string` or message value is never null. `dump-envelope --vector zero-map-entry` prints the wire vector the spec checks (#31); the writer already produced it.
 - **A keyed entry's name now counts as supplying the key field**

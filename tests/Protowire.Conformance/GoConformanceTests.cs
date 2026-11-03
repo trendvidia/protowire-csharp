@@ -184,7 +184,10 @@ public class GoConformanceTests(ITestOutputHelper output)
         {
             foreach (var ds in Parser.Parse(text).Datasets)
             {
-                var desc = Corpus.ByName[ds.Type];
+                if (!Corpus.ByName.TryGetValue(ds.Type, out var desc))
+                {
+                    throw new PxfException(ds.Pos, $"unknown row type {ds.Type}");
+                }
                 foreach (var row in ds.Rows)
                 {
                     var msg = desc.Parser.ParseFrom(ByteString.Empty);
