@@ -37,6 +37,7 @@ format changes.
 - **A parse or decode error reads as protowire-go's does** (#99), so a check on an error's text may need updating:
   - A character the lexer refuses is reported by the site that met it, not as the lexer's own error. In a value it is still the lexer's diagnostic (`unexpected character '$'`). Where a name or punctuation was expected, the error says what was expected and what came instead (`expected identifier, string, integer, or bool, got unexpected character '$'`). At some sites Go names the token only as `ILLEGAL`, and this port does too.
   - A token is named as Go names it: `identifier`, `integer`, `,`, `@directive` and so on, not `IDENT` or `COMMA`.
+  - A message field's error names its literal (`expected a duration literal or '{'`). A `null` on a plain scalar names its wrapper type (`google.protobuf.Int32Value or similar`). A rejected string key of a bool map is quoted.
 - A schema violation for a reserved name or a well-known type's shape now reads as protowire-go's does (#88), such as `r.proto: oneof "r.v1.M.true" uses PXF-reserved name "true" (draft §3.13)`, and an enum value is named beside its enum (`pkg.null`, not `pkg.E.null`) in `Violation.Element`.
 - `(pxf.required)` and `(pxf.default)` now apply inside list elements and map values (#52).
 - A nesting-depth error now reads `nesting depth exceeds MaxNestingDepth=100`.

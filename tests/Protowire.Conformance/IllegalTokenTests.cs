@@ -73,12 +73,24 @@ public class IllegalTokenTests
     [InlineData("test.v1.AllTypes", ", = 1\n",
             "1:1: expected identifier, string, integer, or bool, got , (\",\")",
             "1:1: expected identifier, string, integer, or bool, got , (\",\")")]
+    [InlineData("test.v1.AllTypes", "dur_field = 1.5x\n",
+            "2:1: expected '=', ':', or '{' after \"x\", got EOF",
+            "1:13: expected a duration literal or '{' for message field \"dur_field\", got float (\"1.5\")")]
+    [InlineData("test.v1.AllTypes", "ts_field = 5\n",
+            "",
+            "1:12: expected a timestamp literal or '{' for message field \"ts_field\", got integer (\"5\")")]
     [InlineData("keyed.v1.Node", "children { $ { } }\n",
             "1:12: expected identifier, string, integer, or bool, got unexpected character '$'",
             "1:12: expected entry name (identifier or string) in keyed field \"children\", got unexpected character '$'")]
     [InlineData("keyed.v1.Node", "children { a $ }\n",
             "1:14: expected '=', ':', or '{' after \"a\", got ILLEGAL",
             "1:14: expected '{' or '=' after entry name \"a\" in keyed field \"children\", got ILLEGAL")]
+    [InlineData("mapkeys.v1.Flags", "by_flag = { \"t\": \"x\" }\n",
+            "",
+            "1:13: invalid bool map key \"t\" for field \"by_flag\": a bool key is true, false, 0, 1, \"true\" or \"false\"")]
+    [InlineData("nulls.ed.v1.Ed", "implicit_scalar = null\n",
+            "",
+            "1:19: null is not allowed on scalar field \"implicit_scalar\": declare it optional, or as a wrapper type (google.protobuf.Int32Value or similar), to make it nullable")]
     public void ReportsWhatTheReferenceReports(string message, string doc, string parseError, string decodeError)
     {
         Assert.Equal(parseError, Error(() => Parser.Parse(doc)));

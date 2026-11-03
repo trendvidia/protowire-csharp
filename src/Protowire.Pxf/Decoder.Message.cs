@@ -201,6 +201,21 @@ public partial class Decoder
     private static bool Nullable(FieldDescriptor fd) =>
         fd.HasPresence && !fd.IsRepeated && !fd.IsMap && !fd.IsRequired;
 
+    // The wrapper type a scalar of this type would be declared as, as
+    // protowire-go's wrapperName names it.
+    private static string WrapperName(FieldType t) => t switch
+    {
+        FieldType.Bool => "Bool",
+        FieldType.String => "String",
+        FieldType.Bytes => "Bytes",
+        FieldType.Float => "Float",
+        FieldType.Double => "Double",
+        FieldType.Int64 or FieldType.SInt64 or FieldType.SFixed64 => "Int64",
+        FieldType.UInt32 or FieldType.Fixed32 => "UInt32",
+        FieldType.UInt64 or FieldType.Fixed64 => "UInt64",
+        _ => "Int32",
+    };
+
     private static PxfException NullNotAllowed(Position pos, FieldDescriptor fd)
     {
         bool isMsg = fd.FieldType is FieldType.Message or FieldType.Group;
@@ -208,7 +223,7 @@ public partial class Decoder
         if (fd.IsRepeated) return new(pos, $"null is not allowed on repeated field \"{fd.Name}\"");
         if (fd.IsRequired && isMsg) return new(pos, $"null is not allowed on required field \"{fd.Name}\": it must be set");
         if (fd.IsRequired) return new(pos, $"null is not allowed on scalar field \"{fd.Name}\": the field is required, so it must be set");
-        return new(pos, $"null is not allowed on scalar field \"{fd.Name}\": declare it optional, or as a wrapper type, to make it nullable");
+        return new(pos, $"null is not allowed on scalar field \"{fd.Name}\": declare it optional, or as a wrapper type (google.protobuf.{WrapperName(fd.FieldType)}Value or similar), to make it nullable");
     }
 
     private void DecodeFieldValue(IMessage msg, FieldDescriptor fd)
@@ -303,12 +318,12 @@ public partial class Decoder
 
     private static string MessageValueForms(MessageDescriptor mdesc)
     {
-        if (WellKnown.IsTimestamp(mdesc)) return "a timestamp or '{'";
-        if (WellKnown.IsDuration(mdesc)) return "a duration or '{'";
+        if (WellKnown.IsTimestamp(mdesc)) return "a timestamp literal or '{'";
+        if (WellKnown.IsDuration(mdesc)) return "a duration literal or '{'";
         if (WellKnown.IsWrapper(mdesc)) return "a scalar or '{'";
-        if (WellKnown.IsBigInt(mdesc)) return "an integer or '{'";
-        if (WellKnown.IsDecimal(mdesc) || WellKnown.IsBigFloat(mdesc)) return "a number or '{'";
-        if (WellKnown.IsSecret(mdesc)) return "a string or '{'";
+        if (WellKnown.IsBigInt(mdesc)) return "an integer literal or '{'";
+        if (WellKnown.IsDecimal(mdesc) || WellKnown.IsBigFloat(mdesc)) return "a numeric literal or '{'";
+        if (WellKnown.IsSecret(mdesc)) return "a string literal or '{'";
         return "'{'";
     }
 
@@ -973,7 +988,9 @@ public partial class Decoder
                     case (not TokenKind.STRING, "1"): return true;
                     case (not TokenKind.STRING, "0"): return false;
                 }
-                throw new PxfException(pos, $"invalid bool map key {key} for field \"{field.Name}\": a bool key is true, false, 0, 1, \"true\" or \"false\"");
+                // A string key is quoted, as protowire-go quotes it.
+                string shown = kind == TokenKind.STRING ? TokenText.Quote(key) : key;
+                throw new PxfException(pos, $"invalid bool map key {shown} for field \"{field.Name}\": a bool key is true, false, 0, 1, \"true\" or \"false\"");
             default:
                 throw new PxfException(pos, $"unsupported map key kind: {keyFd.FieldType}");
         }
