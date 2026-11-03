@@ -27,7 +27,7 @@ public class MapNestingDepthTests
     private static void AssertRejected(string doc)
     {
         var e = Assert.Throws<PxfException>(() => new Decoder().Unmarshal(doc, new Tree()));
-        Assert.Contains("nesting depth exceeds 100", e.Message);
+        Assert.Contains("nesting depth exceeds MaxNestingDepth=100", e.Message);
     }
 
     [Fact]

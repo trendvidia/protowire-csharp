@@ -13,23 +13,39 @@ public class PxfException : Exception
 
 public sealed class Parser
 {
-    // HARDENING.md § Mandatory limits.
-    private const int MaxNestingDepth = 100;
-
     private readonly Lexer _lex;
+    private readonly int _maxDepth;
     private Token _current;
     private List<Comment> _comments = [];
     private int _depth;
 
-    private Parser(string input)
+    private Parser(string input, PxfLimits limits)
     {
-        _lex = new Lexer(input);
+        _maxDepth = limits.MaxNestingDepth;
+        _lex = new Lexer(input, limits.MaxBytesLiteralLength);
         // Prime _current with an EOF sentinel so the nullable-reference-types
         // analysis is satisfied without `null!`; the very next Advance() call
         // overwrites it with the real first token.
         _current = new Token(TokenKind.EOF, string.Empty, Position.Empty);
         Advance();
     }
+
+    /// <summary>
+    /// A parser running on the decoder's own lexer, for the values the decoder
+    /// reads as Parse reads them: a @dataset cell, a directive body, a value
+    /// it discards. It stops on the token after the value.
+    /// </summary>
+    internal Parser(Lexer lex, Token current, int maxDepth, int depth)
+    {
+        _lex = lex;
+        _current = current;
+        _maxDepth = maxDepth;
+        _depth = depth;
+    }
+
+    internal Token Current => _current;
+
+    internal IValue ParseValueHere() => ParseValue();
 
     private void Advance()
     {
@@ -58,7 +74,14 @@ public sealed class Parser
         return c;
     }
 
-    public static Document Parse(string input) => new Parser(input).ParseDocument();
+    public static Document Parse(string input) => Parse(input, PxfLimits.Default);
+
+    /// <summary>Parses under the given limits.</summary>
+    public static Document Parse(string input, PxfLimits limits)
+    {
+        Decoder.CheckMessageSize(input, limits);
+        return new Parser(input, limits).ParseDocument();
+    }
 
     private Document ParseDocument()
     {
@@ -244,6 +267,7 @@ public sealed class Parser
         Advance(); // consume (
 
         var columns = new List<string>();
+        var columnPositions = new List<Position>();
         if (_current.Kind != TokenKind.IDENT)
         {
             throw new PxfException(_current.Pos,
@@ -255,13 +279,8 @@ public sealed class Parser
             {
                 throw new PxfException(_current.Pos, $"expected column field name, got {_current.Kind}");
             }
-            string colName = _current.Value;
-            if (colName.Contains('.'))
-            {
-                throw new PxfException(_current.Pos,
-                    $"@dataset column \"{colName}\": dotted column paths are not supported in v1 (draft §3.4.4)");
-            }
-            columns.Add(colName);
+            columns.Add(_current.Value);
+            columnPositions.Add(_current.Pos);
             Advance();
             if (_current.Kind == TokenKind.COMMA)
             {
@@ -275,6 +294,7 @@ public sealed class Parser
             throw new PxfException(_current.Pos,
                 $"expected ',' or ')' in @dataset column list, got {_current.Kind}");
         }
+        DatasetPaths.CheckHeader(columns, columnPositions);
         int endOffset = _current.Pos.Offset + 1; // past `)`
         Advance(); // consume )
 
@@ -331,24 +351,19 @@ public sealed class Parser
 
     /// <summary>
     /// Consumes one cell of a @dataset row. Returns null for an empty
-    /// cell (no value between two commas, or at row start/end). Rejects
-    /// list and block values per v1 cell-grammar (draft §3.4.4).
+    /// cell (no value between two commas, or at row start/end). Any value
+    /// is a cell, lists and blocks included (draft §3.4.4).
     /// </summary>
     private IValue? ParseRowCell()
     {
-        switch (_current.Kind)
-        {
-            case TokenKind.COMMA:
-            case TokenKind.RPAREN:
-                return null;
-            case TokenKind.LBRACKET:
-                throw new PxfException(_current.Pos,
-                    "@dataset cells cannot contain list values in v1 (draft §3.4.4)");
-            case TokenKind.LBRACE:
-                throw new PxfException(_current.Pos,
-                    "@dataset cells cannot contain block values in v1 (draft §3.4.4)");
-        }
-        return ParseValue();
+        if (_current.Kind is TokenKind.COMMA or TokenKind.RPAREN) return null;
+        // Comments before the cell belong to no entry of the cell.
+        var pending = _comments;
+        _comments = [];
+        var value = ParseValue();
+        pending.AddRange(_comments);
+        _comments = pending;
+        return value;
     }
 
     /// <summary>
@@ -412,25 +427,9 @@ public sealed class Parser
                 {
                     string raw = _current.Value;
                     byte[] decoded;
-                    try
+                    if (!Base64Lenient.TryDecode(raw, out decoded))
                     {
-                        decoded = Convert.FromBase64String(raw);
-                    }
-                    catch (FormatException)
-                    {
-                        // Try URL-safe alphabet (allowed per draft §3.7).
-                        try
-                        {
-                            string padded = raw.Replace('-', '+').Replace('_', '/');
-                            int rem = padded.Length % 4;
-                            if (rem != 0) padded = padded.PadRight(padded.Length + (4 - rem), '=');
-                            decoded = Convert.FromBase64String(padded);
-                        }
-                        catch (FormatException)
-                        {
-                            throw new PxfException(_current.Pos,
-                                $"@proto descriptor body: invalid base64");
-                        }
+                        throw new PxfException(_current.Pos, "@proto descriptor body: invalid base64");
                     }
                     int endOffset = _lex.Pos;
                     Advance();
@@ -500,12 +499,13 @@ public sealed class Parser
         var leading = FlushComments();
         var pos = _current.Pos;
 
-        if (_current.Kind != TokenKind.IDENT && _current.Kind != TokenKind.STRING && _current.Kind != TokenKind.INT)
+        if (_current.Kind is not (TokenKind.IDENT or TokenKind.STRING or TokenKind.INT or TokenKind.BOOL))
         {
-            throw new PxfException(pos, $"expected identifier, string, or integer, got {_current.Kind} (\"{_current.Value}\")");
+            throw new PxfException(pos, $"expected identifier, string, integer, or bool, got {_current.Kind} (\"{_current.Value}\")");
         }
         var keyKind = _current.Kind;
         string key = _current.Value;
+        string keyPrec = keyKind == TokenKind.INT ? _lex.Prec : "";
         Advance();
 
         switch (_current.Kind)
@@ -516,9 +516,9 @@ public sealed class Parser
                 // Fields"; well-formed everywhere, and the schema layer
                 // restricts it to keyed blocks). An integer key is only
                 // valid with `:`.
-                if (keyKind == TokenKind.INT)
+                if (keyKind is TokenKind.INT or TokenKind.BOOL)
                 {
-                    throw new PxfException(pos, $"field assignment with '=' requires an identifier or string key, got {keyKind} (\"{key}\"); use ':' for map entries");
+                    throw NonNameAssignment(pos, keyKind, key);
                 }
                 Advance();
                 var val = ParseValue();
@@ -529,22 +529,26 @@ public sealed class Parser
                 // document top level.
                 if (!allowMapEntry)
                 {
-                    throw new PxfException(pos, "map entry (':' form) is only allowed inside a '{ … }' block; use '=' for top-level field assignments");
+                    throw TopLevelMapEntry(pos);
+                }
+                if (keyPrec.Length > 0)
+                {
+                    throw new PxfException(pos, $"map key {key}: a key cannot carry a precision suffix (p{keyPrec})");
                 }
                 Advance();
                 var mapVal = ParseValue();
-                return new MapEntry { Pos = pos, Key = key, Value = mapVal, LeadingComments = leading };
+                return new MapEntry { Pos = pos, Key = key, KeyQuoted = keyKind == TokenKind.STRING, Value = mapVal, LeadingComments = leading };
 
             case TokenKind.LBRACE:
                 // `{ ... }` is the block tail of a field_entry; same name
                 // rule as `=`.
-                if (keyKind == TokenKind.INT)
+                if (keyKind is TokenKind.INT or TokenKind.BOOL)
                 {
-                    throw new PxfException(pos, $"submessage block requires an identifier or string key, got {keyKind} (\"{key}\")");
+                    throw NonNameBlock(pos, keyKind, key);
                 }
-                if (_depth >= MaxNestingDepth)
+                if (_depth >= _maxDepth)
                 {
-                    throw new PxfException(_current.Pos, $"nesting depth exceeds {MaxNestingDepth}");
+                    throw new PxfException(_current.Pos, $"nesting depth exceeds MaxNestingDepth={_maxDepth}");
                 }
                 _depth++;
                 try
@@ -575,12 +579,12 @@ public sealed class Parser
                 return s;
 
             case TokenKind.INT:
-                var i = new IntVal { Pos = pos, Raw = _current.Value };
+                var i = new IntVal { Pos = pos, Raw = _current.Value, Prec = _lex.Prec };
                 Advance();
                 return i;
 
             case TokenKind.FLOAT:
-                var f = new FloatVal { Pos = pos, Raw = _current.Value };
+                var f = new FloatVal { Pos = pos, Raw = _current.Value, Prec = _lex.Prec };
                 Advance();
                 return f;
 
@@ -590,12 +594,7 @@ public sealed class Parser
                 return b;
 
             case TokenKind.BYTES:
-                byte[] decoded;
-                try
-                {
-                    decoded = Convert.FromBase64String(_current.Value);
-                }
-                catch
+                if (!Base64Lenient.TryDecode(_current.Value, out var decoded))
                 {
                     throw new PxfException(pos, $"invalid base64: {_current.Value}");
                 }
@@ -604,11 +603,11 @@ public sealed class Parser
                 return bytes;
 
             case TokenKind.TIMESTAMP:
-                if (!DateTime.TryParse(_current.Value, out var dt))
+                if (!Rfc3339.TryParse(_current.Value, out long tsSeconds, out int tsNanos))
                 {
                     throw new PxfException(pos, $"invalid timestamp \"{_current.Value}\"");
                 }
-                var ts = new TimestampVal { Pos = pos, Value = dt, Raw = _current.Value };
+                var ts = new TimestampVal { Pos = pos, Value = ToDateTime(tsSeconds, tsNanos), Raw = _current.Value };
                 Advance();
                 return ts;
 
@@ -641,9 +640,9 @@ public sealed class Parser
 
     private IValue ParseList()
     {
-        if (_depth >= MaxNestingDepth)
+        if (_depth >= _maxDepth)
         {
-            throw new PxfException(_current.Pos, $"nesting depth exceeds {MaxNestingDepth}");
+            throw new PxfException(_current.Pos, $"nesting depth exceeds MaxNestingDepth={_maxDepth}");
         }
         _depth++;
         try
@@ -675,9 +674,9 @@ public sealed class Parser
 
     private IValue ParseBlockVal()
     {
-        if (_depth >= MaxNestingDepth)
+        if (_depth >= _maxDepth)
         {
-            throw new PxfException(_current.Pos, $"nesting depth exceeds {MaxNestingDepth}");
+            throw new PxfException(_current.Pos, $"nesting depth exceeds MaxNestingDepth={_maxDepth}");
         }
         _depth++;
         try
@@ -698,6 +697,11 @@ public sealed class Parser
         var entries = new List<IEntry>();
         while (_current.Kind != TokenKind.RBRACE && _current.Kind != TokenKind.EOF)
         {
+            if (_current.Kind == TokenKind.AT_TYPE)
+            {
+                entries.Add(ParseTypeEntry(first: entries.Count == 0));
+                continue;
+            }
             entries.Add(ParseEntry());
         }
         if (_current.Kind != TokenKind.RBRACE)
@@ -707,4 +711,46 @@ public sealed class Parser
         Advance();
         return entries;
     }
+
+    private TypeEntry ParseTypeEntry(bool first)
+    {
+        var leading = FlushComments();
+        var pos = _current.Pos;
+        if (!first) throw new PxfException(pos, Decoder.TypeEntryMisplaced);
+        Advance();
+        if (_current.Kind != TokenKind.EQUALS)
+        {
+            throw new PxfException(_current.Pos, $"expected '=' after @type, got {_current.Kind}");
+        }
+        Advance();
+        if (_current.Kind != TokenKind.STRING)
+        {
+            throw new PxfException(_current.Pos, $"expected a string type URL after @type =, got {_current.Kind}");
+        }
+        string url = _current.Value;
+        Advance();
+        return new TypeEntry { Pos = pos, Url = url, LeadingComments = leading };
+    }
+
+    // DateTime stops at year 1; a timestamp before it keeps its Raw spelling.
+    private static DateTime ToDateTime(long seconds, int nanos)
+    {
+        try
+        {
+            return DateTime.UnixEpoch.AddSeconds(seconds).AddTicks(nanos / 100);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return DateTime.MinValue;
+        }
+    }
+
+    internal static PxfException NonNameAssignment(Position pos, TokenKind kind, string key) =>
+        new(pos, $"field assignment with '=' requires an identifier or string key, got {kind} (\"{key}\"); use ':' for map entries");
+
+    internal static PxfException NonNameBlock(Position pos, TokenKind kind, string key) =>
+        new(pos, $"submessage block requires an identifier or string key, got {kind} (\"{key}\")");
+
+    internal static PxfException TopLevelMapEntry(Position pos) =>
+        new(pos, "map entry (':' form) is only allowed inside a '{ … }' block; use '=' for top-level field assignments");
 }

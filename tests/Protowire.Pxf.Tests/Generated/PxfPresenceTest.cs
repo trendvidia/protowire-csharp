@@ -30,43 +30,45 @@ namespace Protowire.Pxf.Tests.Presence {
             "bm5vdGF0aW9ucy5wcm90bxoQcHhmL2JpZ251bS5wcm90bxoeZ29vZ2xlL3By",
             "b3RvYnVmL2R1cmF0aW9uLnByb3RvGiBnb29nbGUvcHJvdG9idWYvZmllbGRf",
             "bWFzay5wcm90bxofZ29vZ2xlL3Byb3RvYnVmL3RpbWVzdGFtcC5wcm90bxoe",
-            "Z29vZ2xlL3Byb3RvYnVmL3dyYXBwZXJzLnByb3RvIqcBCgRVc2VyEhcKBG5h",
-            "bWUYASABKAlCA5BSAVIEbmFtZRIdCgRyb2xlGAIgASgJQgmaUgZ2aWV3ZXJS",
-            "BHJvbGUSIAoIcHJpb3JpdHkYAyABKAVCBJpSATVSCHByaW9yaXR5EhQKBWFk",
-            "bWluGAQgASgIUgVhZG1pbhIvCgVfbnVsbBhjIAEoCzIaLmdvb2dsZS5wcm90",
-            "b2J1Zi5GaWVsZE1hc2tSBE51bGwi5wMKCERlZmF1bHRzEhYKAXMYASABKAlC",
-            "CJpSBWhlbGxvUgFzEhUKAWIYAiABKAhCB5pSBHRydWVSAWISFwoDaTMyGAMg",
-            "ASgFQgWaUgItN1IDaTMyEh8KA2k2NBgEIAEoA0INmlIKOTAwMDAwMDAwMFID",
-            "aTY0EhcKA3UzMhgFIAEoDUIFmlICNDJSA3UzMhIgCgN1NjQYBiABKARCDppS",
-            "CzE4MDAwMDAwMDAwUgN1NjQSGAoDZjMyGAcgASgCQgaaUgMwLjVSA2YzMhIY",
-            "CgNmNjQYCCABKAFCBppSAzIuNVIDZjY0EhcKAmJ5GAkgASgMQgeaUgRBUUlE",
-            "UgJieRIwCgVjb2xvchgKIAEoDjISLnByZXNlbmNlLnYxLkNvbG9yQgaaUgNS",
-            "RURSBWNvbG9yEkMKAnRzGAsgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVz",
-            "dGFtcEIXmlIUMjAyNC0wMS0wMlQwMzowNDowNVpSAnRzEjUKA2R1chgMIAEo",
-            "CzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkIImlIFMWgzMG1SA2R1chI8",
-            "Cgd3cmFwcGVkGA0gASgLMhsuZ29vZ2xlLnByb3RvYnVmLkludDMyVmFsdWVC",
-            "BZpSAjk5Ugd3cmFwcGVkIjIKBk5lc3RlZBIoCgVpbm5lchgBIAEoCzISLnBy",
-            "ZXNlbmNlLnYxLklubmVyUgVpbm5lciIiCgVJbm5lchIZCgVsYWJlbBgBIAEo",
-            "CUIDkFIBUgVsYWJlbCIvCglLZXllZEl0ZW0SDgoCaWQYASABKAlSAmlkEhIK",
-            "BG5vdGUYAiABKAlSBG5vdGUiiAEKC0tleWVkUGFyZW50EhMKAmlkGAEgASgJ",
-            "QgOQUgFSAmlkEjMKBWl0ZW1zGAIgAygLMhYucHJlc2VuY2UudjEuS2V5ZWRJ",
-            "dGVtQgWiUgJpZFIFaXRlbXMSLwoFX251bGwYYyABKAsyGi5nb29nbGUucHJv",
-            "dG9idWYuRmllbGRNYXNrUgROdWxsIn4KCkJpZ051bWJlcnMSJAoHYmlnX2lu",
-            "dBgBIAEoCzILLnB4Zi5CaWdJbnRSBmJpZ0ludBIeCgNkZWMYAiABKAsyDC5w",
-            "eGYuRGVjaW1hbFIDZGVjEioKCWJpZ19mbG9hdBgDIAEoCzINLnB4Zi5CaWdG",
-            "bG9hdFIIYmlnRmxvYXQqMgoFQ29sb3ISFQoRQ09MT1JfVU5TUEVDSUZJRUQQ",
-            "ABIHCgNSRUQQARIJCgVHUkVFThACQoUBCg9jb20ucHJlc2VuY2UudjFCFFB4",
-            "ZlByZXNlbmNlVGVzdFByb3RvUAGiAgNQWFiqAhxQcm90b3dpcmUuUHhmLlRl",
-            "c3RzLlByZXNlbmNlygILUHJlc2VuY2VcVjHiAhdQcmVzZW5jZVxWMVxHUEJN",
-            "ZXRhZGF0YeoCDFByZXNlbmNlOjpWMWIGcHJvdG8z"));
+            "Z29vZ2xlL3Byb3RvYnVmL3dyYXBwZXJzLnByb3RvItYBCgRVc2VyEhcKBG5h",
+            "bWUYASABKAlCA5BSAVIEbmFtZRIiCgRyb2xlGAIgASgJQgmaUgZ2aWV3ZXJI",
+            "AFIEcm9sZYgBARIlCghwcmlvcml0eRgDIAEoBUIEmlIBNUgBUghwcmlvcml0",
+            "eYgBARIZCgVhZG1pbhgEIAEoCEgCUgVhZG1pbogBARIvCgVfbnVsbBhjIAEo",
+            "CzIaLmdvb2dsZS5wcm90b2J1Zi5GaWVsZE1hc2tSBE51bGxCBwoFX3JvbGVC",
+            "CwoJX3ByaW9yaXR5QggKBl9hZG1pbiLnAwoIRGVmYXVsdHMSFgoBcxgBIAEo",
+            "CUIImlIFaGVsbG9SAXMSFQoBYhgCIAEoCEIHmlIEdHJ1ZVIBYhIXCgNpMzIY",
+            "AyABKAVCBZpSAi03UgNpMzISHwoDaTY0GAQgASgDQg2aUgo5MDAwMDAwMDAw",
+            "UgNpNjQSFwoDdTMyGAUgASgNQgWaUgI0MlIDdTMyEiAKA3U2NBgGIAEoBEIO",
+            "mlILMTgwMDAwMDAwMDBSA3U2NBIYCgNmMzIYByABKAJCBppSAzAuNVIDZjMy",
+            "EhgKA2Y2NBgIIAEoAUIGmlIDMi41UgNmNjQSFwoCYnkYCSABKAxCB5pSBEFR",
+            "SURSAmJ5EjAKBWNvbG9yGAogASgOMhIucHJlc2VuY2UudjEuQ29sb3JCBppS",
+            "A1JFRFIFY29sb3ISQwoCdHMYCyABKAsyGi5nb29nbGUucHJvdG9idWYuVGlt",
+            "ZXN0YW1wQheaUhQyMDI0LTAxLTAyVDAzOjA0OjA1WlICdHMSNQoDZHVyGAwg",
+            "ASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQgiaUgUxaDMwbVIDZHVy",
+            "EjwKB3dyYXBwZWQYDSABKAsyGy5nb29nbGUucHJvdG9idWYuSW50MzJWYWx1",
+            "ZUIFmlICOTlSB3dyYXBwZWQiMgoGTmVzdGVkEigKBWlubmVyGAEgASgLMhIu",
+            "cHJlc2VuY2UudjEuSW5uZXJSBWlubmVyIiIKBUlubmVyEhkKBWxhYmVsGAEg",
+            "ASgJQgOQUgFSBWxhYmVsIj0KCUtleWVkSXRlbRIOCgJpZBgBIAEoCVICaWQS",
+            "FwoEbm90ZRgCIAEoCUgAUgRub3RliAEBQgcKBV9ub3RlIogBCgtLZXllZFBh",
+            "cmVudBITCgJpZBgBIAEoCUIDkFIBUgJpZBIzCgVpdGVtcxgCIAMoCzIWLnBy",
+            "ZXNlbmNlLnYxLktleWVkSXRlbUIFolICaWRSBWl0ZW1zEi8KBV9udWxsGGMg",
+            "ASgLMhouZ29vZ2xlLnByb3RvYnVmLkZpZWxkTWFza1IETnVsbCJ+CgpCaWdO",
+            "dW1iZXJzEiQKB2JpZ19pbnQYASABKAsyCy5weGYuQmlnSW50UgZiaWdJbnQS",
+            "HgoDZGVjGAIgASgLMgwucHhmLkRlY2ltYWxSA2RlYxIqCgliaWdfZmxvYXQY",
+            "AyABKAsyDS5weGYuQmlnRmxvYXRSCGJpZ0Zsb2F0KjIKBUNvbG9yEhUKEUNP",
+            "TE9SX1VOU1BFQ0lGSUVEEAASBwoDUkVEEAESCQoFR1JFRU4QAkKFAQoPY29t",
+            "LnByZXNlbmNlLnYxQhRQeGZQcmVzZW5jZVRlc3RQcm90b1ABogIDUFhYqgIc",
+            "UHJvdG93aXJlLlB4Zi5UZXN0cy5QcmVzZW5jZcoCC1ByZXNlbmNlXFYx4gIX",
+            "UHJlc2VuY2VcVjFcR1BCTWV0YWRhdGHqAgxQcmVzZW5jZTo6VjFiBnByb3Rv",
+            "Mw=="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::Protowire.Pxf.AnnotationsReflection.Descriptor, global::Protowire.Pxf.BignumReflection.Descriptor, global::Google.Protobuf.WellKnownTypes.DurationReflection.Descriptor, global::Google.Protobuf.WellKnownTypes.FieldMaskReflection.Descriptor, global::Google.Protobuf.WellKnownTypes.TimestampReflection.Descriptor, global::Google.Protobuf.WellKnownTypes.WrappersReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(new[] {typeof(global::Protowire.Pxf.Tests.Presence.Color), }, null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::Protowire.Pxf.Tests.Presence.User), global::Protowire.Pxf.Tests.Presence.User.Parser, new[]{ "Name", "Role", "Priority", "Admin", "Null" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Protowire.Pxf.Tests.Presence.User), global::Protowire.Pxf.Tests.Presence.User.Parser, new[]{ "Name", "Role", "Priority", "Admin", "Null" }, new[]{ "Role", "Priority", "Admin" }, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Protowire.Pxf.Tests.Presence.Defaults), global::Protowire.Pxf.Tests.Presence.Defaults.Parser, new[]{ "S", "B", "I32", "I64", "U32", "U64", "F32", "F64", "By", "Color", "Ts", "Dur", "Wrapped" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Protowire.Pxf.Tests.Presence.Nested), global::Protowire.Pxf.Tests.Presence.Nested.Parser, new[]{ "Inner" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Protowire.Pxf.Tests.Presence.Inner), global::Protowire.Pxf.Tests.Presence.Inner.Parser, new[]{ "Label" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Protowire.Pxf.Tests.Presence.KeyedItem), global::Protowire.Pxf.Tests.Presence.KeyedItem.Parser, new[]{ "Id", "Note" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Protowire.Pxf.Tests.Presence.KeyedItem), global::Protowire.Pxf.Tests.Presence.KeyedItem.Parser, new[]{ "Id", "Note" }, new[]{ "Note" }, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Protowire.Pxf.Tests.Presence.KeyedParent), global::Protowire.Pxf.Tests.Presence.KeyedParent.Parser, new[]{ "Id", "Items", "Null" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Protowire.Pxf.Tests.Presence.BigNumbers), global::Protowire.Pxf.Tests.Presence.BigNumbers.Parser, new[]{ "BigInt", "Dec", "BigFloat" }, null, null, null, null)
           }));
@@ -92,6 +94,7 @@ namespace Protowire.Pxf.Tests.Presence {
   {
     private static readonly pb::MessageParser<User> _parser = new pb::MessageParser<User>(() => new User());
     private pb::UnknownFieldSet _unknownFields;
+    private int _hasBits0;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pb::MessageParser<User> Parser { get { return _parser; } }
@@ -119,6 +122,7 @@ namespace Protowire.Pxf.Tests.Presence {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public User(User other) : this() {
+      _hasBits0 = other._hasBits0;
       name_ = other.name_;
       role_ = other.role_;
       priority_ = other.priority_;
@@ -147,38 +151,82 @@ namespace Protowire.Pxf.Tests.Presence {
 
     /// <summary>Field number for the "role" field.</summary>
     public const int RoleFieldNumber = 2;
-    private string role_ = "";
+    private readonly static string RoleDefaultValue = "";
+
+    private string role_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string Role {
-      get { return role_; }
+      get { return role_ ?? RoleDefaultValue; }
       set {
         role_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
+    /// <summary>Gets whether the "role" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasRole {
+      get { return role_ != null; }
+    }
+    /// <summary>Clears the value of the "role" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearRole() {
+      role_ = null;
+    }
 
     /// <summary>Field number for the "priority" field.</summary>
     public const int PriorityFieldNumber = 3;
+    private readonly static int PriorityDefaultValue = 0;
+
     private int priority_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int Priority {
-      get { return priority_; }
+      get { if ((_hasBits0 & 1) != 0) { return priority_; } else { return PriorityDefaultValue; } }
       set {
+        _hasBits0 |= 1;
         priority_ = value;
       }
+    }
+    /// <summary>Gets whether the "priority" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasPriority {
+      get { return (_hasBits0 & 1) != 0; }
+    }
+    /// <summary>Clears the value of the "priority" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearPriority() {
+      _hasBits0 &= ~1;
     }
 
     /// <summary>Field number for the "admin" field.</summary>
     public const int AdminFieldNumber = 4;
+    private readonly static bool AdminDefaultValue = false;
+
     private bool admin_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public bool Admin {
-      get { return admin_; }
+      get { if ((_hasBits0 & 2) != 0) { return admin_; } else { return AdminDefaultValue; } }
       set {
+        _hasBits0 |= 2;
         admin_ = value;
       }
+    }
+    /// <summary>Gets whether the "admin" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasAdmin {
+      get { return (_hasBits0 & 2) != 0; }
+    }
+    /// <summary>Clears the value of the "admin" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearAdmin() {
+      _hasBits0 &= ~2;
     }
 
     /// <summary>Field number for the "_null" field.</summary>
@@ -221,9 +269,9 @@ namespace Protowire.Pxf.Tests.Presence {
     public override int GetHashCode() {
       int hash = 1;
       if (Name.Length != 0) hash ^= Name.GetHashCode();
-      if (Role.Length != 0) hash ^= Role.GetHashCode();
-      if (Priority != 0) hash ^= Priority.GetHashCode();
-      if (Admin != false) hash ^= Admin.GetHashCode();
+      if (HasRole) hash ^= Role.GetHashCode();
+      if (HasPriority) hash ^= Priority.GetHashCode();
+      if (HasAdmin) hash ^= Admin.GetHashCode();
       if (Null_ != null) hash ^= Null.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
@@ -247,15 +295,15 @@ namespace Protowire.Pxf.Tests.Presence {
         output.WriteRawTag(10);
         output.WriteString(Name);
       }
-      if (Role.Length != 0) {
+      if (HasRole) {
         output.WriteRawTag(18);
         output.WriteString(Role);
       }
-      if (Priority != 0) {
+      if (HasPriority) {
         output.WriteRawTag(24);
         output.WriteInt32(Priority);
       }
-      if (Admin != false) {
+      if (HasAdmin) {
         output.WriteRawTag(32);
         output.WriteBool(Admin);
       }
@@ -277,15 +325,15 @@ namespace Protowire.Pxf.Tests.Presence {
         output.WriteRawTag(10);
         output.WriteString(Name);
       }
-      if (Role.Length != 0) {
+      if (HasRole) {
         output.WriteRawTag(18);
         output.WriteString(Role);
       }
-      if (Priority != 0) {
+      if (HasPriority) {
         output.WriteRawTag(24);
         output.WriteInt32(Priority);
       }
-      if (Admin != false) {
+      if (HasAdmin) {
         output.WriteRawTag(32);
         output.WriteBool(Admin);
       }
@@ -306,13 +354,13 @@ namespace Protowire.Pxf.Tests.Presence {
       if (Name.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(Name);
       }
-      if (Role.Length != 0) {
+      if (HasRole) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(Role);
       }
-      if (Priority != 0) {
+      if (HasPriority) {
         size += 1 + pb::CodedOutputStream.ComputeInt32Size(Priority);
       }
-      if (Admin != false) {
+      if (HasAdmin) {
         size += 1 + 1;
       }
       if (Null_ != null) {
@@ -333,13 +381,13 @@ namespace Protowire.Pxf.Tests.Presence {
       if (other.Name.Length != 0) {
         Name = other.Name;
       }
-      if (other.Role.Length != 0) {
+      if (other.HasRole) {
         Role = other.Role;
       }
-      if (other.Priority != 0) {
+      if (other.HasPriority) {
         Priority = other.Priority;
       }
-      if (other.Admin != false) {
+      if (other.HasAdmin) {
         Admin = other.Admin;
       }
       if (other.Null_ != null) {
@@ -1576,14 +1624,28 @@ namespace Protowire.Pxf.Tests.Presence {
 
     /// <summary>Field number for the "note" field.</summary>
     public const int NoteFieldNumber = 2;
-    private string note_ = "";
+    private readonly static string NoteDefaultValue = "";
+
+    private string note_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string Note {
-      get { return note_; }
+      get { return note_ ?? NoteDefaultValue; }
       set {
         note_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
+    }
+    /// <summary>Gets whether the "note" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasNote {
+      get { return note_ != null; }
+    }
+    /// <summary>Clears the value of the "note" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearNote() {
+      note_ = null;
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -1611,7 +1673,7 @@ namespace Protowire.Pxf.Tests.Presence {
     public override int GetHashCode() {
       int hash = 1;
       if (Id.Length != 0) hash ^= Id.GetHashCode();
-      if (Note.Length != 0) hash ^= Note.GetHashCode();
+      if (HasNote) hash ^= Note.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -1634,7 +1696,7 @@ namespace Protowire.Pxf.Tests.Presence {
         output.WriteRawTag(10);
         output.WriteString(Id);
       }
-      if (Note.Length != 0) {
+      if (HasNote) {
         output.WriteRawTag(18);
         output.WriteString(Note);
       }
@@ -1652,7 +1714,7 @@ namespace Protowire.Pxf.Tests.Presence {
         output.WriteRawTag(10);
         output.WriteString(Id);
       }
-      if (Note.Length != 0) {
+      if (HasNote) {
         output.WriteRawTag(18);
         output.WriteString(Note);
       }
@@ -1669,7 +1731,7 @@ namespace Protowire.Pxf.Tests.Presence {
       if (Id.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(Id);
       }
-      if (Note.Length != 0) {
+      if (HasNote) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(Note);
       }
       if (_unknownFields != null) {
@@ -1687,7 +1749,7 @@ namespace Protowire.Pxf.Tests.Presence {
       if (other.Id.Length != 0) {
         Id = other.Id;
       }
-      if (other.Note.Length != 0) {
+      if (other.HasNote) {
         Note = other.Note;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);

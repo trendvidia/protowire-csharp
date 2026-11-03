@@ -14,9 +14,9 @@ import "google/protobuf/wrappers.proto";
 
 message User {
   string name = 1 [(pxf.required) = true];
-  string role = 2 [(pxf.default) = "viewer"];
-  int32 priority = 3 [(pxf.default) = "5"];
-  bool admin = 4;
+  optional string role = 2 [(pxf.default) = "viewer"];
+  optional int32 priority = 3 [(pxf.default) = "5"];
+  optional bool admin = 4;
   google.protobuf.FieldMask _null = 99;
 }
 
@@ -54,7 +54,7 @@ message Inner {
 // presence path that loses the element prefix shows up as the parent's.
 message KeyedItem {
   string id = 1;
-  string note = 2;
+  optional string note = 2;
 }
 
 message KeyedParent {

@@ -15,8 +15,34 @@ format changes.
 
 - **CI compares this port with protowire-go** (#66). `tool/go_oracle` records what the reference does with every document in the vendored spec corpora, and `tests/Protowire.Conformance` fails on a different verdict, PB bytes, written PXF or formatted PXF. `pxf.Secret` is vendored as a generated type, because the corpora use it.
 
+### Changed
+
+- **Generated messages now decode from their descriptors**, by the reference's rules, and several things that were accepted are now rejected. Check documents that relied on any of these:
+  - An unknown field is an error. `Decoder.DiscardUnknown` skips it instead. A hand-written class still skips.
+  - A singular field or a map key bound twice in one body (#46, #48), where the last value used to win. Keys compare as values, so `1:` and `"1":` are one key.
+  - `null` on a plain scalar, a repeated field, a list element or a map value (#44). It remains legal on a field with presence.
+  - A raw line feed in a simple string (#44), and `,` or `;` between the entries of a block (#49).
+  - A value of the wrong type, such as a string in an `int32` field, which was either coerced or failed as a raw .NET exception. Every rejection is now a `PxfException`.
+  - The `@type url` spelling inside an Any block. It is `@type = "url"` (#42), and the encoder writes that.
+  - An identifier outside ASCII.
+- `(pxf.required)` and `(pxf.default)` now apply inside list elements and map values (#52).
+- A nesting-depth error now reads `nesting depth exceeds MaxNestingDepth=100`.
+
+### Added
+
+- `PxfLimits`, set through `Decoder.Limits` or `Parser.Parse(input, limits)`, makes the draft's limits per-call.
+- The type entry of an Any block, in a singular field, a list element or a map value (#42).
+- Wrapper-typed fields take a scalar or a block (#45).
+- `@dataset` cells may be lists or blocks, and columns may be dotted paths, at the parse level (#41, #43).
+- Bool map keys, `+inf`, and the BigFloat precision suffix in the lexer.
+
 ### Fixed
 
+- **Fractional and `µs` duration literals** (#19), such as `1.5ms` and `2µs`. Other ports write them for any measured latency. A duration now keeps every nanosecond, and a malformed one such as `5min` is rejected by the lexer.
+- **A Timestamp keeps nanoseconds**, and any RFC 3339 offset, rather than stopping at 100 ns.
+- **A `(pxf.default)` on a oneof member no longer clears the sibling the document set** (#63).
+- **A keyed entry body cannot undo its entry name** (#65): `null` on the key, or another member of the key's oneof, is a key conflict.
+- **A block on an unkeyed repeated field is rejected** (#52), where `items { a { } }` used to decode to nothing.
 - **A PB map entry missing its key or value is no longer dropped** (#60). A missing field is now its type's default, as protobuf says, so such an entry stays in the map, and a `string` or message value is never null. `dump-envelope --vector zero-map-entry` prints the wire vector the spec checks (#31); the writer already produced it.
 - **A keyed entry's name now counts as supplying the key field**
   ([trendvidia/protowire-go#214](https://github.com/trendvidia/protowire-go/issues/214)).

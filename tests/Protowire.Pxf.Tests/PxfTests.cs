@@ -124,7 +124,7 @@ float = 0.00123
         var pxfText = encoder.Marshal(msg);
 
         // The output should contain @type and the fields of Endpoint
-        Assert.Contains("@type type.googleapis.com/bench.v1.Endpoint", pxfText);
+        Assert.Contains("@type = \"type.googleapis.com/bench.v1.Endpoint\"", pxfText);
         Assert.Contains("path = \"/api\"", pxfText);
 
         var decoder = new Decoder { Registry = registry };

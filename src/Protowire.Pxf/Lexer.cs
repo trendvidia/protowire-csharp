@@ -17,11 +17,20 @@ internal class Lexer
     private int _pos;
     private int _line = 1;
     private int _col = 1;
+    private readonly int _maxBytesLiteral;
 
-    public Lexer(string input)
+    public Lexer(string input, int maxBytesLiteral = 64 << 20)
     {
         _input = input;
+        _maxBytesLiteral = maxBytesLiteral;
     }
+
+    /// <summary>
+    /// The precision suffix of the last INT or FLOAT token, as written ("53"
+    /// for 0.1p53), or "" for none (draft -01 § PXF Annotations). Read it only
+    /// while that token is current.
+    /// </summary>
+    internal string Prec { get; private set; } = "";
 
     /// <summary>The raw input the lexer is scanning.</summary>
     internal string Input => _input;
@@ -30,10 +39,10 @@ internal class Lexer
     internal int Pos => _pos;
 
     /// <summary>Opaque lexer state snapshot for one-token lookahead.</summary>
-    internal readonly record struct State(int Pos, int Line, int Col);
+    internal readonly record struct State(int Pos, int Line, int Col, string Prec);
 
     /// <summary>Captures the current lexer position for later restore.</summary>
-    internal State Save() => new(_pos, _line, _col);
+    internal State Save() => new(_pos, _line, _col, Prec);
 
     /// <summary>Restores a previously-captured lexer position.</summary>
     internal void Restore(State s)
@@ -41,6 +50,7 @@ internal class Lexer
         _pos = s.Pos;
         _line = s.Line;
         _col = s.Col;
+        Prec = s.Prec;
     }
 
     /// <summary>
@@ -169,16 +179,26 @@ internal class Lexer
                 return LexDirective(pos);
 
             case '-':
-            case var _ when char.IsDigit(ch):
+            case '+':
+            case var _ when char.IsAsciiDigit(ch):
                 return LexNumber(pos);
 
             case var _ when IsIdentStart(ch):
                 return LexIdent(pos);
 
             default:
-                Advance();
-                return new Token(TokenKind.ILLEGAL, ch.ToString(), pos);
+                return LexIllegal(pos);
         }
+    }
+
+    private Token LexIllegal(Position pos)
+    {
+        char ch = Advance();
+        if (char.IsHighSurrogate(ch) && char.IsLowSurrogate(Peek()))
+        {
+            return new Token(TokenKind.ILLEGAL, $"unexpected character '{ch}{Advance()}'", pos);
+        }
+        return new Token(TokenKind.ILLEGAL, $"unexpected character '{ch}'", pos);
     }
 
     private Token LexLineComment(Position pos)
@@ -221,6 +241,12 @@ internal class Lexer
         Span<char> charBuf = stackalloc char[2];
         while (_pos < _input.Length)
         {
+            if (Peek() == '\n')
+            {
+                // A simple string holds no raw line feed (draft § String Literals).
+                return new Token(TokenKind.ILLEGAL,
+                    "newline in string literal: write it as \\n, or use a \"\"\"triple-quoted\"\"\" string", pos);
+            }
             char ch = Advance();
             if (ch == '"')
             {
@@ -434,15 +460,18 @@ internal class Lexer
         while (_pos < _input.Length)
         {
             char ch = _input[_pos];
+            // Judged from the length, three bytes per four characters, so the
+            // literal is neither scanned to its end nor decoded to refuse it.
+            if ((_pos - start) / 4 * 3 > _maxBytesLiteral)
+            {
+                return new Token(TokenKind.ILLEGAL,
+                    $"bytes literal decodes to more than MaxBytesLiteralLength={_maxBytesLiteral} bytes", pos);
+            }
             if (ch == '"')
             {
                 string raw = _input[start.._pos];
                 Advance(); // closing "
-                try
-                {
-                    Convert.FromBase64String(raw);
-                }
-                catch (FormatException)
+                if (!Base64Lenient.TryDecode(raw, out _))
                 {
                     return new Token(TokenKind.ILLEGAL, "invalid base64 in bytes literal", pos);
                 }
@@ -468,7 +497,7 @@ internal class Lexer
         string name = _input[start.._pos];
         if (name.Length == 0)
         {
-            return new Token(TokenKind.ILLEGAL, "@", pos);
+            return new Token(TokenKind.ILLEGAL, "\"@\" must be followed by a directive name", pos);
         }
         return name switch
         {
@@ -483,18 +512,30 @@ internal class Lexer
     {
         int start = _pos;
         bool neg = false;
-        if (Peek() == '-')
+        if (Peek() is '-' or '+')
         {
-            neg = true;
+            char sign = Peek();
             Advance();
-            if (_pos >= _input.Length || !char.IsDigit(Peek()))
+            // "+inf" and "-inf" are the only signed identifier literals.
+            if (HasIdent("inf"))
             {
-                return new Token(TokenKind.ILLEGAL, "-", pos);
+                Advance(); Advance(); Advance();
+                Prec = "";
+                return new Token(TokenKind.FLOAT, _input[start.._pos], pos);
             }
+            if (sign == '+')
+            {
+                return new Token(TokenKind.ILLEGAL, "\"+\" is valid only in \"+inf\"", pos);
+            }
+            if (_pos >= _input.Length || !char.IsAsciiDigit(Peek()))
+            {
+                return new Token(TokenKind.ILLEGAL, "\"-\" must be followed by a digit or \"inf\"", pos);
+            }
+            neg = true;
         }
 
         int digitStart = _pos;
-        while (_pos < _input.Length && char.IsDigit(Peek()))
+        while (_pos < _input.Length && char.IsAsciiDigit(Peek()))
         {
             Advance();
         }
@@ -505,18 +546,32 @@ internal class Lexer
         {
             return LexTimestamp(pos, start);
         }
-        // Float: '.' or 'e'/'E'
-        if (_pos < _input.Length && (Peek() == '.' || Peek() == 'e' || Peek() == 'E'))
+        // A fraction is '.' and at least one digit. Floats and durations both
+        // take one, so it is consumed first and what follows tells them apart.
+        bool frac = false;
+        if (Peek() == '.' && char.IsAsciiDigit(PeekAt(1)))
         {
-            return LexFloat(pos, start);
+            frac = true;
+            Advance();
+            while (_pos < _input.Length && char.IsAsciiDigit(Peek()))
+            {
+                Advance();
+            }
         }
-        // Duration: digits followed by a time unit letter
+        // Before the float branch, so "1.5ms" is one token and not FLOAT then IDENT.
         if (_pos < _input.Length && IsDurationUnit(Peek()))
         {
             return LexDuration(pos, start);
         }
+        // Float: fraction, or 'e'/'E' exponent, or a bare trailing '.'
+        if (frac || (_pos < _input.Length && Peek() is '.' or 'e' or 'E'))
+        {
+            return LexFloat(pos, start);
+        }
 
-        return new Token(TokenKind.INT, _input[start.._pos], pos);
+        string value = _input[start.._pos];
+        LexPrecision();
+        return new Token(TokenKind.INT, value, pos);
     }
 
     private Token LexFloat(Position pos, int start)
@@ -524,24 +579,48 @@ internal class Lexer
         if (Peek() == '.')
         {
             Advance();
-            while (_pos < _input.Length && char.IsDigit(Peek()))
+            while (_pos < _input.Length && char.IsAsciiDigit(Peek()))
             {
                 Advance();
             }
         }
-        if (_pos < _input.Length && (Peek() == 'e' || Peek() == 'E'))
+        if (_pos < _input.Length && Peek() is 'e' or 'E')
         {
             Advance();
-            if (_pos < _input.Length && (Peek() == '+' || Peek() == '-'))
+            if (_pos < _input.Length && Peek() is '+' or '-')
             {
                 Advance();
             }
-            while (_pos < _input.Length && char.IsDigit(Peek()))
+            while (_pos < _input.Length && char.IsAsciiDigit(Peek()))
             {
                 Advance();
             }
         }
-        return new Token(TokenKind.FLOAT, _input[start.._pos], pos);
+        string value = _input[start.._pos];
+        LexPrecision();
+        return new Token(TokenKind.FLOAT, value, pos);
+    }
+
+    // A number's precision suffix, "p" and one or more digits. Any field but a
+    // pxf.BigFloat rejects one; that is the decoder's call, not the lexer's.
+    private void LexPrecision()
+    {
+        Prec = "";
+        if (Peek() != 'p' || !char.IsAsciiDigit(PeekAt(1))) return;
+        Advance();
+        int start = _pos;
+        while (_pos < _input.Length && char.IsAsciiDigit(Peek()))
+        {
+            Advance();
+        }
+        Prec = _input[start.._pos];
+    }
+
+    private bool HasIdent(string word)
+    {
+        int end = _pos + word.Length;
+        if (end > _input.Length || string.CompareOrdinal(_input, _pos, word, 0, word.Length) != 0) return false;
+        return end == _input.Length || !IsIdentPart(_input[end]);
     }
 
     private Token LexTimestamp(Position pos, int start)
@@ -549,7 +628,7 @@ internal class Lexer
         while (_pos < _input.Length)
         {
             char ch = Peek();
-            if (char.IsWhiteSpace(ch) || ch == ',' || ch == ']' || ch == '}' || ch == ')' || ch == '#')
+            if (ch is ' ' or '\n' or '\t' or '\r' or ',' or ']' or '}' or ')' or '#')
             {
                 break;
             }
@@ -560,23 +639,30 @@ internal class Lexer
             Advance();
         }
         string raw = _input[start.._pos];
-        if (!DateTime.TryParse(raw, out _))
+        if (!Rfc3339.TryParse(raw, out _, out _))
         {
-             return new Token(TokenKind.ILLEGAL, "invalid timestamp: " + raw, pos);
+            return new Token(TokenKind.ILLEGAL, "invalid timestamp: " + raw, pos);
         }
         return new Token(TokenKind.TIMESTAMP, raw, pos);
     }
 
+    // The scan is loose, so "5min" is reported as one invalid duration and not
+    // as a duration and an identifier; TryParseNanos decides what it was.
     private Token LexDuration(Position pos, int start)
     {
-        while (_pos < _input.Length && (char.IsDigit(Peek()) || (Peek() >= 'a' && Peek() <= 'z')))
+        while (_pos < _input.Length)
         {
+            char ch = Peek();
+            bool part = char.IsAsciiDigit(ch) || ch is >= 'a' and <= 'z' or MicroSign
+                || (ch == '.' && char.IsAsciiDigit(PeekAt(1)));
+            if (!part) break;
             Advance();
         }
         string raw = _input[start.._pos];
-        // In Go, time.ParseDuration is quite specific.
-        // For C#, we might need a custom parser or just keep the raw string for now.
-        // I'll skip strict validation for now.
+        if (!DurationParser.TryParseNanos(raw, out _))
+        {
+            return new Token(TokenKind.ILLEGAL, "invalid duration: " + raw, pos);
+        }
         return new Token(TokenKind.DURATION, raw, pos);
     }
 
@@ -599,7 +685,8 @@ internal class Lexer
         return new Token(TokenKind.IDENT, val, pos);
     }
 
-    private static bool IsIdentStart(char ch) => char.IsLetter(ch) || ch == '_';
-    private static bool IsIdentPart(char ch) => IsIdentStart(ch) || char.IsDigit(ch) || ch == '.' || ch == '/';
-    private static bool IsDurationUnit(char ch) => ch == 'h' || ch == 'm' || ch == 's' || ch == 'n' || ch == 'u' || ch == 'µ';
+    private const char MicroSign = '\u00B5'; // U+03BC GREEK SMALL LETTER MU is not a unit
+    private static bool IsIdentStart(char ch) => char.IsAsciiLetter(ch) || ch == '_';
+    private static bool IsIdentPart(char ch) => IsIdentStart(ch) || char.IsAsciiDigit(ch) || ch == '.';
+    private static bool IsDurationUnit(char ch) => ch is 'h' or 'm' or 's' or 'n' or 'u' or MicroSign;
 }

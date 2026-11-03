@@ -11,19 +11,8 @@ namespace Protowire.Pxf;
 /// <summary>
 /// Provides methods for decoding PXF (Protowire Exchange Format) text into C# objects.
 /// </summary>
-public class Decoder
+public partial class Decoder
 {
-    // HARDENING.md § Mandatory limits — bounds native call-stack growth on
-    // attacker input. Matches the cross-port default.
-    private const int MaxNestingDepth = 100;
-
-    // HARDENING.md § Mandatory limits — bounds the superlinear big-number
-    // parsers. Counts a literal's significant mantissa digits only (#410),
-    // and is enforced at each big-number parse rather than in the lexer so
-    // that a (pxf.default) string, which never passes the lexer, is under
-    // it too. It also bounds the scale of a pxf.Decimal literal.
-    private const int MaxNumericLiteralDigits = 4096;
-
     private Lexer _lex = null!;
     private Token _current = null!;
     private Result? _result;
@@ -38,7 +27,17 @@ public class Decoder
     // of a keyed repeated field. Consumed there, so nested submessages do
     // not inherit the key-field checks.
     private KeyedElemState? _keyedElem;
+    private PxfLimits _limits = PxfLimits.Default;
     public TypeRegistry Registry { get; set; } = TypeRegistry.Empty;
+
+    /// <summary>The limits of each decode; the draft's values by default.</summary>
+    public PxfLimits Limits { get => _limits; set => _limits = value; }
+
+    /// <summary>
+    /// Skip a field the schema of a generated message does not declare, rather
+    /// than reject the document. A hand-written class always skips.
+    /// </summary>
+    public bool DiscardUnknown { get; set; }
 
     /// <summary>
     /// Unmarshals a PXF-formatted string into the specified object.
@@ -74,7 +73,7 @@ public class Decoder
         _rootMsg = msg;
         _nullMaskFd = AnnotationsRuntime.FindNullMaskField(msg.Descriptor);
         ParseInto(data, msg);
-        PostDecode(msg, "");
+        PostDecode(msg, "", _nullMaskFd);
         return _result;
     }
 
@@ -87,6 +86,19 @@ public class Decoder
         _depth = 0;
         _elemDepth = 0;
         _keyedElem = null;
+        _mapKeys = new(ReferenceEqualityComparer.Instance);
+    }
+
+    internal static void CheckMessageSize(string data, PxfLimits limits)
+    {
+        // Each UTF-16 unit is at least one byte of the input, so the common
+        // case needs no count.
+        if (data.Length * 3L <= limits.MaxMessageSize) return;
+        int size = System.Text.Encoding.UTF8.GetByteCount(data);
+        if (size > limits.MaxMessageSize)
+        {
+            throw new PxfException(new Position(1, 1, 0), $"input of {size} bytes exceeds MaxMessageSize={limits.MaxMessageSize}");
+        }
     }
 
     private void ParseInto(string data, object obj)
@@ -101,12 +113,20 @@ public class Decoder
         {
             Schema.EnsureBindable(obj.GetType());
         }
-        _lex = new Lexer(data);
+        CheckMessageSize(data, _limits);
+        _lex = new Lexer(data, _limits.MaxBytesLiteralLength);
         Advance();
 
         ConsumeDirectives();
 
-        DecodeFields(obj, false);
+        if (obj is IMessage message)
+        {
+            DecodeMessage(message, false);
+        }
+        else
+        {
+            DecodeFields(obj, false);
+        }
     }
 
     /// <summary>
@@ -203,6 +223,11 @@ public class Decoder
         if (_current.Kind == TokenKind.LBRACE)
         {
             int open = _current.Pos.Offset;
+            // Read as Parse reads it, so a body that is not PXF is an error
+            // here too, not skipped by counting braces.
+            var parser = new Parser(_lex, _current, _limits.MaxNestingDepth, depth: 0);
+            parser.ParseValueHere();
+            _current = parser.Current;
             int close = BraceScan.FindMatchingBrace(_lex.Input, open);
             if (close < 0)
             {
@@ -210,8 +235,6 @@ public class Decoder
             }
             body = System.Text.Encoding.UTF8.GetBytes(_lex.Input[(open + 1)..close]);
             hasBody = true;
-            _lex.RepositionTo(close + 1);
-            Advance();
         }
         string typeField = prefixes.Count == 1 ? prefixes[0] : string.Empty;
         return new Directive
@@ -248,25 +271,22 @@ public class Decoder
                 $"@dataset column list must contain at least one field name, got {_current.Kind}");
         }
         var columns = new List<string>();
+        var columnPositions = new List<Position>();
         for (; ; )
         {
             if (_current.Kind != TokenKind.IDENT)
             {
                 throw new PxfException(_current.Pos, $"expected column field name, got {_current.Kind}");
             }
-            string colName = _current.Value;
-            if (colName.Contains('.'))
-            {
-                throw new PxfException(_current.Pos,
-                    $"@dataset column \"{colName}\": dotted column paths are not supported in v1 (draft §3.4.4)");
-            }
-            columns.Add(colName);
+            columns.Add(_current.Value);
+            columnPositions.Add(_current.Pos);
             Advance();
             if (_current.Kind == TokenKind.COMMA) { Advance(); continue; }
             if (_current.Kind == TokenKind.RPAREN) break;
             throw new PxfException(_current.Pos,
                 $"expected ',' or ')' in @dataset column list, got {_current.Kind}");
         }
+        DatasetPaths.CheckHeader(columns, columnPositions);
         Advance(); // consume )
 
         var rows = new List<DatasetRow>();
@@ -305,93 +325,16 @@ public class Decoder
     }
 
     /// <summary>
-    /// Consumes one cell of a @dataset row. Returns null for an empty
-    /// cell. Rejects list and block values per v1 cell-grammar.
+    /// One cell of a @dataset row: null for an empty cell, and otherwise any
+    /// value, read by the parser so it means what it means under Parse.
     /// </summary>
     private IValue? ConsumeRowCell()
     {
-        switch (_current.Kind)
-        {
-            case TokenKind.COMMA:
-            case TokenKind.RPAREN:
-                return null;
-            case TokenKind.LBRACKET:
-                throw new PxfException(_current.Pos,
-                    "@dataset cells cannot contain list values in v1 (draft §3.4.4)");
-            case TokenKind.LBRACE:
-                throw new PxfException(_current.Pos,
-                    "@dataset cells cannot contain block values in v1 (draft §3.4.4)");
-        }
-        // Mirror the value-parsing subset used by row cells. AST shape
-        // matches Parser.ParseValue.
-        var pos = _current.Pos;
-        switch (_current.Kind)
-        {
-            case TokenKind.STRING:
-                {
-                    var v = new StringVal { Pos = pos, Value = _current.Value };
-                    Advance();
-                    return v;
-                }
-            case TokenKind.INT:
-                {
-                    var v = new IntVal { Pos = pos, Raw = _current.Value };
-                    Advance();
-                    return v;
-                }
-            case TokenKind.FLOAT:
-                {
-                    var v = new FloatVal { Pos = pos, Raw = _current.Value };
-                    Advance();
-                    return v;
-                }
-            case TokenKind.BOOL:
-                {
-                    var v = new BoolVal { Pos = pos, Value = _current.Value == "true" };
-                    Advance();
-                    return v;
-                }
-            case TokenKind.BYTES:
-                {
-                    byte[] decoded;
-                    try { decoded = Convert.FromBase64String(_current.Value); }
-                    catch (FormatException) { throw new PxfException(pos, $"invalid base64: {_current.Value}"); }
-                    var v = new BytesVal { Pos = pos, Value = decoded };
-                    Advance();
-                    return v;
-                }
-            case TokenKind.TIMESTAMP:
-                {
-                    if (!DateTime.TryParse(_current.Value, out var dt))
-                    {
-                        throw new PxfException(pos, $"invalid timestamp \"{_current.Value}\"");
-                    }
-                    var v = new TimestampVal { Pos = pos, Value = dt, Raw = _current.Value };
-                    Advance();
-                    return v;
-                }
-            case TokenKind.DURATION:
-                {
-                    var dv = DurationParser.Parse(_current.Value);
-                    var v = new DurationVal { Pos = pos, Value = dv, Raw = _current.Value };
-                    Advance();
-                    return v;
-                }
-            case TokenKind.NULL:
-                {
-                    var v = new NullVal { Pos = pos };
-                    Advance();
-                    return v;
-                }
-            case TokenKind.IDENT:
-                {
-                    var v = new IdentVal { Pos = pos, Name = _current.Value };
-                    Advance();
-                    return v;
-                }
-            default:
-                throw new PxfException(pos, $"expected value, got {_current.Kind} (\"{_current.Value}\")");
-        }
+        if (_current.Kind is TokenKind.COMMA or TokenKind.RPAREN) return null;
+        var parser = new Parser(_lex, _current, _limits.MaxNestingDepth, depth: 0);
+        var value = parser.ParseValueHere();
+        _current = parser.Current;
+        return value;
     }
 
     /// <summary>Mirrors <see cref="Parser.ParseProtoDirective"/>.</summary>
@@ -443,22 +386,9 @@ public class Decoder
             case TokenKind.BYTES:
                 {
                     string raw = _current.Value;
-                    byte[] decoded;
-                    try { decoded = Convert.FromBase64String(raw); }
-                    catch (FormatException)
+                    if (!Base64Lenient.TryDecode(raw, out var decoded))
                     {
-                        try
-                        {
-                            string padded = raw.Replace('-', '+').Replace('_', '/');
-                            int rem = padded.Length % 4;
-                            if (rem != 0) padded = padded.PadRight(padded.Length + (4 - rem), '=');
-                            decoded = Convert.FromBase64String(padded);
-                        }
-                        catch (FormatException)
-                        {
-                            throw new PxfException(_current.Pos,
-                                "@proto descriptor body: invalid base64");
-                        }
+                        throw new PxfException(_current.Pos, "@proto descriptor body: invalid base64");
                     }
                     Advance();
                     return new ProtoDirective
@@ -526,16 +456,22 @@ public class Decoder
     // accepted and one deeper is rejected. Parser counts the same way.
     private void EnterDescent()
     {
-        if (_depth >= MaxNestingDepth)
+        if (_depth >= _limits.MaxNestingDepth)
         {
             throw new PxfException(_current.Pos,
-                $"nesting depth exceeds {MaxNestingDepth}");
+                $"nesting depth exceeds MaxNestingDepth={_limits.MaxNestingDepth}");
         }
         _depth++;
     }
 
     private void DecodeFields(object obj, bool inBlock)
     {
+        // A hand-written class can hold a generated message.
+        if (obj is IMessage message)
+        {
+            DecodeMessage(message, inBlock);
+            return;
+        }
         if (inBlock) EnterDescent();
         try
         {
@@ -547,19 +483,14 @@ public class Decoder
         }
     }
 
+    // The path for a hand-written class: no descriptor, so a member's CLR type
+    // is the only schema. An unknown member is skipped.
     private void DecodeFieldsBody(object obj, bool inBlock)
     {
         var type = obj.GetType();
-        IMessage? msg = obj as IMessage;
-        var msgDesc = msg?.Descriptor;
-
         var props = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
         var fields = type.GetFields(BindingFlags.Public | BindingFlags.Instance);
-
-        var localSetFields = new HashSet<string>();
-
-        var keyedElem = _keyedElem;
-        _keyedElem = null;
+        var bound = new HashSet<string>();
 
         while (true)
         {
@@ -575,91 +506,33 @@ public class Decoder
             }
 
             var pos = _current.Pos;
-            if (_current.Kind == TokenKind.AT_TYPE)
+            if (_current.Kind == TokenKind.AT_TYPE) throw new PxfException(pos, TypeEntryMisplaced);
+            if (_current.Kind is not (TokenKind.IDENT or TokenKind.STRING or TokenKind.INT or TokenKind.BOOL))
             {
-                Advance();
-                if (_current.Kind != TokenKind.IDENT) throw new PxfException(_current.Pos, "expected type name after @type");
-                var typeUrl = _current.Value;
-                Advance();
-
-                if (obj is IMessage any && WellKnown.IsAny(any.Descriptor))
-                {
-                    // This is handled by the caller or we need to handle it here.
-                    // Actually, if we are inside DecodeFields for an Any, we should probably 
-                    // have already resolved the type.
-                    // But if we are here, it means we are decoding an Any that was just created.
-
-                    var typeName = typeUrl;
-                    if (typeName.Contains("/")) typeName = typeName[(typeName.LastIndexOf('/') + 1)..];
-                    var desc = Registry.Find(typeName);
-                    if (desc == null) throw new PxfException(pos, $"type \"{typeName}\" not found in registry");
-
-                    // The body shares the Any's braces, which the enclosing
-                    // DecodeFields has already counted as one descent.
-                    var unpackedMsg = desc.Parser.ParseFrom(Array.Empty<byte>());
-                    DecodeFieldsBody(unpackedMsg, true);
-
-                    var typeUrlProp = any.GetType().GetProperty("TypeUrl");
-                    var valueProp = any.GetType().GetProperty("Value");
-                    typeUrlProp?.SetValue(any, typeUrl);
-                    valueProp?.SetValue(any, unpackedMsg.ToByteString());
-                    return; // Done with this block
-                }
-                continue;
-            }
-
-            if (_current.Kind != TokenKind.IDENT && _current.Kind != TokenKind.STRING && _current.Kind != TokenKind.INT)
-            {
-                throw new PxfException(pos, $"expected identifier, string, or integer, got {_current.Kind}");
+                throw new PxfException(pos, $"expected identifier, string, integer, or bool, got {_current.Kind}");
             }
             var keyKind = _current.Kind;
             string key = _current.Value;
             Advance();
 
-            // Strict-PXF-keys grammar: an integer key is only valid with `:`
-            // (map entries). A string key before `=` or `{` is well-formed,
-            // but it is a quoted entry name: keyed blocks have their own
-            // decode loop, so in message context it never names a field.
-            // Enforce both here before the unknown-field skip path silently
-            // swallows the input.
-            if (_current.Kind == TokenKind.EQUALS || _current.Kind == TokenKind.LBRACE)
+            // Strict-PXF-keys grammar, enforced before the unknown-member skip
+            // can swallow it. A string key before `=` or `{` is well-formed
+            // but is a quoted entry name, which names no member.
+            if (_current.Kind is TokenKind.EQUALS or TokenKind.LBRACE)
             {
-                if (keyKind == TokenKind.STRING)
+                if (keyKind == TokenKind.STRING) throw Keyed.QuotedNameUnkeyed(pos, key);
+                if (keyKind is TokenKind.INT or TokenKind.BOOL)
                 {
-                    throw Keyed.QuotedNameUnkeyed(pos, key);
-                }
-                if (keyKind == TokenKind.INT && _current.Kind == TokenKind.EQUALS)
-                {
-                    throw new PxfException(pos, $"field assignment with '=' requires an identifier or string key, got {keyKind} (\"{key}\"); use ':' for map entries");
-                }
-                if (keyKind == TokenKind.INT)
-                {
-                    throw new PxfException(pos, $"submessage block requires an identifier or string key, got {keyKind} (\"{key}\")");
+                    throw _current.Kind == TokenKind.EQUALS
+                        ? Parser.NonNameAssignment(pos, keyKind, key)
+                        : Parser.NonNameBlock(pos, keyKind, key);
                 }
             }
-            // `:` (map entry) is reserved for inside a `{ ... }` block; the
-            // document represents a proto message, never a map<K,V>.
-            if (_current.Kind == TokenKind.COLON && !inBlock)
-            {
-                throw new PxfException(pos, "map entry (':' form) is only allowed inside a '{ … }' block; use '=' for top-level field assignments");
-            }
-
-            FieldDescriptor? fd = msgDesc?.Fields.InDeclarationOrder().FirstOrDefault(f => f.Name == key);
-            if (fd != null && fd.ContainingOneof != null)
-            {
-                var oneofName = fd.ContainingOneof.Name;
-                if (localSetFields.Contains("oneof:" + oneofName))
-                {
-                    throw new PxfException(pos, $"oneof \"{oneofName}\": field \"{key}\" conflicts with already-set field");
-                }
-                localSetFields.Add("oneof:" + oneofName);
-            }
+            if (_current.Kind == TokenKind.COLON && !inBlock) throw Parser.TopLevelMapEntry(pos);
 
             var prop = props.FirstOrDefault(p => MatchName(p.Name, key));
             var field = fields.FirstOrDefault(f => MatchName(f.Name, key));
-
             if (prop != null && !prop.CanWrite && !typeof(IEnumerable).IsAssignableFrom(prop.PropertyType)) prop = null;
-
             Type? memberType = prop?.PropertyType ?? field?.FieldType;
 
             if (memberType == null)
@@ -676,7 +549,12 @@ public class Decoder
                 continue;
             }
 
-            localSetFields.Add(key);
+            bool collection = typeof(IEnumerable).IsAssignableFrom(memberType)
+                && memberType != typeof(string) && memberType != typeof(byte[]);
+            if (!collection && !bound.Add(prop?.Name ?? field!.Name))
+            {
+                throw new PxfException(pos, $"field \"{key}\" is already set");
+            }
 
             switch (_current.Kind)
             {
@@ -684,55 +562,17 @@ public class Decoder
                     Advance();
                     if (_current.Kind == TokenKind.NULL)
                     {
-                        if (_result != null && fd != null)
-                        {
-                            var path = _pathPrefix + fd.Name;
-                            _result.MarkNull(path);
-                            if (_nullMaskFd != null && _rootMsg != null && _elemDepth == 0)
-                            {
-                                AnnotationsRuntime.AppendNullPath(_rootMsg, _nullMaskFd, path);
-                            }
-                        }
                         Advance();
                         continue;
                     }
-                    if (keyedElem != null && fd?.Name == keyedElem.KeyName && _current.Kind == TokenKind.STRING)
-                    {
-                        keyedElem.CheckExplicitKey(_current.Value, _current.Pos);
-                    }
-                    if (_result != null && fd != null)
-                    {
-                        _result.MarkPresent(_pathPrefix + fd.Name);
-                    }
                     var currentVal = prop?.GetValue(obj) ?? field?.GetValue(obj);
-                    // `name = { ... }` spells the keyed block form: a block
-                    // tail abbreviates `= { ... }`.
-                    if (_current.Kind == TokenKind.LBRACE && fd != null && Keyed.KeyField(fd) is { } assignedKeyFd)
-                    {
-                        Advance();
-                        DecodeKeyedBlock((IList)currentVal!, fd, assignedKeyFd);
-                        break;
-                    }
-                    var val = DecodeValue(memberType, fd, currentVal);
+                    var val = DecodeValue(memberType, currentVal);
                     if (prop != null && prop.CanWrite) prop.SetValue(obj, val);
                     else if (field != null) field.SetValue(obj, val);
                     break;
 
                 case TokenKind.LBRACE:
                     Advance();
-                    if (fd != null && Keyed.KeyField(fd) is { } blockKeyFd)
-                    {
-                        _result?.MarkPresent(_pathPrefix + fd.Name);
-                        DecodeKeyedBlock((IList)(prop?.GetValue(obj) ?? field?.GetValue(obj))!, fd, blockKeyFd);
-                        break;
-                    }
-                    if (fd != null && fd.IsRepeated && !fd.IsMap && _current.Kind == TokenKind.STRING)
-                    {
-                        // The block spells the keyed form on a field with no
-                        // (pxf.key). Report the quoted name, the more specific
-                        // schema violation.
-                        throw Keyed.QuotedNameUnkeyed(_current.Pos, _current.Value);
-                    }
                     var subObj = prop?.GetValue(obj) ?? field?.GetValue(obj);
                     if (subObj == null)
                     {
@@ -740,112 +580,12 @@ public class Decoder
                         if (prop != null && prop.CanWrite) prop.SetValue(obj, subObj);
                         else if (field != null) field.SetValue(obj, subObj);
                     }
-                    if (_result != null && fd != null)
-                    {
-                        _result.MarkPresent(_pathPrefix + fd.Name);
-                        var saved = _pathPrefix;
-                        _pathPrefix = _pathPrefix + fd.Name + ".";
-                        try
-                        {
-                            DecodeFields(subObj!, true);
-                        }
-                        finally
-                        {
-                            _pathPrefix = saved;
-                        }
-                    }
-                    else
-                    {
-                        DecodeFields(subObj!, true);
-                    }
+                    DecodeFields(subObj!, true);
                     break;
 
                 default:
                     throw new PxfException(_current.Pos, $"expected '=' or '{{' after \"{key}\"");
             }
-        }
-    }
-
-    /// <summary>
-    /// Decodes the block form of a keyed repeated field: named entries,
-    /// <c>name { ... }</c> or <c>name = { ... }</c>, one per element in list
-    /// order. Each entry name, unquoted, populates the element's key field.
-    /// The opening <c>{</c> is consumed on entry, the closing <c>}</c> on
-    /// return. Mirrors <c>decodeKeyedBlockBody</c> in
-    /// <c>protowire-go/encoding/pxf/decode_fast.go</c>.
-    /// </summary>
-    private void DecodeKeyedBlock(IList list, FieldDescriptor fd, FieldDescriptor keyFd)
-    {
-        if (_depth >= MaxNestingDepth)
-        {
-            throw new PxfException(_current.Pos, $"nesting depth exceeds {MaxNestingDepth}");
-        }
-        _depth++;
-        try
-        {
-            var seen = new HashSet<string>(StringComparer.Ordinal);
-            while (_current.Kind != TokenKind.RBRACE)
-            {
-                if (_current.Kind == TokenKind.EOF)
-                {
-                    throw new PxfException(_current.Pos, $"expected '}}' to close keyed field \"{fd.Name}\", got EOF");
-                }
-                if (_current.Kind != TokenKind.IDENT && _current.Kind != TokenKind.STRING)
-                {
-                    throw new PxfException(_current.Pos,
-                        $"expected entry name (identifier or string) in keyed field \"{fd.Name}\", got {_current.Kind}");
-                }
-                var namePos = _current.Pos;
-                string name = _current.Value;
-                if (name.Length == 0)
-                {
-                    throw Keyed.EmptyName(namePos, fd.Name);
-                }
-                if (!seen.Add(name))
-                {
-                    throw Keyed.DuplicateKey(namePos, fd.Name, name);
-                }
-                Advance();
-
-                if (_current.Kind == TokenKind.EQUALS)
-                {
-                    Advance();
-                    if (_current.Kind != TokenKind.LBRACE)
-                    {
-                        throw new PxfException(_current.Pos,
-                            $"keyed entry \"{name}\" of field \"{fd.Name}\" must have a block value ('{{ ... }}'): the element type is a message");
-                    }
-                }
-                else if (_current.Kind != TokenKind.LBRACE)
-                {
-                    throw new PxfException(_current.Pos,
-                        $"expected '{{' or '=' after entry name \"{name}\" in keyed field \"{fd.Name}\", got {_current.Kind}");
-                }
-                Advance();
-
-                var element = fd.MessageType.Parser.ParseFrom(Array.Empty<byte>());
-                keyFd.Accessor.SetValue(element, name);
-                _keyedElem = new KeyedElemState(fd.Name, keyFd.Name, name, Named: true);
-                var saved = EnterElement(fd, list.Count);
-                try
-                {
-                    // The entry name supplies the key field, so presence
-                    // must say so: PostDecode and callers read nothing else
-                    // (protowire-go#214).
-                    _result?.MarkPresent(_pathPrefix + keyFd.Name);
-                    DecodeFields(element, true);
-                }
-                finally
-                {
-                    LeaveElement(saved);
-                }
-                list.Add(element);
-            }
-            Advance();
-        }
-        finally
-        {
-            _depth--;
         }
     }
 
@@ -869,135 +609,49 @@ public class Decoder
         _elemDepth--;
     }
 
-    private object? DecodeValue(Type type, FieldDescriptor? fd, object? currentVal)
+    private object? DecodeValue(Type type, object? currentVal)
     {
         var pos = _current.Pos;
+        var underlying = System.Nullable.GetUnderlyingType(type);
+        if (underlying != null) type = underlying;
 
-        if (fd != null && fd.FieldType == FieldType.Message && WellKnown.IsAny(fd.MessageType))
-        {
-            return DecodeAny(currentVal);
-        }
-
-        if (type == typeof(DateTime) || (fd != null && fd.FieldType == FieldType.Message && WellKnown.IsTimestamp(fd.MessageType)))
+        if (type == typeof(DateTime))
         {
             if (_current.Kind != TokenKind.TIMESTAMP) throw new PxfException(pos, "expected timestamp");
-            var dt = DateTime.Parse(_current.Value);
+            var dt = DateTime.Parse(_current.Value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
             Advance();
-            if (type == typeof(DateTime)) return dt;
-            var wkt = currentVal ?? Activator.CreateInstance(type)!;
-            WellKnown.SetTimestamp(wkt, dt);
-            return wkt;
+            return dt;
         }
 
-        if (type == typeof(TimeSpan) || (fd != null && fd.FieldType == FieldType.Message && WellKnown.IsDuration(fd.MessageType)))
+        if (type == typeof(TimeSpan))
         {
-            if (_current.Kind != TokenKind.DURATION && _current.Kind != TokenKind.INT) throw new PxfException(pos, "expected duration");
+            if (_current.Kind is not (TokenKind.DURATION or TokenKind.INT)) throw new PxfException(pos, "expected duration");
             var ts = DurationParser.Parse(_current.Value);
             Advance();
-            if (type == typeof(TimeSpan)) return ts;
-            var wkt = currentVal ?? Activator.CreateInstance(type)!;
-            WellKnown.SetDuration(wkt, ts);
-            return wkt;
-        }
-
-        if (fd != null && fd.FieldType == FieldType.Message)
-        {
-            if (WellKnown.IsBigInt(fd.MessageType))
-            {
-                CheckLiteralDigits(_current.Value, pos);
-                var bi = System.Numerics.BigInteger.Parse(_current.Value);
-                Advance();
-                var msg = currentVal ?? Activator.CreateInstance(type)!;
-                WellKnown.SetBigInt(msg, bi);
-                return msg;
-            }
-            if (WellKnown.IsDecimal(fd.MessageType))
-            {
-                var s = _current.Value;
-                CheckLiteralDigits(s, pos);
-                bool negative = s.StartsWith('-');
-                if (negative) s = s[1..];
-                int dotIdx = s.IndexOf('.');
-                int scale = 0;
-                if (dotIdx >= 0)
-                {
-                    scale = s.Length - dotIdx - 1;
-                    s = s.Remove(dotIdx, 1);
-                }
-                CheckDecimalScale(scale, pos);
-                var unscaled = System.Numerics.BigInteger.Parse(s);
-                Advance();
-                var msg = currentVal ?? Activator.CreateInstance(type)!;
-                WellKnown.SetDecimal(msg, new Protowire.Pb.Decimal(unscaled, scale, negative));
-                return msg;
-            }
-            if (WellKnown.IsBigFloat(fd.MessageType))
-            {
-                var s = _current.Value;
-                CheckLiteralDigits(s, pos);
-                bool negative = s.StartsWith('-');
-                if (negative) s = s[1..];
-                int dotIdx = s.IndexOf('.');
-                int scale = 0;
-                if (dotIdx >= 0)
-                {
-                    scale = s.Length - dotIdx - 1;
-                    s = s.Remove(dotIdx, 1);
-                }
-                var unscaled = System.Numerics.BigInteger.Parse(s);
-                Advance();
-                var msg = currentVal ?? Activator.CreateInstance(type)!;
-                WellKnown.SetBigFloat(msg, new Protowire.Pb.BigFloat(unscaled, -scale, (uint)s.Length, negative));
-                return msg;
-            }
+            return ts;
         }
 
         if (type == typeof(System.Numerics.BigInteger))
         {
-            var s = _current.Value.Trim();
-            CheckLiteralDigits(s, pos);
-            var bi = System.Numerics.BigInteger.Parse(s);
+            CheckLiteralDigits(_current.Value, pos);
+            if (!System.Numerics.BigInteger.TryParse(_current.Value, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var bi))
+            {
+                throw new PxfException(pos, $"invalid big integer: {_current.Value}");
+            }
             Advance();
             return bi;
         }
         if (type == typeof(Protowire.Pb.Decimal))
         {
-            var s = _current.Value.Trim();
-            CheckLiteralDigits(s, pos);
-            bool negative = s.StartsWith('-');
-            if (negative) s = s[1..];
-            int dotIdx = s.IndexOf('.');
-            int scale = 0;
-            if (dotIdx >= 0)
-            {
-                scale = s.Length - dotIdx - 1;
-                s = s.Remove(dotIdx, 1);
-            }
-            CheckDecimalScale(scale, pos);
-            if (string.IsNullOrEmpty(s)) s = "0";
-            var unscaled = System.Numerics.BigInteger.Parse(s);
+            var dec = ParseDecimal(_current.Value, pos);
             Advance();
-            return new Protowire.Pb.Decimal(unscaled, scale, negative);
+            return dec;
         }
         if (type == typeof(Protowire.Pb.BigFloat))
         {
-            // Simple parsing for now: treat as decimal and convert
-            var s = _current.Value.Trim();
-            CheckLiteralDigits(s, pos);
-            bool negative = s.StartsWith('-');
-            if (negative) s = s[1..];
-            int dotIdx = s.IndexOf('.');
-            int scale = 0;
-            if (dotIdx >= 0)
-            {
-                scale = s.Length - dotIdx - 1;
-                s = s.Remove(dotIdx, 1);
-            }
-            if (string.IsNullOrEmpty(s)) s = "0";
-            var unscaled = System.Numerics.BigInteger.Parse(s);
+            var bf = ParseBigFloatToken(pos);
             Advance();
-            // This is a very simplified BigFloat conversion, usually BigFloat would use binary exponent
-            return new Protowire.Pb.BigFloat(unscaled, -scale, (uint)s.Length, negative);
+            return bf;
         }
 
         if (type == typeof(string))
@@ -1012,56 +666,21 @@ public class Decoder
             Advance();
             return b;
         }
-        if (type == typeof(int))
+        if (type == typeof(int)) return ParseNumber<int>(pos);
+        if (type == typeof(long)) return ParseNumber<long>(pos);
+        // uint32 / fixed32 and uint64 / fixed64 generate uint / ulong.
+        if (type == typeof(uint)) return ParseNumber<uint>(pos);
+        if (type == typeof(ulong)) return ParseNumber<ulong>(pos);
+        if (type == typeof(float)) return ParseNumber<float>(pos);
+        if (type == typeof(double)) return ParseNumber<double>(pos);
+        if (type == typeof(byte[]) || type == typeof(ByteString))
         {
-            var i = int.Parse(_current.Value);
+            if (!Base64Lenient.TryDecode(_current.Value, out var bytes))
+            {
+                throw new PxfException(pos, $"invalid base64: {_current.Value}");
+            }
             Advance();
-            return i;
-        }
-        if (type == typeof(long))
-        {
-            var l = long.Parse(_current.Value);
-            Advance();
-            return l;
-        }
-        // uint32 / fixed32 and uint64 / fixed64 generate uint / ulong; the
-        // shared sbe-bench fixture's order_id is the first uint64 this path
-        // met (#26).
-        if (type == typeof(uint))
-        {
-            var u = uint.Parse(_current.Value);
-            Advance();
-            return u;
-        }
-        if (type == typeof(ulong))
-        {
-            var u = ulong.Parse(_current.Value);
-            Advance();
-            return u;
-        }
-        if (type == typeof(float))
-        {
-            var f = float.Parse(_current.Value);
-            Advance();
-            return f;
-        }
-        if (type == typeof(double))
-        {
-            var d = double.Parse(_current.Value);
-            Advance();
-            return d;
-        }
-        if (type == typeof(byte[]))
-        {
-            var bytes = Convert.FromBase64String(_current.Value);
-            Advance();
-            return bytes;
-        }
-        if (type == typeof(ByteString))
-        {
-            var bytes = Convert.FromBase64String(_current.Value);
-            Advance();
-            return ByteString.CopyFrom(bytes);
+            return type == typeof(byte[]) ? bytes : ByteString.CopyFrom(bytes);
         }
         if (type.IsEnum)
         {
@@ -1069,27 +688,18 @@ public class Decoder
             {
                 string enumName = _current.Value;
                 Advance();
-                if (fd != null && fd.FieldType == FieldType.Enum)
-                {
-                    var ev = fd.EnumType.FindValueByName(enumName);
-                    if (ev != null) return Enum.ToObject(type, ev.Number);
-                }
-                return Enum.Parse(type, enumName, true);
+                if (Enum.TryParse(type, enumName, true, out var parsed)) return parsed;
+                throw new PxfException(pos, $"unknown enum value \"{enumName}\" for {type.Name}");
             }
-            else
-            {
-                var en = int.Parse(_current.Value);
-                Advance();
-                return Enum.ToObject(type, en);
-            }
+            return Enum.ToObject(type, ParseNumber<int>(pos));
         }
         if (typeof(IDictionary).IsAssignableFrom(type))
         {
-            return DecodeMap(type, fd, currentVal as IDictionary);
+            return DecodeMap(type, currentVal as IDictionary);
         }
         if (typeof(IEnumerable).IsAssignableFrom(type))
         {
-            return DecodeList(type, fd, currentVal as IEnumerable);
+            return DecodeList(type, currentVal as IEnumerable);
         }
 
         if (_current.Kind == TokenKind.LBRACE)
@@ -1103,45 +713,23 @@ public class Decoder
         throw new PxfException(pos, $"unsupported type {type}");
     }
 
-    private object DecodeAny(object? currentVal)
+    private T ParseNumber<T>(Position pos) where T : IParsable<T>
     {
-        if (_current.Kind != TokenKind.LBRACE) throw new PxfException(_current.Pos, "expected '{' for Any");
-        Advance();
-
-        string? typeUrl = null;
-        if (_current.Kind == TokenKind.AT_TYPE)
+        if (!T.TryParse(_current.Value, CultureInfo.InvariantCulture, out var value))
         {
-            Advance();
-            if (_current.Kind != TokenKind.IDENT) throw new PxfException(_current.Pos, "expected type name after @type");
-            typeUrl = _current.Value;
-            Advance();
+            throw new PxfException(pos, $"invalid {typeof(T).Name}: {_current.Value}");
         }
-
-        if (typeUrl == null) throw new PxfException(_current.Pos, "missing @type in Any");
-
-        var typeName = typeUrl;
-        if (typeName.Contains("/")) typeName = typeName[(typeName.LastIndexOf('/') + 1)..];
-
-        var desc = Registry.Find(typeName);
-        if (desc == null) throw new PxfException(_current.Pos, $"type \"{typeName}\" not found in registry");
-
-        var msg = desc.Parser.ParseFrom(Array.Empty<byte>());
-        DecodeFields(msg, true);
-
-        var any = (IMessage)(currentVal ?? Activator.CreateInstance(typeof(Google.Protobuf.WellKnownTypes.Any))!);
-        var packMethod = any.GetType().GetMethod("Pack", new[] { typeof(IMessage) });
-        packMethod?.Invoke(any, new object[] { msg });
-
-        return any;
+        Advance();
+        return value;
     }
 
-    private object DecodeList(Type type, FieldDescriptor? fd, IEnumerable? currentList)
+    private object DecodeList(Type type, IEnumerable? currentList)
     {
         if (_current.Kind != TokenKind.LBRACKET) throw new PxfException(_current.Pos, "expected '['");
         EnterDescent();
         try
         {
-            return DecodeListBody(type, fd, currentList);
+            return DecodeListBody(type, currentList);
         }
         finally
         {
@@ -1149,41 +737,24 @@ public class Decoder
         }
     }
 
-    private object DecodeListBody(Type type, FieldDescriptor? fd, IEnumerable? currentList)
+    private object DecodeListBody(Type type, IEnumerable? currentList)
     {
         Advance();
 
         var itemType = type.IsArray ? type.GetElementType()! : type.GetGenericArguments()[0];
         var list = (currentList as IList) ?? (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(itemType))!;
 
-        if (list.IsReadOnly && list is not IList) // Handle RepeatedField which is not exactly IList in some contexts but usually is
-        {
-            // RepeatedField implements IList
-        }
-
-        // The anonymous form of a keyed repeated field: elements get the
-        // key-field checks, with no entry name to agree with.
-        var keyFd = fd != null ? Keyed.KeyField(fd) : null;
-
         while (_current.Kind != TokenKind.RBRACKET && _current.Kind != TokenKind.EOF)
         {
-            if (keyFd != null && _current.Kind == TokenKind.LBRACE)
+            if (list.Count >= _limits.MaxRepeatedCount)
             {
-                _keyedElem = new KeyedElemState(fd!.Name, keyFd.Name, EntryName: "", Named: false);
-                var saved = EnterElement(fd, list.Count);
-                try
-                {
-                    list.Add(DecodeValue(itemType, null, null));
-                }
-                finally
-                {
-                    LeaveElement(saved);
-                }
+                throw new PxfException(_current.Pos, $"repeated field exceeds MaxRepeatedCount={_limits.MaxRepeatedCount}");
             }
-            else
+            if (_current.Kind == TokenKind.NULL)
             {
-                list.Add(DecodeValue(itemType, null, null));
+                throw new PxfException(_current.Pos, "null is not allowed as a list element");
             }
+            list.Add(DecodeValue(itemType, null));
             if (_current.Kind == TokenKind.COMMA) Advance();
         }
         if (_current.Kind != TokenKind.RBRACKET) throw new PxfException(_current.Pos, "expected ']'");
@@ -1198,17 +769,12 @@ public class Decoder
         return list;
     }
 
-    private IDictionary DecodeMap(Type type, FieldDescriptor? fd, IDictionary? currentMap)
+    private IDictionary DecodeMap(Type type, IDictionary? currentMap)
     {
         if (_current.Kind != TokenKind.LBRACE) throw new PxfException(_current.Pos, "expected '{'");
         // HARDENING.md § Recursion: a map's `{` is a descent like any other,
         // whether or not its values are messages.
-        if (_depth >= MaxNestingDepth)
-        {
-            throw new PxfException(_current.Pos,
-                $"nesting depth exceeds {MaxNestingDepth}");
-        }
-        _depth++;
+        EnterDescent();
         try
         {
             return DecodeMapBody(type, currentMap);
@@ -1225,17 +791,39 @@ public class Decoder
         var keyType = type.GetGenericArguments()[0];
         var valType = type.GetGenericArguments()[1];
         var map = currentMap ?? (IDictionary)Activator.CreateInstance(typeof(Dictionary<,>).MakeGenericType(keyType, valType))!;
+        var keys = new HashSet<object>();
 
         while (_current.Kind != TokenKind.RBRACE && _current.Kind != TokenKind.EOF)
         {
+            var pos = _current.Pos;
+            if (map.Count >= _limits.MaxRepeatedCount)
+            {
+                throw new PxfException(pos, $"map field exceeds MaxRepeatedCount={_limits.MaxRepeatedCount}");
+            }
+            if (_current.Kind is not (TokenKind.IDENT or TokenKind.STRING or TokenKind.INT or TokenKind.BOOL))
+            {
+                throw new PxfException(pos, $"expected map key, got {_current.Kind}");
+            }
             var keyStr = _current.Value;
             Advance();
             if (_current.Kind != TokenKind.COLON) throw new PxfException(_current.Pos, "expected ':'");
             Advance();
 
-            var key = Convert.ChangeType(keyStr, keyType);
-            var val = DecodeValue(valType, null, null);
-            map[key] = val;
+            object key;
+            try
+            {
+                key = Convert.ChangeType(keyStr, keyType, CultureInfo.InvariantCulture);
+            }
+            catch (Exception e) when (e is FormatException or OverflowException)
+            {
+                throw new PxfException(pos, $"invalid map key: {keyStr}");
+            }
+            if (!keys.Add(key)) throw new PxfException(pos, $"map key {keyStr} is already set");
+            if (_current.Kind == TokenKind.NULL)
+            {
+                throw new PxfException(_current.Pos, "null is not allowed as a map value");
+            }
+            map[key] = DecodeValue(valType, null);
         }
         if (_current.Kind != TokenKind.RBRACE) throw new PxfException(_current.Pos, "expected '}'");
         Advance();
@@ -1267,45 +855,82 @@ public class Decoder
     }
 
     /// <summary>
-    /// Descriptor-driven counterpart of <see cref="ApplyDefaultsAndValidatePoco"/>:
-    /// validates <c>(pxf.required)</c>, applies <c>(pxf.default)</c>, and recurses
-    /// into present, non-null singular message fields. Skips the <c>_null</c>
-    /// FieldMask field at the root.
-    ///
-    /// <para>Mirrors <c>postDecode</c> in <c>protowire-go/encoding/pxf/decode_fast.go</c>.</para>
+    /// Validates <c>(pxf.required)</c>, applies <c>(pxf.default)</c>, and
+    /// recurses into the bodies the input wrote: present singular messages,
+    /// list elements and map values, each under the path its fields were
+    /// recorded at. Skips the <c>_null</c> mask at the root. Mirrors
+    /// <c>postDecode</c> in <c>protowire-go/encoding/pxf/decode_fast.go</c>.
     /// </summary>
-    private void PostDecode(IMessage msg, string pathPrefix)
+    private void PostDecode(IMessage msg, string pathPrefix, FieldDescriptor? nullMaskFd)
     {
-        var desc = msg.Descriptor;
-        foreach (var fd in desc.Fields.InDeclarationOrder())
+        foreach (var fd in msg.Descriptor.Fields.InDeclarationOrder())
         {
-            if (pathPrefix == "" && _nullMaskFd != null && fd.FieldNumber == _nullMaskFd.FieldNumber)
-            {
-                continue;
-            }
+            if (nullMaskFd != null && fd.FieldNumber == nullMaskFd.FieldNumber) continue;
             string path = pathPrefix + fd.Name;
-            bool present = _result!.Has(path);
-            if (!present)
+            if (!_result!.Has(path))
             {
                 if (AnnotationsRuntime.IsRequired(fd))
                 {
-                    throw new PxfException(Position.Empty, $"required field \"{path}\" is absent");
+                    throw new PxfException(new Position(1, 1, 0), $"required field \"{path}\" is absent");
                 }
                 var def = AnnotationsRuntime.GetDefault(fd);
-                if (def != null)
+                if (def != null && !OneofAlreadyChosen(fd, pathPrefix))
                 {
                     ApplyDefault(msg, fd, def);
                 }
             }
-            else if ((fd.FieldType == FieldType.Message || fd.FieldType == FieldType.Group)
-                     && !fd.IsRepeated && !fd.IsMap && !_result.IsNull(path))
+            else if (!_result.IsNull(path))
             {
-                if (fd.Accessor.GetValue(msg) is IMessage sub)
-                {
-                    PostDecode(sub, path + ".");
-                }
+                PostDecodeBodies(msg, fd, path);
             }
+            // null + default: the default does not apply, null is intentional.
         }
+    }
+
+    private void PostDecodeBodies(IMessage msg, FieldDescriptor fd, string path)
+    {
+        if (fd.IsMap)
+        {
+            var valueFd = fd.MessageType.FindFieldByNumber(2);
+            if (valueFd.FieldType is not (FieldType.Message or FieldType.Group) || WellKnown.IsWrapper(valueFd.MessageType)) return;
+            var entries = new List<(string Path, IMessage Body)>();
+            foreach (DictionaryEntry e in (IDictionary)fd.Accessor.GetValue(msg))
+            {
+                entries.Add((path + KeySuffix(e.Key), (IMessage)e.Value!));
+            }
+            // Key order, so the first error is the same on every run.
+            entries.Sort((a, b) => string.CompareOrdinal(a.Path, b.Path));
+            foreach (var (entryPath, body) in entries)
+            {
+                PostDecode(body, entryPath + ".", null);
+            }
+            return;
+        }
+        if (fd.FieldType is not (FieldType.Message or FieldType.Group) || WellKnown.IsWrapper(fd.MessageType)) return;
+        if (fd.IsRepeated)
+        {
+            int i = 0;
+            foreach (var element in (IList)fd.Accessor.GetValue(msg))
+            {
+                PostDecode((IMessage)element, $"{path}[{i++}].", null);
+            }
+            return;
+        }
+        if (fd.Accessor.GetValue(msg) is IMessage sub)
+        {
+            PostDecode(sub, path + ".", null);
+        }
+    }
+
+    // Setting a member of a oneof clears the rest, so a default applied over a
+    // chosen sibling destroys it. Presence is read from the document, because
+    // a default applied earlier in this pass also sets the case. A member
+    // bound to null counts as chosen.
+    private bool OneofAlreadyChosen(FieldDescriptor fd, string pathPrefix)
+    {
+        var oneof = fd.RealContainingOneof;
+        return oneof != null
+            && oneof.Fields.Any(m => m.FieldNumber != fd.FieldNumber && _result!.Has(pathPrefix + m.Name));
     }
 
     /// <summary>
@@ -1397,16 +1022,23 @@ public class Decoder
 
         if (WellKnown.IsTimestamp(mdesc))
         {
-            var dt = DateTime.Parse(def, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
-            WellKnown.SetTimestamp(sub, dt);
+            if (!Rfc3339.TryParse(def, out long seconds, out int nanos))
+            {
+                throw new PxfException(Position.Empty, $"invalid default timestamp \"{def}\" for field \"{fd.Name}\"");
+            }
+            sub = WellKnown.NewSecondsNanos(mdesc, seconds, nanos);
         }
         else if (WellKnown.IsDuration(mdesc))
         {
-            WellKnown.SetDuration(sub, DurationParser.Parse(def));
+            if (!DurationParser.TryParseNanos(def, out long total))
+            {
+                throw new PxfException(Position.Empty, $"invalid default duration \"{def}\" for field \"{fd.Name}\"");
+            }
+            sub = WellKnown.NewSecondsNanos(mdesc, total / 1_000_000_000, (int)(total % 1_000_000_000));
         }
         else if (WellKnown.IsBigInt(mdesc))
         {
-            CheckLiteralDigits(def, Position.Empty);
+            CheckLiteralDigits(def, Position.Empty, PxfLimits.Default.MaxNumericLiteralDigits);
             WellKnown.SetBigInt(sub, System.Numerics.BigInteger.Parse(def, CultureInfo.InvariantCulture));
         }
         else if (WellKnown.IsDecimal(mdesc))
@@ -1446,7 +1078,7 @@ public class Decoder
 
     private static Protowire.Pb.Decimal ParseDecimalLiteral(string s)
     {
-        CheckLiteralDigits(s, Position.Empty);
+        CheckLiteralDigits(s, Position.Empty, PxfLimits.Default.MaxNumericLiteralDigits);
         bool negative = s.StartsWith('-');
         if (negative) s = s[1..];
         int dot = s.IndexOf('.');
@@ -1456,7 +1088,7 @@ public class Decoder
             scale = s.Length - dot - 1;
             s = s.Remove(dot, 1);
         }
-        CheckDecimalScale(scale, Position.Empty);
+        CheckDecimalScale(scale, Position.Empty, PxfLimits.Default.MaxNumericLiteralDigits);
         if (s.Length == 0) s = "0";
         return new Protowire.Pb.Decimal(
             System.Numerics.BigInteger.Parse(s, CultureInfo.InvariantCulture), scale, negative);
@@ -1464,7 +1096,7 @@ public class Decoder
 
     private static Protowire.Pb.BigFloat ParseBigFloatLiteral(string s)
     {
-        CheckLiteralDigits(s, Position.Empty);
+        CheckLiteralDigits(s, Position.Empty, PxfLimits.Default.MaxNumericLiteralDigits);
         bool negative = s.StartsWith('-');
         if (negative) s = s[1..];
         int dot = s.IndexOf('.');
@@ -1482,14 +1114,15 @@ public class Decoder
 
     // Rejects a literal past MaxNumericLiteralDigits before it reaches a
     // big-number parser. A literal no longer than the limit needs no count.
-    private static void CheckLiteralDigits(string s, Position pos)
+    private void CheckLiteralDigits(string s, Position pos) => CheckLiteralDigits(s, pos, _limits.MaxNumericLiteralDigits);
+
+    private static void CheckLiteralDigits(string s, Position pos, int limit)
     {
-        if (s.Length <= MaxNumericLiteralDigits) return;
+        if (s.Length <= limit) return;
         int n = CountDigits(s);
-        if (n > MaxNumericLiteralDigits)
+        if (n > limit)
         {
-            throw new PxfException(pos,
-                $"numeric literal has {n} digits; MaxNumericLiteralDigits={MaxNumericLiteralDigits}");
+            throw new PxfException(pos, $"numeric literal has {n} digits; MaxNumericLiteralDigits={limit}");
         }
     }
 
@@ -1513,12 +1146,13 @@ public class Decoder
 
     // Leading zeros do not count as digits, so "0.000…1" is one digit however
     // many places it has; its scale is bounded here, as on the PB wire.
-    private static void CheckDecimalScale(int scale, Position pos)
+    private void CheckDecimalScale(int scale, Position pos) => CheckDecimalScale(scale, pos, _limits.MaxNumericLiteralDigits);
+
+    private static void CheckDecimalScale(int scale, Position pos, int limit)
     {
-        if (scale > MaxNumericLiteralDigits)
+        if (scale > limit)
         {
-            throw new PxfException(pos,
-                $"pxf.Decimal scale {scale} exceeds MaxNumericLiteralDigits={MaxNumericLiteralDigits}");
+            throw new PxfException(pos, $"pxf.Decimal scale {scale} exceeds MaxNumericLiteralDigits={limit}");
         }
     }
 
@@ -1543,37 +1177,14 @@ public class Decoder
         return normalizedMember == normalizedKey;
     }
 
-    // Skips a value the target has no member for. Iterative, so a skipped
-    // value costs no stack, but it is bounded like a decoded one: the
-    // counter starts from the depth of the enclosing body and `{` and `[`
-    // count alike (HARDENING.md § Recursion).
+    // Skips a value the target has no member for, read by the parser, so a
+    // discarded value is held to the grammar: an unterminated block or a
+    // lexical error inside it is reported. It starts from the enclosing body's
+    // depth, so the nesting limit binds it as it binds a decoded value.
     private void SkipValue()
     {
-        if (_current.Kind != TokenKind.LBRACE && _current.Kind != TokenKind.LBRACKET)
-        {
-            Advance();
-            return;
-        }
-        int open = 0;
-        do
-        {
-            switch (_current.Kind)
-            {
-                case TokenKind.LBRACE:
-                case TokenKind.LBRACKET:
-                    if (_depth + open >= MaxNestingDepth)
-                    {
-                        throw new PxfException(_current.Pos,
-                            $"nesting depth exceeds {MaxNestingDepth}");
-                    }
-                    open++;
-                    break;
-                case TokenKind.RBRACE:
-                case TokenKind.RBRACKET:
-                    open--;
-                    break;
-            }
-            Advance();
-        } while (open > 0 && _current.Kind != TokenKind.EOF);
+        var parser = new Parser(_lex, _current, _limits.MaxNestingDepth, _depth);
+        parser.ParseValueHere();
+        _current = parser.Current;
     }
 }

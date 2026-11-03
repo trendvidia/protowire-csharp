@@ -68,7 +68,9 @@ public class Encoder
         WriteIndent(level);
         _sb.Append(name).Append(" {\n");
         WriteIndent(level + 1);
-        _sb.Append("@type ").Append(typeUrl).Append('\n');
+        _sb.Append("@type = ");
+        WriteQuotedString(_sb, typeUrl);
+        _sb.Append('\n');
         EncodeMessage(unpacked, level + 1);
         WriteIndent(level);
         _sb.Append("}\n");
@@ -365,6 +367,15 @@ public class Encoder
         else if (val is ByteString bs)
         {
             _sb.Append("b\"").Append(bs.ToBase64()).Append('"');
+        }
+        else if (val is Enum e)
+        {
+            // Generated enums keep the proto name in an attribute; the CLR
+            // member name is not a PXF spelling.
+            var member = e.GetType().GetField(e.ToString());
+            var original = member?.GetCustomAttribute<OriginalNameAttribute>();
+            if (original != null) _sb.Append(original.Name);
+            else _sb.Append(Convert.ToInt32(e, System.Globalization.CultureInfo.InvariantCulture));
         }
         else
         {

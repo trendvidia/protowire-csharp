@@ -140,10 +140,24 @@ public sealed record Assignment : IEntry
     public string TrailingComment { get; init; } = string.Empty;
 }
 
+/// <summary>
+/// <c>@type = "url"</c>, the type entry of a <c>google.protobuf.Any</c> block
+/// (draft -01 "Any Blocks"). Only ever the first entry of a block.
+/// </summary>
+public sealed record TypeEntry : IEntry
+{
+    public required Position Pos { get; init; }
+    public string Url { get; init; } = string.Empty;
+    public List<Comment> LeadingComments { get; init; } = [];
+    public string TrailingComment { get; init; } = string.Empty;
+}
+
 public sealed record MapEntry : IEntry
 {
     public required Position Pos { get; init; }
     public string Key { get; init; } = string.Empty;
+    /// <summary>True when <see cref="Key"/> was written as a string literal.</summary>
+    public bool KeyQuoted { get; init; }
     public required IValue Value { get; init; }
     public List<Comment> LeadingComments { get; init; } = [];
     public string TrailingComment { get; init; } = string.Empty;
@@ -172,12 +186,16 @@ public sealed record IntVal : IValue
 {
     public required Position Pos { get; init; }
     public string Raw { get; init; } = string.Empty;
+    /// <summary>The precision suffix's digits, or empty for none.</summary>
+    public string Prec { get; init; } = string.Empty;
 }
 
 public sealed record FloatVal : IValue
 {
     public required Position Pos { get; init; }
     public string Raw { get; init; } = string.Empty;
+    /// <summary>The precision suffix's digits, or empty for none.</summary>
+    public string Prec { get; init; } = string.Empty;
 }
 
 public sealed record BoolVal : IValue

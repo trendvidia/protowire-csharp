@@ -63,6 +63,13 @@ public static class Format
                     }
                     sb.Append('\n');
                     break;
+                case TypeEntry t:
+                    WriteComments(sb, t.LeadingComments, level);
+                    WriteIndent(sb, level);
+                    sb.Append("@type = ");
+                    Encoder.WriteQuotedString(sb, t.Url);
+                    sb.Append('\n');
+                    break;
                 case MapEntry m:
                     WriteComments(sb, m.LeadingComments, level);
                     WriteIndent(sb, level);
@@ -120,9 +127,11 @@ public static class Format
                 break;
             case IntVal i:
                 sb.Append(i.Raw);
+                if (i.Prec.Length > 0) sb.Append('p').Append(i.Prec);
                 break;
             case FloatVal f:
                 sb.Append(f.Raw);
+                if (f.Prec.Length > 0) sb.Append('p').Append(f.Prec);
                 break;
             case BoolVal b:
                 sb.Append(b.Value ? "true" : "false");
