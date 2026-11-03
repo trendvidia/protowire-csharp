@@ -224,13 +224,19 @@ public class AnyReadBackTests
         new() { Payload = new Any { TypeUrl = "anyback.v1.T", Value = value.ToByteString() } };
 
     // marshal_depth_test.go:171. An Any is not refused for what its bytes
-    // hold: when a body would be too deep, the Any stays raw.
+    // hold: when a body would be too deep, the Any stays raw, at any limit.
     [Fact]
     public void AnyTooDeep_StaysRaw()
     {
         var m = TAny(DeepT(new T(), 150));
         string doc = AssertReadsBack(m);
         Assert.DoesNotContain("@type", doc);
+
+        // The body fits under a raised limit, on a reader raised to match.
+        doc = AssertReadsBack(m,
+            new Encoder { Registry = Registry, MaxNestingDepth = 200 },
+            new Decoder { Registry = Registry, Limits = PxfLimits.Default with { MaxNestingDepth = 200 } });
+        Assert.Contains("@type", doc);
     }
 
     // marshal_depth_test.go:192. An Any that sits past the limit itself has

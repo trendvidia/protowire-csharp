@@ -52,7 +52,7 @@ format changes.
 
 - **`pxf.BigFloat` is read and written as a binary floating-point value** (#47). It was stored with a decimal scale as its exponent, so a value decoded from PXF was wrong on the wire, and the encoder wrote raw fields. It now follows the spec's corpus both ways: a suffixed literal reads at its precision, an unsuffixed one at 256 bits, and `MaxBigFloatExponent` bounds the value. **A BigFloat decoded from PXF by an earlier version holds the wrong value.**
 - **A string map key is written bare exactly when it is identifier-safe** (#35, #36), dots included. `"true"`, `"null"`, `"123"` and `".e"` stay quoted, which keeps a formatted document binding to the same keys.
-- **An Any is written as a type entry and a body only when it reads back unchanged**, and otherwise as `type_url` and `value`.
+- **An Any is written as a type entry and a body only when it reads back unchanged**, and otherwise as `type_url` and `value`. Under an `Encoder.MaxNestingDepth` raised past 100, an Any whose value nests deeper than 100 is now written as a body too, as the reference writes it; it used to stay raw because protobuf's own parser stopped at 100 (#81).
 - **A Duration past the literal's 292-year range is written as a block**, and a `pxf.Secret` with metadata keeps its block form.
 - **Fractional and `µs` duration literals** (#19), such as `1.5ms` and `2µs`. Other ports write them for any measured latency. A duration now keeps every nanosecond, and a malformed one such as `5min` is rejected by the lexer.
 - **A Timestamp keeps nanoseconds**, and any RFC 3339 offset, rather than stopping at 100 ns.
