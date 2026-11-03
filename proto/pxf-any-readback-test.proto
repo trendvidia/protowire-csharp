@@ -1,0 +1,50 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 TrendVidia, LLC.
+// Schemas for AnyReadBackTests (#81): an Any is written as a body only when
+// that body reads back as the stored value. Holder through Required mirror
+// protowire-go any_body_readback_test.go; T mirrors marshal_depth_test.go.
+syntax = "proto3";
+package anyback.v1;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+import "pxf/annotations.proto";
+
+message Holder {
+  google.protobuf.Any payload = 1;
+  Holder next = 2;
+}
+
+message Leaf {
+  string tag = 1;
+  int32 n = 2;
+}
+
+message Rich {
+  google.protobuf.Timestamp ts = 1;
+  google.protobuf.Int32Value w = 2;
+  Leaf leaf = 3;
+  map<string, int32> m = 4;
+  repeated int32 r = 5;
+  optional int32 o = 6;
+  google.protobuf.Duration d = 7;
+  repeated Leaf leaves = 8;
+}
+
+message Defaulted {
+  string label = 1 [(pxf.default) = "dflt"];
+  int32 n = 2;
+}
+
+message Required {
+  int32 n = 1 [(pxf.required) = true];
+  string s = 2;
+}
+
+message T {
+  T next = 1;
+  int32 v = 6;
+  google.protobuf.Any payload = 9;
+}
