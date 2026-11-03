@@ -137,7 +137,10 @@ The script runs `buf generate proto` (pinned generator, see `buf.gen.yaml`), mov
 Built on `Google.Protobuf` reflection (`MessageDescriptor`, `IFieldAccessor`) — the descriptor-driven design means the same codec works for any compiled-in message type. A few items fall out of that or are deferred:
 
 - **`net10.0` minimum.** The build leans on C# 13 features (collection expressions, file-scoped types). Targeting `net8.0` or earlier would require backporting and is not currently planned.
-- **`Google.Protobuf` doesn't expose extension fields as readable named fields on `FieldOptions` for arbitrary `.proto` files.** The `(pxf.required)` / `(pxf.default)` reader works because the `AnnotationsExtensions` class is shipped in this repo; downstream `.proto` files that bring their own extensions need their generated `*Extensions` class on the runtime classpath.
+- **A generated class is required for descriptor-driven decoding.** `Google.Protobuf` has no dynamic message, so a schema known only at run time cannot be decoded here.
+- **Hand-written classes get less checking than generated messages.** With no descriptor, an unknown member is skipped and a value's type comes from the CLR. Use generated messages where the schema matters.
+- **No streaming `@dataset` reader** (#75). `Decoder.BindRow` works from a parsed document.
+- **No `OnSecretField` hook** (#74). A `pxf.Secret` value is stored on the message.
 - **No async API on the codec surface.** All decode / encode is synchronous in-memory. For very large PXF documents an async streaming surface would be welcome.
 - **The CLI lives in [trendvidia/protowire/cmd/protowire](https://github.com/trendvidia/protowire/tree/main/cmd/protowire), not here.** This repo ships only the library + cross-port harnesses.
 
