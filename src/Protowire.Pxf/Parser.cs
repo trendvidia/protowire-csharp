@@ -56,22 +56,15 @@ public sealed class Parser
 
     internal IValue ParseValueHere() => ParseValue();
 
-    private void Advance() => Advance(keepIllegal: false);
-
-    // keepIllegal leaves an ILLEGAL token current instead of throwing, for the
-    // token after a @dataset header or row: there protowire-go's parser
-    // reports what any token is doing beside the rows (DatasetBesideEntries)
-    // before what is wrong with it (#96).
-    private void Advance(bool keepIllegal)
+    // A token the lexer rejected becomes current like any other, and the
+    // site expecting something reports it, as protowire-go's parser does: a
+    // name position says what it wanted, a value position gives the lexer's
+    // diagnostic alone (#99).
+    private void Advance()
     {
         while (true)
         {
             _current = _lex.Next();
-            if (_current.Kind == TokenKind.ILLEGAL)
-            {
-                if (keepIllegal) return;
-                throw new PxfException(_current.Pos, _current.Value);
-            }
             if (_current.Kind == TokenKind.NEWLINE) continue;
             if (_current.Kind == TokenKind.COMMENT)
             {
@@ -143,7 +136,7 @@ public sealed class Parser
                     Advance();
                     if (_current.Kind != TokenKind.IDENT)
                     {
-                        throw new PxfException(_current.Pos, $"expected type name after @type, got {_current.Kind}");
+                        throw new PxfException(_current.Pos, $"expected type name after @type, got {TokenText.Name(_current.Kind)}");
                     }
                     typeUrl = _current.Value;
                     bodyOffset = _current.Pos.Offset + _current.Value.Length;
@@ -188,13 +181,6 @@ public sealed class Parser
             {
                 throw new PxfException(_current.Pos, DatasetBesideEntries);
             }
-        }
-
-        // Only a @dataset leaves an ILLEGAL token current, and that one was
-        // reported above; anywhere else it is the lexer's error, as before.
-        if (_current.Kind == TokenKind.ILLEGAL)
-        {
-            throw new PxfException(_current.Pos, _current.Value);
         }
 
         var entries = new List<IEntry>();
@@ -306,7 +292,7 @@ public sealed class Parser
         if (_current.Kind != TokenKind.LPAREN)
         {
             throw new PxfException(_current.Pos,
-                $"expected '(' to start @dataset column list, got {_current.Kind}");
+                $"expected '(' to start @dataset column list, got {TokenText.Name(_current.Kind)}");
         }
         Advance(); // consume (
 
@@ -315,13 +301,13 @@ public sealed class Parser
         if (_current.Kind != TokenKind.IDENT)
         {
             throw new PxfException(_current.Pos,
-                $"@dataset column list must contain at least one field name, got {_current.Kind}");
+                $"@dataset column list must contain at least one field name, got {TokenText.Name(_current.Kind)}");
         }
         for (;;)
         {
             if (_current.Kind != TokenKind.IDENT)
             {
-                throw new PxfException(_current.Pos, $"expected column field name, got {_current.Kind}");
+                throw new PxfException(_current.Pos, $"expected column field name, got {TokenText.Name(_current.Kind)}");
             }
             columns.Add(_current.Value);
             columnPositions.Add(_current.Pos);
@@ -336,11 +322,11 @@ public sealed class Parser
                 break;
             }
             throw new PxfException(_current.Pos,
-                $"expected ',' or ')' in @dataset column list, got {_current.Kind}");
+                $"expected ',' or ')' in @dataset column list, got {TokenText.Name(_current.Kind)}");
         }
         DatasetPaths.CheckHeader(columns, columnPositions);
         int endOffset = _current.Pos.Offset + 1; // past `)`
-        Advance(keepIllegal: true); // consume )
+        Advance(); // consume )
 
         var rows = new List<DatasetRow>();
         while (_current.Kind == TokenKind.LPAREN)
@@ -380,12 +366,12 @@ public sealed class Parser
         if (_current.Kind != TokenKind.RPAREN)
         {
             throw new PxfException(_current.Pos,
-                $"expected ',' or ')' in @dataset row, got {_current.Kind}");
+                $"expected ',' or ')' in @dataset row, got {TokenText.Name(_current.Kind)}");
         }
         int endOffset = _current.Pos.Offset + 1;
         if (advancePastClose)
         {
-            Advance(keepIllegal: true); // consume )
+            Advance(); // consume )
         }
 
         if (cells.Count != expected)
@@ -444,7 +430,7 @@ public sealed class Parser
                     if (_current.Kind != TokenKind.LBRACE)
                     {
                         throw new PxfException(_current.Pos,
-                            $"expected '{{' after @proto {typeName}, got {_current.Kind}");
+                            $"expected '{{' after @proto {typeName}, got {TokenText.Name(_current.Kind)}");
                     }
                     var (body, end) = CaptureBraceBody("@proto " + typeName);
                     return (new ProtoDirective
@@ -490,7 +476,7 @@ public sealed class Parser
                 }
             default:
                 throw new PxfException(_current.Pos,
-                    $"expected '{{', dotted identifier, triple-quoted string, or b\"...\" after @proto, got {_current.Kind}");
+                    $"expected '{{', dotted identifier, triple-quoted string, or b\"...\" after @proto, got {TokenText.Name(_current.Kind)}");
         }
     }
 
@@ -548,7 +534,7 @@ public sealed class Parser
 
         if (_current.Kind is not (TokenKind.IDENT or TokenKind.STRING or TokenKind.INT or TokenKind.BOOL))
         {
-            throw new PxfException(pos, $"expected identifier, string, integer, or bool, got {_current.Kind} (\"{_current.Value}\")");
+            throw new PxfException(pos, $"expected identifier, string, integer, or bool, got {TokenText.Describe(_current)}");
         }
         var keyKind = _current.Kind;
         string key = _current.Value;
@@ -610,7 +596,7 @@ public sealed class Parser
                 }
 
             default:
-                throw new PxfException(_current.Pos, $"expected '=', ':', or '{{' after \"{key}\", got {_current.Kind}");
+                throw new PxfException(_current.Pos, $"expected '=', ':', or '{{' after {TokenText.Quote(key)}, got {TokenText.Name(_current.Kind)}");
         }
     }
 
@@ -681,7 +667,10 @@ public sealed class Parser
                 return ParseBlockVal();
 
             default:
-                throw new PxfException(pos, $"expected value, got {_current.Kind} (\"{_current.Value}\")");
+                // A rejected token is its diagnostic alone: an expectation adds
+                // nothing to "invalid duration: 5seconds".
+                if (_current.Kind == TokenKind.ILLEGAL) throw new PxfException(pos, _current.Value);
+                throw new PxfException(pos, $"expected value, got {TokenText.Describe(_current)}");
         }
     }
 
@@ -708,7 +697,7 @@ public sealed class Parser
             }
             if (_current.Kind != TokenKind.RBRACKET)
             {
-                throw new PxfException(_current.Pos, $"expected ']', got {_current.Kind}");
+                throw new PxfException(_current.Pos, $"expected ']', got {TokenText.Name(_current.Kind)}");
             }
             Advance();
             return new ListVal { Pos = pos, Elements = elems };
@@ -753,7 +742,7 @@ public sealed class Parser
         }
         if (_current.Kind != TokenKind.RBRACE)
         {
-            throw new PxfException(_current.Pos, $"expected '}}', got {_current.Kind}");
+            throw new PxfException(_current.Pos, $"expected '}}', got {TokenText.Name(_current.Kind)}");
         }
         Advance();
         return entries;
@@ -767,12 +756,12 @@ public sealed class Parser
         Advance();
         if (_current.Kind != TokenKind.EQUALS)
         {
-            throw new PxfException(_current.Pos, $"expected '=' after @type, got {_current.Kind}");
+            throw new PxfException(_current.Pos, $"expected '=' after @type, got {TokenText.Describe(_current)}");
         }
         Advance();
         if (_current.Kind != TokenKind.STRING)
         {
-            throw new PxfException(_current.Pos, $"expected a string type URL after @type =, got {_current.Kind}");
+            throw new PxfException(_current.Pos, $"expected a string type URL after @type =, got {TokenText.Describe(_current)}");
         }
         string url = _current.Value;
         Advance();
@@ -793,10 +782,10 @@ public sealed class Parser
     }
 
     internal static PxfException NonNameAssignment(Position pos, TokenKind kind, string key) =>
-        new(pos, $"field assignment with '=' requires an identifier or string key, got {kind} (\"{key}\"); use ':' for map entries");
+        new(pos, $"field assignment with '=' requires an identifier or string key, got {TokenText.Name(kind)} ({TokenText.Quote(key)}); use ':' for map entries");
 
     internal static PxfException NonNameBlock(Position pos, TokenKind kind, string key) =>
-        new(pos, $"submessage block requires an identifier or string key, got {kind} (\"{key}\")");
+        new(pos, $"submessage block requires an identifier or string key, got {TokenText.Name(kind)} ({TokenText.Quote(key)})");
 
     internal static PxfException TopLevelMapEntry(Position pos) =>
         new(pos, "map entry (':' form) is only allowed inside a '{ … }' block; use '=' for top-level field assignments");

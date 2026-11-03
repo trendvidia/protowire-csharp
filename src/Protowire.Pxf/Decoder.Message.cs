@@ -68,7 +68,7 @@ public partial class Decoder
             if (_current.Kind == TokenKind.AT_TYPE) throw new PxfException(pos, TypeEntryMisplaced);
             if (_current.Kind is not (TokenKind.IDENT or TokenKind.STRING or TokenKind.INT or TokenKind.BOOL))
             {
-                throw new PxfException(pos, $"expected identifier, string, integer, or bool, got {_current.Kind} (\"{_current.Value}\")");
+                throw new PxfException(pos, $"expected identifier, string, integer, or bool, got {TokenText.Describe(_current)}");
             }
             var keyKind = _current.Kind;
             string key = _current.Value;
@@ -166,7 +166,7 @@ public partial class Decoder
                     throw new PxfException(pos, "unexpected ':' in message context, use '=' for field assignments");
 
                 default:
-                    throw new PxfException(_current.Pos, $"expected '=', ':', or '{{' after \"{key}\", got {_current.Kind}");
+                    throw new PxfException(_current.Pos, $"expected '=', ':', or '{{' after {TokenText.Quote(key)}, got {TokenText.Name(_current.Kind)}");
             }
         }
     }
@@ -213,6 +213,7 @@ public partial class Decoder
 
     private void DecodeFieldValue(IMessage msg, FieldDescriptor fd)
     {
+        if (IllegalError() is { } illegal) throw illegal;
         if (fd.IsMap)
         {
             DecodeMapField(msg, fd);
@@ -264,7 +265,7 @@ public partial class Decoder
         }
         if (_current.Kind != TokenKind.LBRACE)
         {
-            throw new PxfException(_current.Pos, $"expected {MessageValueForms(mdesc)} for message field \"{fd.Name}\", got {_current.Kind} (\"{_current.Value}\")");
+            throw new PxfException(_current.Pos, $"expected {MessageValueForms(mdesc)} for message field \"{fd.Name}\", got {TokenText.Describe(_current)}");
         }
         Advance();
         DecodeSingularBody(msg, fd);
@@ -500,19 +501,20 @@ public partial class Decoder
                         break;
                     default:
                         throw new PxfException(_current.Pos,
-                            $"expected pxf.Secret field name (value/hint/fingerprint), got {_current.Kind} (\"{_current.Value}\")");
+                            $"expected pxf.Secret field name (value/hint/fingerprint), got {TokenText.Describe(_current)}");
                 }
                 string name = _current.Value;
                 var namePos = _current.Pos;
                 Advance();
                 if (_current.Kind != TokenKind.EQUALS)
                 {
-                    throw new PxfException(_current.Pos, $"expected '=' after pxf.Secret field \"{name}\", got {_current.Kind}");
+                    throw new PxfException(_current.Pos, $"expected '=' after pxf.Secret field \"{name}\", got {TokenText.Name(_current.Kind)}");
                 }
                 Advance();
+                if (IllegalError() is { } illegal) throw illegal;
                 if (_current.Kind != TokenKind.STRING)
                 {
-                    throw new PxfException(_current.Pos, $"expected string value for pxf.Secret {name}, got {_current.Kind}");
+                    throw new PxfException(_current.Pos, $"expected string value for pxf.Secret {name}, got {TokenText.Name(_current.Kind)}");
                 }
                 FieldDescriptor? fd = name switch
                 {
@@ -727,10 +729,11 @@ public partial class Decoder
                 {
                     throw new PxfException(_current.Pos, $"null is not allowed in repeated field \"{fd.Name}\"");
                 }
+                if (IllegalError() is { } illegal) throw illegal;
                 list.Add(isMessage ? ConsumeListMessage(fd, list, keyFd) : ConsumeScalar(fd, fd));
                 if (_current.Kind == TokenKind.COMMA) Advance();
             }
-            if (_current.Kind != TokenKind.RBRACKET) throw new PxfException(_current.Pos, $"expected ']', got {_current.Kind}");
+            if (_current.Kind != TokenKind.RBRACKET) throw new PxfException(_current.Pos, $"expected ']', got {TokenText.Name(_current.Kind)}");
             Advance();
         }
         finally
@@ -746,7 +749,7 @@ public partial class Decoder
         if (TryShorthand(mdesc, fd, out var value, out _)) return value!;
         if (_current.Kind != TokenKind.LBRACE)
         {
-            throw new PxfException(_current.Pos, $"expected {MessageValueForms(mdesc)} for repeated message element, got {_current.Kind} (\"{_current.Value}\")");
+            throw new PxfException(_current.Pos, $"expected {MessageValueForms(mdesc)} for repeated message element, got {TokenText.Describe(_current)}");
         }
         Advance();
         var sub = NewMessage(mdesc);
@@ -786,7 +789,7 @@ public partial class Decoder
                 if (_current.Kind is not (TokenKind.IDENT or TokenKind.STRING))
                 {
                     throw new PxfException(_current.Pos,
-                        $"expected entry name (identifier or string) in keyed field \"{fd.Name}\", got {_current.Kind}");
+                        $"expected entry name (identifier or string) in keyed field \"{fd.Name}\", got {TokenText.Describe(_current)}");
                 }
                 var namePos = _current.Pos;
                 string name = _current.Value;
@@ -806,7 +809,7 @@ public partial class Decoder
                 else if (_current.Kind != TokenKind.LBRACE)
                 {
                     throw new PxfException(_current.Pos,
-                        $"expected '{{' or '=' after entry name \"{name}\" in keyed field \"{fd.Name}\", got {_current.Kind}");
+                        $"expected '{{' or '=' after entry name {TokenText.Quote(name)} in keyed field \"{fd.Name}\", got {TokenText.Name(_current.Kind)}");
                 }
                 Advance();
                 if (list.Count >= _limits.MaxRepeatedCount)
@@ -863,7 +866,7 @@ public partial class Decoder
                 var keyKind = _current.Kind;
                 if (keyKind is not (TokenKind.IDENT or TokenKind.STRING or TokenKind.INT or TokenKind.BOOL))
                 {
-                    throw new PxfException(pos, $"expected map key, got {keyKind} (\"{_current.Value}\")");
+                    throw new PxfException(pos, $"expected map key, got {TokenText.Describe(_current)}");
                 }
                 if (keyKind == TokenKind.INT && _lex.Prec.Length > 0)
                 {
@@ -877,7 +880,7 @@ public partial class Decoder
                 }
                 if (_current.Kind != TokenKind.COLON)
                 {
-                    throw new PxfException(_current.Pos, $"expected ':' after map key, got {_current.Kind}");
+                    throw new PxfException(_current.Pos, $"expected ':' after map key, got {TokenText.Name(_current.Kind)}");
                 }
                 Advance();
 
@@ -887,9 +890,10 @@ public partial class Decoder
                 {
                     throw new PxfException(_current.Pos, $"null is not allowed as map value in field \"{fd.Name}\"");
                 }
+                if (IllegalError() is { } illegal) throw illegal;
                 map[key] = isMessage ? ConsumeMapMessage(fd, valueFd.MessageType, key) : ConsumeScalar(valueFd, fd);
             }
-            if (_current.Kind != TokenKind.RBRACE) throw new PxfException(_current.Pos, $"expected '}}', got {_current.Kind}");
+            if (_current.Kind != TokenKind.RBRACE) throw new PxfException(_current.Pos, $"expected '}}', got {TokenText.Name(_current.Kind)}");
             Advance();
         }
         finally
@@ -904,7 +908,7 @@ public partial class Decoder
         if (TryShorthand(mdesc, fd, out var value, out _)) return value!;
         if (_current.Kind != TokenKind.LBRACE)
         {
-            throw new PxfException(_current.Pos, $"expected {MessageValueForms(mdesc)} for map message value, got {_current.Kind} (\"{_current.Value}\")");
+            throw new PxfException(_current.Pos, $"expected {MessageValueForms(mdesc)} for map message value, got {TokenText.Describe(_current)}");
         }
         Advance();
         var sub = NewMessage(mdesc);
@@ -1000,12 +1004,12 @@ public partial class Decoder
         Advance();
         if (_current.Kind != TokenKind.EQUALS)
         {
-            throw new PxfException(_current.Pos, $"expected '=' after @type, got {_current.Kind}");
+            throw new PxfException(_current.Pos, $"expected '=' after @type, got {TokenText.Describe(_current)}");
         }
         Advance();
         if (_current.Kind != TokenKind.STRING)
         {
-            throw new PxfException(_current.Pos, $"expected a string type URL after @type =, got {_current.Kind}");
+            throw new PxfException(_current.Pos, $"expected a string type URL after @type =, got {TokenText.Describe(_current)}");
         }
         string url = _current.Value;
         var urlPos = _current.Pos;
