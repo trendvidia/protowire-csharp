@@ -13,6 +13,13 @@ Copyright (c) 2026 TrendVidia, LLC.
   <ItemGroup>
     <ProjectReference Include="..\..\src\Protowire.Pxf\Protowire.Pxf.csproj" />
     <ProjectReference Include="..\..\src\Protowire.Pb\Protowire.Pb.csproj" />
+    <ProjectReference Include="..\..\src\Protowire.Sbe\Protowire.Sbe.csproj" />
+  </ItemGroup>
+
+  <!-- pb-text writes testdata/text's messages, whose schema the conformance
+       tests already generate. -->
+  <ItemGroup>
+    <Compile Include="..\..\tests\Protowire.Conformance\Generated\Text.cs" Link="Generated\Text.cs" />
   </ItemGroup>
 
 </Project>

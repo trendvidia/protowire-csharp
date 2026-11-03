@@ -108,6 +108,9 @@ managed:
     - file_option: csharp_namespace
       value: Protowire.Conformance.Schemas.SettingsAnnotated
       path: conformance/settings_annotated.proto
+    - file_option: csharp_namespace
+      value: Protowire.CheckDecode.Schemas
+      path: conformance/adversarial.proto
 plugins:
   - remote: buf.build/protocolbuffers/csharp:v29.3
     out: .generated

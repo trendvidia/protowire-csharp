@@ -257,4 +257,54 @@ public class PbTests
         var e = Assert.Throws<InvalidOperationException>(() => Pb.Unmarshal(doc, new Node()));
         Assert.Contains("nesting depth exceeds 100", e.Message);
     }
+
+    public class Packed
+    {
+        [Protowire(1)] public List<int> Values { get; set; } = new();
+        [Protowire(2)] public string Name { get; set; } = "";
+    }
+
+    // Proto3 packs a repeated scalar by default, and this decoder used to read
+    // the run's length as one element and the rest as field tags.
+    [Fact]
+    public void PackedRepeated_ReadsEveryElement()
+    {
+        var got = new Packed();
+        Pb.Unmarshal([0x0A, 0x03, 1, 2, 3], got);
+        Assert.Equal([1, 2, 3], got.Values);
+    }
+
+    [Fact]
+    public void Limit_MaxMessageSize()
+    {
+        byte[] doc = [0x12, 0x02, (byte)'h', (byte)'i'];
+        Pb.Unmarshal(doc, new Packed(), new PbLimits { MaxMessageSize = 4 });
+        var e = Assert.Throws<InvalidOperationException>(() => Pb.Unmarshal(doc, new Packed(), new PbLimits { MaxMessageSize = 3 }));
+        Assert.Contains("MaxMessageSize=3", e.Message);
+    }
+
+    [Fact]
+    public void Limit_MaxMessageSize_Default_RefusesOnePast()
+    {
+        var doc = new byte[(64 << 20) + 1];
+        var e = Assert.Throws<InvalidOperationException>(() => Pb.Unmarshal(doc, new Packed()));
+        Assert.Contains("MaxMessageSize", e.Message);
+    }
+
+    [Theory]
+    [InlineData(new byte[] { 0x0A, 0x02, 1, 2, 0x0A, 0x01, 3 })] // packed, across two runs
+    [InlineData(new byte[] { 0x08, 1, 0x08, 2, 0x08, 3 })] // unpacked
+    public void Limit_MaxRepeatedCount(byte[] doc)
+    {
+        Pb.Unmarshal(doc, new Packed(), new PbLimits { MaxRepeatedCount = 3 });
+        var e = Assert.Throws<InvalidOperationException>(() => Pb.Unmarshal(doc, new Packed(), new PbLimits { MaxRepeatedCount = 2 }));
+        Assert.Contains("MaxRepeatedCount=2", e.Message);
+    }
+
+    [Fact]
+    public void InvalidUtf8_InAString_IsRejected()
+    {
+        var e = Assert.Throws<InvalidOperationException>(() => Pb.Unmarshal([0x12, 0x01, 0xFF], new Packed()));
+        Assert.Contains("invalid UTF-8", e.Message);
+    }
 }

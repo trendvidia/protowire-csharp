@@ -19,6 +19,10 @@ public static class Pb
     // since that resets every time a fresh stream is constructed.
     private const int MaxNestingDepth = 100;
 
+    // HARDENING.md § UTF-8: a proto3 string is valid UTF-8, and the default
+    // decoder would substitute U+FFFD for what is not.
+    private static readonly System.Text.UTF8Encoding StrictUtf8 = new(false, throwOnInvalidBytes: true);
+
     private static readonly ConcurrentDictionary<Type, StructInfo> StructCache = new();
 
     /// <summary>
@@ -32,7 +36,7 @@ public static class Pb
         var info = GetStructInfo(type);
         using var stream = new MemoryStream();
         using var output = new CodedOutputStream(stream);
-        MarshalStruct(output, v, info);
+        MarshalStruct(output, v, info, 0);
         output.Flush();
         return stream.ToArray();
     }
@@ -42,12 +46,22 @@ public static class Pb
     /// </summary>
     /// <param name="data">The byte array containing the Protobuf binary-encoded data.</param>
     /// <param name="v">The object to unmarshal into.</param>
-    public static void Unmarshal(byte[] data, object v)
+    public static void Unmarshal(byte[] data, object v) => Unmarshal(data, v, PbLimits.Default);
+
+    /// <summary>Unmarshals under the given limits.</summary>
+    /// <param name="data">The byte array containing the Protobuf binary-encoded data.</param>
+    /// <param name="v">The object to unmarshal into.</param>
+    /// <param name="limits">The limits of this call.</param>
+    public static void Unmarshal(byte[] data, object v, PbLimits limits)
     {
+        if (data.Length > limits.MaxMessageSize)
+        {
+            throw new InvalidOperationException($"input of {data.Length} bytes exceeds MaxMessageSize={limits.MaxMessageSize}");
+        }
         var type = v.GetType();
         var info = GetStructInfo(type);
         var input = new CodedInputStream(data);
-        UnmarshalStruct(input, v, info, depth: 0);
+        UnmarshalStruct(input, v, info, 0, limits);
     }
 
     private static StructInfo GetStructInfo(Type type)
@@ -75,8 +89,14 @@ public static class Pb
         });
     }
 
-    private static void MarshalStruct(CodedOutputStream output, object v, StructInfo info)
+    private static void MarshalStruct(CodedOutputStream output, object v, StructInfo info, int depth)
     {
+        // A message a reader at the limit would refuse is an error here, not
+        // bytes nobody can read.
+        if (depth > MaxNestingDepth)
+        {
+            throw new InvalidOperationException($"PB nesting depth exceeds {MaxNestingDepth}");
+        }
         var setOneofs = new HashSet<string>();
         // Process in tag order to be consistent
         foreach (var field in info.Fields.OrderBy(f => f.Tag))
@@ -90,11 +110,11 @@ public static class Pb
                 setOneofs.Add(field.Oneof);
             }
 
-            MarshalField(output, (uint)field.Tag, val, field.ZigZag);
+            MarshalField(output, (uint)field.Tag, val, field.ZigZag, depth);
         }
     }
 
-    private static void MarshalField(CodedOutputStream output, uint tag, object val, bool zigzag)
+    private static void MarshalField(CodedOutputStream output, uint tag, object val, bool zigzag, int depth)
     {
         if (val is bool b)
         {
@@ -177,8 +197,8 @@ public static class Pb
             {
                 using var ms = new MemoryStream();
                 using var entryOutput = new CodedOutputStream(ms);
-                if (entry.Key != null) MarshalField(entryOutput, 1, entry.Key, zigzag);
-                if (entry.Value != null) MarshalField(entryOutput, 2, entry.Value, zigzag);
+                if (entry.Key != null) MarshalField(entryOutput, 1, entry.Key, zigzag, depth + 1);
+                if (entry.Value != null) MarshalField(entryOutput, 2, entry.Value, zigzag, depth + 1);
                 entryOutput.Flush();
                 output.WriteTag(WireFormat.MakeTag((int)tag, WireFormat.WireType.LengthDelimited));
                 output.WriteBytes(ByteString.CopyFrom(ms.ToArray()));
@@ -188,7 +208,7 @@ public static class Pb
         {
             foreach (var item in enumerable)
             {
-                if (item != null) MarshalField(output, tag, item, zigzag);
+                if (item != null) MarshalField(output, tag, item, zigzag, depth);
             }
         }
         else
@@ -197,7 +217,7 @@ public static class Pb
             var nestedInfo = GetStructInfo(val.GetType());
             using var ms = new MemoryStream();
             using var nestedOutput = new CodedOutputStream(ms);
-            MarshalStruct(nestedOutput, val, nestedInfo);
+            MarshalStruct(nestedOutput, val, nestedInfo, depth + 1);
             nestedOutput.Flush();
             output.WriteTag(WireFormat.MakeTag((int)tag, WireFormat.WireType.LengthDelimited));
             output.WriteBytes(ByteString.CopyFrom(ms.ToArray()));
@@ -224,7 +244,7 @@ public static class Pb
         return false;
     }
 
-    private static void UnmarshalStruct(CodedInputStream input, object v, StructInfo info, int depth)
+    private static void UnmarshalStruct(CodedInputStream input, object v, StructInfo info, int depth, PbLimits limits)
     {
         uint tag;
         while ((tag = input.ReadTag()) != 0)
@@ -240,7 +260,7 @@ public static class Pb
                     }
                 }
                 var currentVal = field.GetValue(v);
-                var newVal = UnmarshalField(input, tag, field.Type, currentVal, field.ZigZag, depth);
+                var newVal = UnmarshalField(input, tag, field.Type, currentVal, field.ZigZag, depth, limits);
                 field.SetValue(v, newVal);
             }
             else
@@ -250,7 +270,7 @@ public static class Pb
         }
     }
 
-    private static object? UnmarshalField(CodedInputStream input, uint tag, Type type, object? currentVal, bool zigzag, int depth)
+    private static object? UnmarshalField(CodedInputStream input, uint tag, Type type, object? currentVal, bool zigzag, int depth, PbLimits limits)
     {
         var underlyingType = Nullable.GetUnderlyingType(type) ?? type;
         if (underlyingType == typeof(bool)) return input.ReadBool();
@@ -260,12 +280,12 @@ public static class Pb
         if (underlyingType == typeof(ulong)) return input.ReadUInt64();
         if (underlyingType == typeof(float)) return input.ReadFloat();
         if (underlyingType == typeof(double)) return input.ReadDouble();
-        if (underlyingType == typeof(string)) return input.ReadString();
+        if (underlyingType == typeof(string)) return ReadStrictString(input);
         if (underlyingType == typeof(byte[])) return input.ReadBytes().ToByteArray();
         if (underlyingType == typeof(ByteString)) return input.ReadBytes();
         if (underlyingType == typeof(BigInteger)) return UnmarshalBigInt(input.ReadBytes().ToByteArray());
-        if (underlyingType == typeof(Decimal)) return UnmarshalDecimal(input.ReadBytes().ToByteArray());
-        if (underlyingType == typeof(BigFloat)) return UnmarshalBigFloat(input.ReadBytes().ToByteArray());
+        if (underlyingType == typeof(Decimal)) return UnmarshalDecimal(input.ReadBytes().ToByteArray(), limits);
+        if (underlyingType == typeof(BigFloat)) return UnmarshalBigFloat(input.ReadBytes().ToByteArray(), limits);
         if (underlyingType.IsEnum) return Enum.ToObject(underlyingType, input.ReadEnum());
 
         if (typeof(System.Collections.IDictionary).IsAssignableFrom(type))
@@ -290,31 +310,38 @@ public static class Pb
                 var enumNum = WireFormat.GetTagFieldNumber(etag);
                 // HARDENING.md § Recursion: a map entry is one descent, so a
                 // message value sits two below the map field's parent.
-                if (enumNum == 1) key = UnmarshalField(entryInput, etag, keyType, null, zigzag, depth + 1);
-                else if (enumNum == 2) val = UnmarshalField(entryInput, etag, valType, null, zigzag, depth + 1);
+                if (enumNum == 1) key = UnmarshalField(entryInput, etag, keyType, null, zigzag, depth + 1, limits);
+                else if (enumNum == 2) val = UnmarshalField(entryInput, etag, valType, null, zigzag, depth + 1, limits);
                 else entryInput.SkipLastField();
             }
             // Protobuf: a field missing from a map entry is its type's
             // default, so an entry is never dropped and a value never null.
-            map[key ?? DefaultOf(keyType)] = val ?? DefaultOf(valType);
+            key ??= DefaultOf(keyType);
+            if (map.Count >= limits.MaxRepeatedCount && !map.Contains(key))
+            {
+                throw new InvalidOperationException($"map field exceeds MaxRepeatedCount={limits.MaxRepeatedCount}");
+            }
+            map[key] = val ?? DefaultOf(valType);
             return map;
         }
 
         if (typeof(System.Collections.IList).IsAssignableFrom(type))
         {
             var itemType = type.IsArray ? type.GetElementType()! : type.GetGenericArguments()[0];
-            var item = UnmarshalField(input, tag, itemType, null, zigzag, depth);
-            if (type.IsArray)
+            // A packed field is one length-delimited run of scalars, and it
+            // is what proto3 writes by default, so a decoder must take it.
+            if (WireFormat.GetTagWireType(tag) == WireFormat.WireType.LengthDelimited && IsPackable(itemType))
             {
-                var array = (Array?)currentVal;
-                var newArray = Array.CreateInstance(itemType, (array?.Length ?? 0) + 1);
-                if (array != null) Array.Copy(array, newArray, array.Length);
-                newArray.SetValue(item, newArray.Length - 1);
-                return newArray;
+                var run = new CodedInputStream(input.ReadBytes().ToByteArray());
+                var packedTag = WireFormat.MakeTag(WireFormat.GetTagFieldNumber(tag), WireFormat.WireType.Varint);
+                object? packed = currentVal;
+                while (!run.IsAtEnd)
+                {
+                    packed = AppendItem(type, itemType, packed, UnmarshalField(run, packedTag, itemType, null, zigzag, depth, limits), limits);
+                }
+                return packed ?? Activator.CreateInstance(type);
             }
-            var list = (System.Collections.IList?)currentVal ?? (System.Collections.IList)Activator.CreateInstance(type)!;
-            list.Add(item);
-            return list;
+            return AppendItem(type, itemType, currentVal, UnmarshalField(input, tag, itemType, null, zigzag, depth, limits), limits);
         }
 
         // Nested submessage. HARDENING.md § Recursion: the depth counter
@@ -331,7 +358,7 @@ public static class Pb
         var nestedData = input.ReadBytes().ToByteArray();
         var nestedVal = Activator.CreateInstance(type)!;
         var nestedInput = new CodedInputStream(nestedData);
-        UnmarshalStruct(nestedInput, nestedVal, GetStructInfo(type), depth + 1);
+        UnmarshalStruct(nestedInput, nestedVal, GetStructInfo(type), depth + 1, limits);
         return nestedVal;
     }
 
@@ -343,6 +370,45 @@ public static class Pb
         if (type == typeof(byte[])) return Array.Empty<byte>();
         if (type == typeof(ByteString)) return ByteString.Empty;
         return Activator.CreateInstance(type)!;
+    }
+
+    private static bool IsPackable(Type itemType)
+    {
+        var t = Nullable.GetUnderlyingType(itemType) ?? itemType;
+        return t.IsPrimitive || t.IsEnum;
+    }
+
+    private static object AppendItem(Type type, Type itemType, object? current, object? item, PbLimits limits)
+    {
+        int count = (current as System.Collections.ICollection)?.Count ?? 0;
+        if (count >= limits.MaxRepeatedCount)
+        {
+            throw new InvalidOperationException($"repeated field exceeds MaxRepeatedCount={limits.MaxRepeatedCount}");
+        }
+        if (type.IsArray)
+        {
+            var array = (Array?)current;
+            var newArray = Array.CreateInstance(itemType, (array?.Length ?? 0) + 1);
+            if (array != null) Array.Copy(array, newArray, array.Length);
+            newArray.SetValue(item, newArray.Length - 1);
+            return newArray;
+        }
+        var list = (System.Collections.IList?)current ?? (System.Collections.IList)Activator.CreateInstance(type)!;
+        list.Add(item);
+        return list;
+    }
+
+    private static string ReadStrictString(CodedInputStream input)
+    {
+        var bytes = input.ReadBytes();
+        try
+        {
+            return StrictUtf8.GetString(bytes.Span);
+        }
+        catch (System.Text.DecoderFallbackException)
+        {
+            throw new InvalidOperationException("invalid UTF-8 in string field");
+        }
     }
 
     private static BigInteger UnmarshalBigInt(byte[] data)
@@ -392,6 +458,11 @@ public static class Pb
 
     private static byte[] MarshalDecimal(Decimal dec)
     {
+        int limit = PbLimits.Default.MaxNumericLiteralDigits;
+        if (dec.Scale > limit || dec.Scale < -limit)
+        {
+            throw new InvalidOperationException($"pxf.Decimal scale {dec.Scale} exceeds MaxNumericLiteralDigits={limit}");
+        }
         using var ms = new MemoryStream();
         using var output = new CodedOutputStream(ms);
         var bytes = MagnitudeBytes(dec.Unscaled);
@@ -414,7 +485,7 @@ public static class Pb
         return ms.ToArray();
     }
 
-    private static Decimal UnmarshalDecimal(byte[] data)
+    private static Decimal UnmarshalDecimal(byte[] data, PbLimits limits)
     {
         var input = new CodedInputStream(data);
         var dec = new Decimal();
@@ -428,6 +499,12 @@ public static class Pb
                 case 3: dec.Negative = input.ReadBool(); break;
                 default: input.SkipLastField(); break;
             }
+        }
+        // Rendering costs work proportional to the scale, four bytes whoever
+        // wrote them chose, so it is bounded on both signs.
+        if (dec.Scale > limits.MaxNumericLiteralDigits || dec.Scale < -limits.MaxNumericLiteralDigits)
+        {
+            throw new InvalidOperationException($"pxf.Decimal scale {dec.Scale} exceeds MaxNumericLiteralDigits={limits.MaxNumericLiteralDigits}");
         }
         return dec;
     }
@@ -462,7 +539,7 @@ public static class Pb
         return ms.ToArray();
     }
 
-    private static BigFloat UnmarshalBigFloat(byte[] data)
+    private static BigFloat UnmarshalBigFloat(byte[] data, PbLimits limits)
     {
         var input = new CodedInputStream(data);
         var bf = new BigFloat();
@@ -476,6 +553,16 @@ public static class Pb
                 case 3: bf.Precision = input.ReadUInt32(); break;
                 case 4: bf.Negative = input.ReadBool(); break;
                 default: input.SkipLastField(); break;
+            }
+        }
+        // The value's binary exponent, not the wire field, which shifts with
+        // the precision a producer chose. A zero has none.
+        if (!bf.Mantissa.IsZero)
+        {
+            long binary = bf.Exponent + (long)bf.Mantissa.GetBitLength();
+            if (Math.Abs(binary) > limits.MaxBigFloatExponent)
+            {
+                throw new InvalidOperationException($"pxf.BigFloat binary exponent {binary} exceeds MaxBigFloatExponent={limits.MaxBigFloatExponent}");
             }
         }
         return bf;

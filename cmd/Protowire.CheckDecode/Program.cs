@@ -8,34 +8,49 @@
 //
 // Contract:
 //
-//     check-decode --format <pxf|pb|sbe|envelope> \
+//     check-decode --format <pxf|pb|pb-render|pb-text|sbe|envelope> \
 //                  --schema <fully.qualified.MessageType> \
 //                  --proto  <path-to-adversarial.proto> \
-//                  --input  <path>
+//                  --input  <path> \
+//                  [--limit NAME=VALUE ...]
 //
 //     Exit 0 -> input was accepted (decode succeeded)
 //     Exit 1 -> input was rejected (clean error, "reject: <msg>" to stderr)
 //     Other  -> bug in the decoder (uncaught exception, OOM, ...)
 //
-// Mirrors `protowire-go/scripts/check_decode/main.go` and
-// `protowire-rust/crates/check-decode/src/main.rs`.
+// Mirrors `protowire-go/scripts/check_decode/main.go`.
 //
-// The C# port's PXF and PB decoders consume hand-written POCOs annotated
-// with `[Protowire(N)]`, so the adversarial schemas are mirrored as
-// POCOs below. Drift between this file and adversarial.proto must be caught
-// by the conformance run itself: a wrong field number flips the manifest's
-// accept/reject expectations.
+// This is a codegen port, so --proto is not read: --schema names a message of
+// proto/conformance/adversarial.proto, a byte copy of the corpus's schema,
+// whose generated class the PXF, pb-render and SBE paths use. pb-text does the
+// same with text.proto. The PB codec consumes hand-written classes annotated
+// with `[Protowire(N)]`, so the PB path has the mirrors below. Drift between
+// them and the schema is caught by the corpus: a wrong field number flips an
+// accept or reject expectation.
+//
+// A rejection that is not one of this port's exceptions is exit 2. That is the
+// contract's "bug in the decoder", and it is why a format this harness does not
+// run cannot pass as a clean rejection.
 
+using Google.Protobuf;
+using Google.Protobuf.Reflection;
+using Protowire.CheckDecode.Schemas;
+using Protowire.Conformance.Schemas.Text;
 using Protowire.Pb;
 using Protowire.Pxf;
+using Protowire.Sbe;
 
 return CheckDecode.Run(args);
 
 internal static class CheckDecode
 {
+    private static readonly MessageDescriptor[] Adversarial =
+        AdversarialReflection.Descriptor.MessageTypes.ToArray();
+
     public static int Run(string[] args)
     {
-        string? format = null, schema = null, proto = null, input = null;
+        string? format = null, schema = null, input = null;
+        var limits = new Dictionary<string, int>();
         for (int i = 0; i < args.Length; i++)
         {
             string key = args[i];
@@ -44,8 +59,16 @@ internal static class CheckDecode
             {
                 case "--format": format = val; i++; break;
                 case "--schema": schema = val; i++; break;
-                case "--proto": proto = val; i++; break;
+                case "--proto": i++; break;
                 case "--input": input = val; i++; break;
+                case "--limit":
+                    i++;
+                    if (!TryLimit(val, limits))
+                    {
+                        Console.Error.WriteLine($"check-decode: bad --limit {val}");
+                        return 2;
+                    }
+                    break;
                 default:
                     Console.Error.WriteLine($"check-decode: unknown arg {key}");
                     return 2;
@@ -54,59 +77,120 @@ internal static class CheckDecode
 
         if (string.IsNullOrEmpty(format) || string.IsNullOrEmpty(schema) || string.IsNullOrEmpty(input))
         {
-            Console.Error.WriteLine("usage: check-decode --format ... --schema ... --input ... [--proto ...]");
+            Console.Error.WriteLine("usage: check-decode --format ... --schema ... --input ... [--proto ...] [--limit NAME=VALUE]");
             return 2;
         }
 
         try
         {
-            DoRun(format!, schema!, proto, input!);
+            DoRun(format!, schema!, input!, limits);
             return 0;
         }
-        catch (Exception e)
+        catch (Exception e) when (IsRejection(e))
         {
-            // Any thrown exception from the decoder paths below counts as a clean
-            // rejection. The orchestrator distinguishes rc=1 (reject) from other
-            // non-zero exit codes (decoder bug); the .NET runtime would normally
-            // surface an uncaught exception with rc != 1, so we catch broadly
-            // here and re-classify.
             Console.Error.WriteLine($"reject: {e.Message}");
             return 1;
         }
     }
 
-    private static void DoRun(string format, string schema, string? proto, string input)
+    // The exception types a decode rejects with. SBE's are plain Exception.
+    private static bool IsRejection(Exception e) =>
+        e is PxfException or InvalidProtocolBufferException or InvalidOperationException
+            or FormatException or System.Text.DecoderFallbackException
+        || e.GetType() == typeof(Exception);
+
+    private static bool TryLimit(string? spec, Dictionary<string, int> limits)
+    {
+        var parts = spec?.Split('=', 2);
+        if (parts is not { Length: 2 } || !int.TryParse(parts[1], out int n) || n <= 0) return false;
+        if (parts[0] is not ("MaxMessageSize" or "MaxNestingDepth" or "MaxNumericLiteralDigits"
+            or "MaxBytesLiteralLength" or "MaxRepeatedCount" or "MaxBigFloatExponent"))
+        {
+            return false;
+        }
+        limits[parts[0]] = n;
+        return true;
+    }
+
+    private static void DoRun(string format, string schema, string input, Dictionary<string, int> limits)
     {
         switch (format)
         {
             case "pxf":
-                PxfDecode(input, schema);
+                PxfDecode(input, schema, limits);
                 return;
             case "pb":
-                PbDecode(input, schema);
+                PbDecode(input, schema, limits);
+                return;
+            case "pb-render":
+                new Encoder().Marshal(Generated(schema).Parser.ParseFrom(File.ReadAllBytes(input)));
+                return;
+            case "pb-text":
+                PbText(input, schema);
+                return;
+            case "sbe":
+                SbeDecode(input, schema, limits);
                 return;
             case "envelope":
                 throw new NotSupportedException("envelope decode not yet implemented in this reference");
-            case "sbe":
-                throw new NotSupportedException("sbe decode not yet implemented in this reference");
             default:
                 throw new ArgumentException($"unsupported format: {format}");
         }
     }
 
-    private static void PxfDecode(string input, string schema)
+    private static MessageDescriptor Generated(string schema) =>
+        Adversarial.FirstOrDefault(m => m.FullName == schema)
+        ?? throw new ArgumentException($"unknown schema: {schema}");
+
+    private static void PxfDecode(string input, string schema, Dictionary<string, int> limits)
     {
-        string text = File.ReadAllText(input);
-        var msg = NewMessage(schema);
-        var dec = new Decoder();
-        dec.Unmarshal(text, msg);
+        var defaults = PxfLimits.Default;
+        var decoder = new Decoder
+        {
+            Limits = defaults with
+            {
+                MaxMessageSize = limits.GetValueOrDefault("MaxMessageSize", defaults.MaxMessageSize),
+                MaxNestingDepth = limits.GetValueOrDefault("MaxNestingDepth", defaults.MaxNestingDepth),
+                MaxNumericLiteralDigits = limits.GetValueOrDefault("MaxNumericLiteralDigits", defaults.MaxNumericLiteralDigits),
+                MaxBytesLiteralLength = limits.GetValueOrDefault("MaxBytesLiteralLength", defaults.MaxBytesLiteralLength),
+                MaxRepeatedCount = limits.GetValueOrDefault("MaxRepeatedCount", defaults.MaxRepeatedCount),
+                MaxBigFloatExponent = limits.GetValueOrDefault("MaxBigFloatExponent", defaults.MaxBigFloatExponent),
+            },
+        };
+        decoder.Unmarshal(File.ReadAllText(input), Generated(schema).Parser.ParseFrom(ByteString.Empty));
     }
 
-    private static void PbDecode(string input, string schema)
+    private static void PbDecode(string input, string schema, Dictionary<string, int> limits)
     {
-        byte[] bytes = File.ReadAllBytes(input);
-        var msg = NewMessage(schema);
-        Protowire.Pb.Pb.Unmarshal(bytes, msg);
+        var defaults = PbLimits.Default;
+        Protowire.Pb.Pb.Unmarshal(File.ReadAllBytes(input), NewMessage(schema), defaults with
+        {
+            MaxMessageSize = limits.GetValueOrDefault("MaxMessageSize", defaults.MaxMessageSize),
+            MaxNumericLiteralDigits = limits.GetValueOrDefault("MaxNumericLiteralDigits", defaults.MaxNumericLiteralDigits),
+            MaxRepeatedCount = limits.GetValueOrDefault("MaxRepeatedCount", defaults.MaxRepeatedCount),
+            MaxBigFloatExponent = limits.GetValueOrDefault("MaxBigFloatExponent", defaults.MaxBigFloatExponent),
+        });
+    }
+
+    private static void PbText(string input, string schema)
+    {
+        var desc = TextReflection.Descriptor.MessageTypes.FirstOrDefault(m => m.FullName == schema)
+            ?? throw new ArgumentException($"unknown schema: {schema}");
+        // Bytes rather than text: the gate compares them, and Console would
+        // translate the line ends on Windows.
+        var text = new Encoder().Marshal(desc.Parser.ParseFrom(File.ReadAllBytes(input)));
+        using var stdout = Console.OpenStandardOutput();
+        stdout.Write(new System.Text.UTF8Encoding(false).GetBytes(text));
+    }
+
+    private static void SbeDecode(string input, string schema, Dictionary<string, int> limits)
+    {
+        var codec = new Codec(AdversarialReflection.Descriptor)
+        {
+            MaxMessageSize = limits.GetValueOrDefault("MaxMessageSize", 64 << 20),
+            MaxRepeatedCount = limits.GetValueOrDefault("MaxRepeatedCount", 64 << 20),
+        };
+        codec.Unmarshal(File.ReadAllBytes(input), Generated(schema).Parser.ParseFrom(ByteString.Empty));
     }
 
     private static object NewMessage(string schema) => schema switch
@@ -116,14 +200,13 @@ internal static class CheckDecode
         "adversarial.v1.BytesHolder" => new BytesHolder(),
         "adversarial.v1.BigIntHolder" => new BigIntHolder(),
         "adversarial.v1.BigNumHolder" => new BigNumHolder(),
+        "adversarial.v1.ListHolder" => new ListHolder(),
         _ => throw new ArgumentException($"unknown schema: {schema}"),
     };
 }
 
 // Hand-mirrored from protowire/testdata/adversarial/adversarial.proto.
-// The C# Pxf decoder matches PXF keys to property names case-insensitively
-// (ignoring underscores), and the C# Pb decoder reads `[Protowire(N)]`
-// attributes for field numbers.
+// The C# Pb decoder reads `[Protowire(N)]` attributes for field numbers.
 
 internal sealed class Tree
 {
@@ -154,4 +237,9 @@ internal sealed class BigNumHolder
     [Protowire(1)] public System.Numerics.BigInteger BigInt { get; set; }
     [Protowire(2)] public Protowire.Pb.Decimal? Decimal { get; set; }
     [Protowire(3)] public Protowire.Pb.BigFloat? BigFloat { get; set; }
+}
+
+internal sealed class ListHolder
+{
+    [Protowire(1)] public List<int> Values { get; set; } = new();
 }

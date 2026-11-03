@@ -1,0 +1,100 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 TrendVidia, LLC.
+
+// Schema for the HARDENING.md conformance corpus under testdata/adversarial/.
+//
+// Every corpus file decodes against one of the message types defined here.
+// Each port's check-decode binary statically links the descriptors for these
+// types — they are stable for the lifetime of the corpus. Adding new fields
+// or new message types is a backwards-compatible change; renaming or
+// renumbering existing fields breaks every previously-recorded corpus
+// verdict and requires regenerating the corpus.
+//
+// See docs/HARDENING.md and scripts/cross_security_check.sh.
+
+syntax = "proto3";
+package adversarial.v1;
+
+option java_package = "adversarial.v1";
+option java_multiple_files = true;
+
+import "sbe/annotations.proto";
+import "pxf/bignum.proto";
+
+// Schema-level SBE options. Required so the SBE-targeted message(s) in
+// this file can be registered by per-port SBE codecs. The schema_id is a
+// fixed, arbitrary value — corpus inputs hard-code the matching value in
+// the wire header.
+option (sbe.schema_id) = 9001;
+option (sbe.version) = 0;
+
+// Tree is self-recursive — used to construct deeply-nested PXF text and
+// PB binary inputs that exercise the decoder's MaxNestingDepth cap.
+message Tree {
+  Tree child = 1;
+  string label = 2;
+  // children alternates a list with a block, so a document can descend
+  // through both kinds of PXF nesting (issue #301).
+  repeated Tree children = 3;
+  // branches and tags descend through a map, with a message value and a
+  // scalar value: a map's `{` and every PB map entry are descents whatever
+  // the value's type (issue #449).
+  map<string, Tree> branches = 4;
+  map<string, string> tags = 5;
+}
+
+// StringHolder isolates a single proto3 `string` field for the UTF-8
+// conformance tests (invalid byte sequences, lone surrogates, etc.).
+message StringHolder {
+  string value = 1;
+}
+
+// BytesHolder isolates a single `bytes` field. Used for PXF base64
+// literal-length caps (the `bytes` field is the only place arbitrary
+// non-UTF-8 bytes are legal).
+message BytesHolder {
+  bytes value = 1;
+}
+
+// BigIntHolder is a bare int64 holder — corpus inputs target the lexer's
+// numeric-literal digit cap, so the field type doesn't need to be a
+// well-known BigInt; rejection happens before the parser dispatches.
+message BigIntHolder {
+  int64 value = 1;
+}
+
+// BigNumHolder carries the arbitrary-precision types, so the digit cap can be
+// proved on a field that only the cap rejects (an int64 rejects a long
+// literal as out of range, whatever the cap), and Decimal.scale can be bound
+// on the PB wire (issue #279).
+message BigNumHolder {
+  pxf.BigInt big_int = 1;
+  pxf.Decimal decimal = 2;
+  pxf.BigFloat big_float = 3;
+}
+
+// ListHolder carries the repeated field the MaxRepeatedCount fixtures bound
+// (HARDENING.md § Mandatory limits, issue #299).
+message ListHolder {
+  repeated int32 values = 1;
+}
+
+// SbeWithGroup backs the SBE adversarial inputs. Wire layout per port's
+// SBE codec:
+//   header(8) + root_block(4) + group_header(4) + count*entry_block(4)
+//   header        : block_length(2) | template_id(2) | schema_id(2) | version(2)
+//   root_block    : root_value (uint32 LE, offset 0, size 4)
+//   group_header  : entry_block_length(2) | count(2)
+//   entry_block   : entry_value (uint32 LE, offset 0, size 4)
+//
+// Every adversarial input below targets one of the wire-header fields and
+// expects the decoder to reject before allocating writer state proportional
+// to attacker-supplied counts. See HARDENING.md § SBE.
+message SbeWithGroup {
+  option (sbe.template_id) = 9001;
+  uint32 root_value = 1;
+  message Entry {
+    uint32 entry_value = 1;
+  }
+  repeated Entry entries = 2;
+}
