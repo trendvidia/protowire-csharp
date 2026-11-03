@@ -137,11 +137,9 @@ internal static class Retired
                 Check(e.FullName, "EnumOptions", e.GetOptions(), CarrierOnly);
                 // An enum value is scoped beside its enum, not inside it, as
                 // the reference names it.
-                string scope = e.ContainingType?.FullName ?? e.File.Package;
                 foreach (var v in e.Values)
                 {
-                    string name = scope.Length == 0 ? v.Name : scope + "." + v.Name;
-                    Check(name, "EnumValueOptions", v.GetOptions(), CarrierOnly);
+                    Check(Schema.EnumValueName(v), "EnumValueOptions", v.GetOptions(), CarrierOnly);
                 }
             }
         }
@@ -168,8 +166,7 @@ internal static class Retired
                         $"the descriptor predates the registered extension block and must be recompiled against the current {r.File}";
                     found.Add(new Violation(file.Name, element, detail, num.ToString(System.Globalization.CultureInfo.InvariantCulture))
                     {
-                        Subject = "",
-                        Message = detail + " (STABILITY.md promise 3)",
+                        Text = $"\"{element}\": {detail} (STABILITY.md promise 3)",
                     });
                 }
             }
