@@ -11,13 +11,18 @@ namespace Protowire.Pxf;
 /// is the .proto declaring the element, <paramref name="Element"/> its
 /// fully-qualified name, <paramref name="Detail"/> what is wrong, and
 /// <paramref name="Name"/> the annotation value when the rule has one (the
-/// <c>(pxf.key)</c> value; null for the required-and-default rule).
+/// <c>(pxf.key)</c> value; null for the required-and-default rule). For an
+/// option at a retired extension number (STABILITY.md promise 3) the element is
+/// any annotated one, the file itself included, and the name is the number.
 /// </summary>
 public sealed record Violation(string File, string Element, string Detail, string? Name = null)
 {
     internal string Message { get; init; } = Detail;
 
-    public override string ToString() => $"{File}: field \"{Element}\": {Message}";
+    // What the element is called before its quoted name, with its trailing space.
+    internal string Subject { get; init; } = "field ";
+
+    public override string ToString() => $"{File}: {Subject}\"{Element}\": {Message}";
 }
 
 /// <summary>
@@ -71,7 +76,10 @@ public static class Schema
     /// is checked once, however many import paths reach it, and a violation
     /// names the file that declares it. Checks the reserved names, the shape of
     /// a well-known type, and the placement of <c>(pxf.key)</c>,
-    /// <c>(pxf.required)</c> and <c>(pxf.default)</c>, in either spelling.
+    /// <c>(pxf.required)</c> and <c>(pxf.default)</c>, in either spelling; and,
+    /// in a file importing protowire's annotations, an option at an extension
+    /// number retired in v1.12.0 (STABILITY.md promise 3), which means the
+    /// descriptor must be recompiled.
     /// </summary>
     public static IReadOnlyList<Violation> ValidateFile(FileDescriptor file) =>
         ClosureCache.GetValue(file, static f =>
@@ -120,6 +128,7 @@ public static class Schema
         if (!seen.Add(file.Name)) return;
         WalkMessages(file.Name, file.MessageTypes, found);
         WalkEnums(file.Name, file.EnumTypes, found);
+        Retired.Walk(file, found);
         foreach (var dep in file.Dependencies)
         {
             WalkFile(dep, seen, found);
