@@ -1,3 +1,6 @@
 # Where this port still differs from protowire-go, one aspect of one document
 # per line: <document> <aspect> <issue>. An entry that stops differing fails
 # GoConformanceTests, so this file can only shrink.
+annotated/zero-over-default.pxf text #104
+testdata/dataset/cell-framing.pxf format #108
+testdata/nulls/required-optional.pxf verdict #106

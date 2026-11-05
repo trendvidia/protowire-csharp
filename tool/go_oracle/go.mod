@@ -4,7 +4,7 @@ go 1.26.2
 
 require (
 	github.com/trendvidia/protocompile v0.38.1
-	github.com/trendvidia/protowire-go v1.15.1-0.20261102233304-f8a01b181437
+	github.com/trendvidia/protowire-go v1.16.1
 	google.golang.org/protobuf v1.36.12
 )
 
