@@ -26,19 +26,151 @@ namespace Protowire.Pxf;
 public static class Format
 {
     /// <summary>Pretty-prints a parsed <see cref="Document"/>, preserving comments.</summary>
+    /// <remarks>
+    /// It keeps every directive, with its dataset rows, in document order
+    /// (trendvidia/protowire#558). <c>@type</c> is written first: it binds no
+    /// anonymous <c>@proto</c>, so moving it changes nothing. The other
+    /// directives follow in source order, each after its comments: a named
+    /// directive's body and a <c>@proto</c> body as written, and a dataset as
+    /// its header and then one row per line, an absent cell left empty. A
+    /// document whose only directive is <c>@type</c> formats as it always has.
+    /// </remarks>
     public static string FormatDocument(Document doc)
     {
         var sb = new StringBuilder();
 
-        if (!string.IsNullOrEmpty(doc.TypeURL))
+        var others = TopDirectives(doc);
+        if (others.Count == 0)
         {
-            sb.Append("@type ").Append(doc.TypeURL).Append("\n\n");
+            if (!string.IsNullOrEmpty(doc.TypeURL))
+            {
+                sb.Append("@type ").Append(doc.TypeURL).Append("\n\n");
+            }
+
+            WriteComments(sb, doc.LeadingComments, level: 0);
+            FormatEntries(sb, doc.Entries, level: 0);
+
+            return sb.ToString();
         }
 
+        if (!string.IsNullOrEmpty(doc.TypeURL))
+        {
+            sb.Append("@type ").Append(doc.TypeURL).Append('\n');
+        }
         WriteComments(sb, doc.LeadingComments, level: 0);
-        FormatEntries(sb, doc.Entries, level: 0);
+        foreach (var d in others)
+        {
+            switch (d)
+            {
+                case Directive nd:
+                    WriteComments(sb, nd.LeadingComments, level: 0);
+                    FormatNamedDirective(sb, nd);
+                    break;
+                case DatasetDirective ds:
+                    WriteComments(sb, ds.LeadingComments, level: 0);
+                    FormatDataset(sb, ds);
+                    break;
+                case ProtoDirective pd:
+                    WriteComments(sb, pd.LeadingComments, level: 0);
+                    FormatProto(sb, pd);
+                    break;
+            }
+        }
+        if (doc.Entries.Count > 0)
+        {
+            sb.Append('\n');
+            FormatEntries(sb, doc.Entries, level: 0);
+        }
 
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// The document's directives other than <c>@type</c>, which the
+    /// <see cref="Document"/> keeps in three lists, merged back into source
+    /// order: an anonymous <c>@proto</c> binds the typed directive after it,
+    /// so the order is part of the meaning. Each element is a
+    /// <see cref="Directive"/>, <see cref="DatasetDirective"/> or
+    /// <see cref="ProtoDirective"/>.
+    /// </summary>
+    private static List<object> TopDirectives(Document doc)
+    {
+        var all = new List<(int Offset, object D)>(
+            doc.Directives.Count + doc.Datasets.Count + doc.Protos.Count);
+        foreach (var d in doc.Directives) all.Add((d.Pos.Offset, d));
+        foreach (var d in doc.Datasets) all.Add((d.Pos.Offset, d));
+        foreach (var d in doc.Protos) all.Add((d.Pos.Offset, d));
+        // OrderBy is a stable sort, as Go's slices.SortStableFunc is.
+        return all.OrderBy(a => a.Offset).Select(a => a.D).ToList();
+    }
+
+    /// <summary>
+    /// Writes <c>@&lt;name&gt; prefix* [{body}]</c>, the body as it was written:
+    /// it is raw text, which the directive's consumer decodes.
+    /// </summary>
+    private static void FormatNamedDirective(StringBuilder sb, Directive d)
+    {
+        sb.Append('@').Append(d.Name);
+        foreach (var p in d.Prefixes)
+        {
+            sb.Append(' ').Append(p);
+        }
+        if (d.HasBody)
+        {
+            sb.Append(" {").Append(Encoding.UTF8.GetString(d.Body)).Append('}');
+        }
+        sb.Append('\n');
+    }
+
+    /// <summary>
+    /// Writes the header, then one row per line. A null cell is an absent
+    /// field and is left empty; <c>null</c> (a <see cref="NullVal"/>) is written.
+    /// </summary>
+    private static void FormatDataset(StringBuilder sb, DatasetDirective d)
+    {
+        sb.Append("@dataset");
+        if (!string.IsNullOrEmpty(d.Type))
+        {
+            sb.Append(' ').Append(d.Type);
+        }
+        sb.Append(" (").Append(string.Join(", ", d.Columns)).Append(")\n");
+        foreach (var row in d.Rows)
+        {
+            sb.Append('(');
+            for (int i = 0; i < row.Cells.Count; i++)
+            {
+                if (i > 0) sb.Append(", ");
+                var cell = row.Cells[i];
+                if (cell is not null)
+                {
+                    FormatValue(sb, cell, 0);
+                }
+            }
+            sb.Append(")\n");
+        }
+    }
+
+    /// <summary>Writes a <c>@proto</c> directive in the shape it was read in.</summary>
+    private static void FormatProto(StringBuilder sb, ProtoDirective d)
+    {
+        sb.Append("@proto");
+        switch (d.Shape)
+        {
+            case ProtoShape.Anonymous:
+                sb.Append(" {").Append(Encoding.UTF8.GetString(d.Body)).Append('}');
+                break;
+            case ProtoShape.Named:
+                sb.Append(' ').Append(d.TypeName)
+                    .Append(" {").Append(Encoding.UTF8.GetString(d.Body)).Append('}');
+                break;
+            case ProtoShape.Source:
+                sb.Append(" \"\"\"").Append(Encoding.UTF8.GetString(d.Body)).Append("\"\"\"");
+                break;
+            case ProtoShape.Descriptor:
+                sb.Append(" b\"").Append(Convert.ToBase64String(d.Body)).Append('"');
+                break;
+        }
+        sb.Append('\n');
     }
 
     /// <summary>

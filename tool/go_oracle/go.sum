@@ -18,8 +18,8 @@ github.com/trendvidia/protocompile v0.38.1 h1:re1MMH6toErAPYXKYOE9atomZOQLUPeeew
 github.com/trendvidia/protocompile v0.38.1/go.mod h1:WbN5LRddJxOCdAC9pi2yI5djQ1E6g2uTli/9DwrjZ6Y=
 github.com/trendvidia/protos v0.1.4 h1:uKa2KUCKDFmAHT0iIuypwoUv+k7dM/u1d1zUWPV00kA=
 github.com/trendvidia/protos v0.1.4/go.mod h1:NPP4w6dOu7BkD8psH0cWJamHHiEpi8QfgP88vKkMXUI=
-github.com/trendvidia/protowire-go v1.15.1-0.20261102233304-f8a01b181437 h1:NWAVkPskpkwnve4HnQX6j431WJyftFSE+CVoJk5RUjw=
-github.com/trendvidia/protowire-go v1.15.1-0.20261102233304-f8a01b181437/go.mod h1:55QaDXgzv0Q6jq9pTzzyTuwEF88bWDkf0TU8XwGYS7k=
+github.com/trendvidia/protowire-go v1.16.1 h1:xFNNmOKLOAgzTfrFhsaw0ThN32oqW0+aLSPR5iZ3a4o=
+github.com/trendvidia/protowire-go v1.16.1/go.mod h1:55QaDXgzv0Q6jq9pTzzyTuwEF88bWDkf0TU8XwGYS7k=
 go.yaml.in/yaml/v3 v3.0.5 h1:N6y/pJk8buWs9NY5ERU2HSMfm+IuD/OtfdAnq6kESPw=
 go.yaml.in/yaml/v3 v3.0.5/go.mod h1:HVTZu1O7/Vkt2N+BFy8Zza+lnLsABggaTM2ZpNIGuKg=
 golang.org/x/exp v0.0.0-20250911091902-df9299821621 h1:2id6c1/gto0kaHYyrixvknJ8tUK/Qs5IsmBtrc+FtgU=
