@@ -1,0 +1,2920 @@
+[
+  {
+    "input": "0801",
+    "accept": true
+  },
+  {
+    "input": "0880",
+    "accept": false,
+    "error": "corrupt field 1: unexpected EOF"
+  },
+  {
+    "input": "090100000000000000",
+    "accept": true
+  },
+  {
+    "input": "09010000",
+    "accept": false,
+    "error": "corrupt field 1: unexpected EOF"
+  },
+  {
+    "input": "0a00",
+    "accept": true
+  },
+  {
+    "input": "0a0101",
+    "accept": true,
+    "known": "0a0101"
+  },
+  {
+    "input": "0a01",
+    "accept": false,
+    "error": "field S: corrupt string"
+  },
+  {
+    "input": "0b0c",
+    "accept": true
+  },
+  {
+    "input": "0b",
+    "accept": false,
+    "error": "corrupt field 1: unexpected EOF"
+  },
+  {
+    "input": "0c",
+    "accept": false,
+    "error": "corrupt field 1: proto: mismatching end group marker"
+  },
+  {
+    "input": "0d01000000",
+    "accept": true
+  },
+  {
+    "input": "0d0100",
+    "accept": false,
+    "error": "corrupt field 1: unexpected EOF"
+  },
+  {
+    "input": "0e01",
+    "accept": false,
+    "error": "corrupt field 1: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "0f01",
+    "accept": false,
+    "error": "corrupt field 1: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "1001",
+    "accept": true,
+    "known": "1001"
+  },
+  {
+    "input": "1080",
+    "accept": false,
+    "error": "field I64: corrupt int"
+  },
+  {
+    "input": "110100000000000000",
+    "accept": true
+  },
+  {
+    "input": "11010000",
+    "accept": false,
+    "error": "corrupt field 2: unexpected EOF"
+  },
+  {
+    "input": "1200",
+    "accept": true
+  },
+  {
+    "input": "120101",
+    "accept": true
+  },
+  {
+    "input": "1201",
+    "accept": false,
+    "error": "corrupt field 2: unexpected EOF"
+  },
+  {
+    "input": "1314",
+    "accept": true
+  },
+  {
+    "input": "13",
+    "accept": false,
+    "error": "corrupt field 2: unexpected EOF"
+  },
+  {
+    "input": "14",
+    "accept": false,
+    "error": "corrupt field 2: proto: mismatching end group marker"
+  },
+  {
+    "input": "1501000000",
+    "accept": true
+  },
+  {
+    "input": "150100",
+    "accept": false,
+    "error": "corrupt field 2: unexpected EOF"
+  },
+  {
+    "input": "1601",
+    "accept": false,
+    "error": "corrupt field 2: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "1701",
+    "accept": false,
+    "error": "corrupt field 2: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "1801",
+    "accept": true,
+    "known": "1801"
+  },
+  {
+    "input": "1880",
+    "accept": false,
+    "error": "field I32: corrupt int"
+  },
+  {
+    "input": "190100000000000000",
+    "accept": true
+  },
+  {
+    "input": "19010000",
+    "accept": false,
+    "error": "corrupt field 3: unexpected EOF"
+  },
+  {
+    "input": "1a00",
+    "accept": true
+  },
+  {
+    "input": "1a0101",
+    "accept": true
+  },
+  {
+    "input": "1a01",
+    "accept": false,
+    "error": "corrupt field 3: unexpected EOF"
+  },
+  {
+    "input": "1b1c",
+    "accept": true
+  },
+  {
+    "input": "1b",
+    "accept": false,
+    "error": "corrupt field 3: unexpected EOF"
+  },
+  {
+    "input": "1c",
+    "accept": false,
+    "error": "corrupt field 3: proto: mismatching end group marker"
+  },
+  {
+    "input": "1d01000000",
+    "accept": true
+  },
+  {
+    "input": "1d0100",
+    "accept": false,
+    "error": "corrupt field 3: unexpected EOF"
+  },
+  {
+    "input": "1e01",
+    "accept": false,
+    "error": "corrupt field 3: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "1f01",
+    "accept": false,
+    "error": "corrupt field 3: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "2001",
+    "accept": true,
+    "known": "2001"
+  },
+  {
+    "input": "2080",
+    "accept": false,
+    "error": "field U64: corrupt uint"
+  },
+  {
+    "input": "210100000000000000",
+    "accept": true
+  },
+  {
+    "input": "21010000",
+    "accept": false,
+    "error": "corrupt field 4: unexpected EOF"
+  },
+  {
+    "input": "2200",
+    "accept": true
+  },
+  {
+    "input": "220101",
+    "accept": true
+  },
+  {
+    "input": "2201",
+    "accept": false,
+    "error": "corrupt field 4: unexpected EOF"
+  },
+  {
+    "input": "2324",
+    "accept": true
+  },
+  {
+    "input": "23",
+    "accept": false,
+    "error": "corrupt field 4: unexpected EOF"
+  },
+  {
+    "input": "24",
+    "accept": false,
+    "error": "corrupt field 4: proto: mismatching end group marker"
+  },
+  {
+    "input": "2501000000",
+    "accept": true
+  },
+  {
+    "input": "250100",
+    "accept": false,
+    "error": "corrupt field 4: unexpected EOF"
+  },
+  {
+    "input": "2601",
+    "accept": false,
+    "error": "corrupt field 4: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "2701",
+    "accept": false,
+    "error": "corrupt field 4: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "2801",
+    "accept": true,
+    "known": "2801"
+  },
+  {
+    "input": "2880",
+    "accept": false,
+    "error": "field U32: corrupt uint"
+  },
+  {
+    "input": "290100000000000000",
+    "accept": true
+  },
+  {
+    "input": "29010000",
+    "accept": false,
+    "error": "corrupt field 5: unexpected EOF"
+  },
+  {
+    "input": "2a00",
+    "accept": true
+  },
+  {
+    "input": "2a0101",
+    "accept": true
+  },
+  {
+    "input": "2a01",
+    "accept": false,
+    "error": "corrupt field 5: unexpected EOF"
+  },
+  {
+    "input": "2b2c",
+    "accept": true
+  },
+  {
+    "input": "2b",
+    "accept": false,
+    "error": "corrupt field 5: unexpected EOF"
+  },
+  {
+    "input": "2c",
+    "accept": false,
+    "error": "corrupt field 5: proto: mismatching end group marker"
+  },
+  {
+    "input": "2d01000000",
+    "accept": true
+  },
+  {
+    "input": "2d0100",
+    "accept": false,
+    "error": "corrupt field 5: unexpected EOF"
+  },
+  {
+    "input": "2e01",
+    "accept": false,
+    "error": "corrupt field 5: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "2f01",
+    "accept": false,
+    "error": "corrupt field 5: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "3001",
+    "accept": true,
+    "known": "3001"
+  },
+  {
+    "input": "3080",
+    "accept": false,
+    "error": "field Z64: corrupt int"
+  },
+  {
+    "input": "310100000000000000",
+    "accept": true
+  },
+  {
+    "input": "31010000",
+    "accept": false,
+    "error": "corrupt field 6: unexpected EOF"
+  },
+  {
+    "input": "3200",
+    "accept": true
+  },
+  {
+    "input": "320101",
+    "accept": true
+  },
+  {
+    "input": "3201",
+    "accept": false,
+    "error": "corrupt field 6: unexpected EOF"
+  },
+  {
+    "input": "3334",
+    "accept": true
+  },
+  {
+    "input": "33",
+    "accept": false,
+    "error": "corrupt field 6: unexpected EOF"
+  },
+  {
+    "input": "34",
+    "accept": false,
+    "error": "corrupt field 6: proto: mismatching end group marker"
+  },
+  {
+    "input": "3501000000",
+    "accept": true
+  },
+  {
+    "input": "350100",
+    "accept": false,
+    "error": "corrupt field 6: unexpected EOF"
+  },
+  {
+    "input": "3601",
+    "accept": false,
+    "error": "corrupt field 6: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "3701",
+    "accept": false,
+    "error": "corrupt field 6: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "3801",
+    "accept": true,
+    "known": "3801"
+  },
+  {
+    "input": "3880",
+    "accept": false,
+    "error": "field Z32: corrupt int"
+  },
+  {
+    "input": "390100000000000000",
+    "accept": true
+  },
+  {
+    "input": "39010000",
+    "accept": false,
+    "error": "corrupt field 7: unexpected EOF"
+  },
+  {
+    "input": "3a00",
+    "accept": true
+  },
+  {
+    "input": "3a0101",
+    "accept": true
+  },
+  {
+    "input": "3a01",
+    "accept": false,
+    "error": "corrupt field 7: unexpected EOF"
+  },
+  {
+    "input": "3b3c",
+    "accept": true
+  },
+  {
+    "input": "3b",
+    "accept": false,
+    "error": "corrupt field 7: unexpected EOF"
+  },
+  {
+    "input": "3c",
+    "accept": false,
+    "error": "corrupt field 7: proto: mismatching end group marker"
+  },
+  {
+    "input": "3d01000000",
+    "accept": true
+  },
+  {
+    "input": "3d0100",
+    "accept": false,
+    "error": "corrupt field 7: unexpected EOF"
+  },
+  {
+    "input": "3e01",
+    "accept": false,
+    "error": "corrupt field 7: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "3f01",
+    "accept": false,
+    "error": "corrupt field 7: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "4001",
+    "accept": true,
+    "known": "4001"
+  },
+  {
+    "input": "4080",
+    "accept": false,
+    "error": "field B: corrupt bool"
+  },
+  {
+    "input": "410100000000000000",
+    "accept": true
+  },
+  {
+    "input": "41010000",
+    "accept": false,
+    "error": "corrupt field 8: unexpected EOF"
+  },
+  {
+    "input": "4200",
+    "accept": true
+  },
+  {
+    "input": "420101",
+    "accept": true
+  },
+  {
+    "input": "4201",
+    "accept": false,
+    "error": "corrupt field 8: unexpected EOF"
+  },
+  {
+    "input": "4344",
+    "accept": true
+  },
+  {
+    "input": "43",
+    "accept": false,
+    "error": "corrupt field 8: unexpected EOF"
+  },
+  {
+    "input": "44",
+    "accept": false,
+    "error": "corrupt field 8: proto: mismatching end group marker"
+  },
+  {
+    "input": "4501000000",
+    "accept": true
+  },
+  {
+    "input": "450100",
+    "accept": false,
+    "error": "corrupt field 8: unexpected EOF"
+  },
+  {
+    "input": "4601",
+    "accept": false,
+    "error": "corrupt field 8: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "4701",
+    "accept": false,
+    "error": "corrupt field 8: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "4801",
+    "accept": true
+  },
+  {
+    "input": "4880",
+    "accept": false,
+    "error": "corrupt field 9: unexpected EOF"
+  },
+  {
+    "input": "490100000000000000",
+    "accept": true,
+    "known": "490100000000000000"
+  },
+  {
+    "input": "49010000",
+    "accept": false,
+    "error": "field F64: corrupt float64"
+  },
+  {
+    "input": "4a00",
+    "accept": true
+  },
+  {
+    "input": "4a0101",
+    "accept": true
+  },
+  {
+    "input": "4a01",
+    "accept": false,
+    "error": "corrupt field 9: unexpected EOF"
+  },
+  {
+    "input": "4b4c",
+    "accept": true
+  },
+  {
+    "input": "4b",
+    "accept": false,
+    "error": "corrupt field 9: unexpected EOF"
+  },
+  {
+    "input": "4c",
+    "accept": false,
+    "error": "corrupt field 9: proto: mismatching end group marker"
+  },
+  {
+    "input": "4d01000000",
+    "accept": true
+  },
+  {
+    "input": "4d0100",
+    "accept": false,
+    "error": "corrupt field 9: unexpected EOF"
+  },
+  {
+    "input": "4e01",
+    "accept": false,
+    "error": "corrupt field 9: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "4f01",
+    "accept": false,
+    "error": "corrupt field 9: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "5001",
+    "accept": true
+  },
+  {
+    "input": "5080",
+    "accept": false,
+    "error": "corrupt field 10: unexpected EOF"
+  },
+  {
+    "input": "510100000000000000",
+    "accept": true
+  },
+  {
+    "input": "51010000",
+    "accept": false,
+    "error": "corrupt field 10: unexpected EOF"
+  },
+  {
+    "input": "5200",
+    "accept": true
+  },
+  {
+    "input": "520101",
+    "accept": true
+  },
+  {
+    "input": "5201",
+    "accept": false,
+    "error": "corrupt field 10: unexpected EOF"
+  },
+  {
+    "input": "5354",
+    "accept": true
+  },
+  {
+    "input": "53",
+    "accept": false,
+    "error": "corrupt field 10: unexpected EOF"
+  },
+  {
+    "input": "54",
+    "accept": false,
+    "error": "corrupt field 10: proto: mismatching end group marker"
+  },
+  {
+    "input": "5501000000",
+    "accept": true,
+    "known": "5501000000"
+  },
+  {
+    "input": "550100",
+    "accept": false,
+    "error": "field F32: corrupt float32"
+  },
+  {
+    "input": "5601",
+    "accept": false,
+    "error": "corrupt field 10: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "5701",
+    "accept": false,
+    "error": "corrupt field 10: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "5801",
+    "accept": true
+  },
+  {
+    "input": "5880",
+    "accept": false,
+    "error": "corrupt field 11: unexpected EOF"
+  },
+  {
+    "input": "590100000000000000",
+    "accept": true
+  },
+  {
+    "input": "59010000",
+    "accept": false,
+    "error": "corrupt field 11: unexpected EOF"
+  },
+  {
+    "input": "5a00",
+    "accept": true
+  },
+  {
+    "input": "5a0101",
+    "accept": true,
+    "known": "5a0101"
+  },
+  {
+    "input": "5a01",
+    "accept": false,
+    "error": "field Buf: corrupt bytes"
+  },
+  {
+    "input": "5b5c",
+    "accept": true
+  },
+  {
+    "input": "5b",
+    "accept": false,
+    "error": "corrupt field 11: unexpected EOF"
+  },
+  {
+    "input": "5c",
+    "accept": false,
+    "error": "corrupt field 11: proto: mismatching end group marker"
+  },
+  {
+    "input": "5d01000000",
+    "accept": true
+  },
+  {
+    "input": "5d0100",
+    "accept": false,
+    "error": "corrupt field 11: unexpected EOF"
+  },
+  {
+    "input": "5e01",
+    "accept": false,
+    "error": "corrupt field 11: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "5f01",
+    "accept": false,
+    "error": "corrupt field 11: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "6001",
+    "accept": true
+  },
+  {
+    "input": "6080",
+    "accept": false,
+    "error": "corrupt field 12: unexpected EOF"
+  },
+  {
+    "input": "610100000000000000",
+    "accept": true
+  },
+  {
+    "input": "61010000",
+    "accept": false,
+    "error": "corrupt field 12: unexpected EOF"
+  },
+  {
+    "input": "6200",
+    "accept": true,
+    "known": "6200"
+  },
+  {
+    "input": "620101",
+    "accept": false,
+    "error": "field Inner: corrupt tag"
+  },
+  {
+    "input": "6201",
+    "accept": false,
+    "error": "field Inner: corrupt embedded message"
+  },
+  {
+    "input": "6364",
+    "accept": true
+  },
+  {
+    "input": "63",
+    "accept": false,
+    "error": "corrupt field 12: unexpected EOF"
+  },
+  {
+    "input": "64",
+    "accept": false,
+    "error": "corrupt field 12: proto: mismatching end group marker"
+  },
+  {
+    "input": "6501000000",
+    "accept": true
+  },
+  {
+    "input": "650100",
+    "accept": false,
+    "error": "corrupt field 12: unexpected EOF"
+  },
+  {
+    "input": "6601",
+    "accept": false,
+    "error": "corrupt field 12: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "6701",
+    "accept": false,
+    "error": "corrupt field 12: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "6801",
+    "accept": true
+  },
+  {
+    "input": "6880",
+    "accept": false,
+    "error": "corrupt field 13: unexpected EOF"
+  },
+  {
+    "input": "690100000000000000",
+    "accept": true
+  },
+  {
+    "input": "69010000",
+    "accept": false,
+    "error": "corrupt field 13: unexpected EOF"
+  },
+  {
+    "input": "6a00",
+    "accept": true,
+    "known": "6a00"
+  },
+  {
+    "input": "6a0101",
+    "accept": false,
+    "error": "field List: corrupt tag"
+  },
+  {
+    "input": "6a01",
+    "accept": false,
+    "error": "field List: corrupt embedded message"
+  },
+  {
+    "input": "6b6c",
+    "accept": true
+  },
+  {
+    "input": "6b",
+    "accept": false,
+    "error": "corrupt field 13: unexpected EOF"
+  },
+  {
+    "input": "6c",
+    "accept": false,
+    "error": "corrupt field 13: proto: mismatching end group marker"
+  },
+  {
+    "input": "6d01000000",
+    "accept": true
+  },
+  {
+    "input": "6d0100",
+    "accept": false,
+    "error": "corrupt field 13: unexpected EOF"
+  },
+  {
+    "input": "6e01",
+    "accept": false,
+    "error": "corrupt field 13: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "6f01",
+    "accept": false,
+    "error": "corrupt field 13: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "7001",
+    "accept": true,
+    "known": "720101"
+  },
+  {
+    "input": "7080",
+    "accept": false,
+    "error": "field Nums: corrupt uint"
+  },
+  {
+    "input": "710100000000000000",
+    "accept": true
+  },
+  {
+    "input": "71010000",
+    "accept": false,
+    "error": "corrupt field 14: unexpected EOF"
+  },
+  {
+    "input": "7200",
+    "accept": true
+  },
+  {
+    "input": "720101",
+    "accept": true,
+    "known": "720101"
+  },
+  {
+    "input": "7201",
+    "accept": false,
+    "error": "field Nums: corrupt packed field"
+  },
+  {
+    "input": "7374",
+    "accept": true
+  },
+  {
+    "input": "73",
+    "accept": false,
+    "error": "corrupt field 14: unexpected EOF"
+  },
+  {
+    "input": "74",
+    "accept": false,
+    "error": "corrupt field 14: proto: mismatching end group marker"
+  },
+  {
+    "input": "7501000000",
+    "accept": true
+  },
+  {
+    "input": "750100",
+    "accept": false,
+    "error": "corrupt field 14: unexpected EOF"
+  },
+  {
+    "input": "7601",
+    "accept": false,
+    "error": "corrupt field 14: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "7701",
+    "accept": false,
+    "error": "corrupt field 14: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "7801",
+    "accept": true,
+    "known": "7a0101"
+  },
+  {
+    "input": "7880",
+    "accept": false,
+    "error": "field Zigs: corrupt int"
+  },
+  {
+    "input": "790100000000000000",
+    "accept": true
+  },
+  {
+    "input": "79010000",
+    "accept": false,
+    "error": "corrupt field 15: unexpected EOF"
+  },
+  {
+    "input": "7a00",
+    "accept": true
+  },
+  {
+    "input": "7a0101",
+    "accept": true,
+    "known": "7a0101"
+  },
+  {
+    "input": "7a01",
+    "accept": false,
+    "error": "field Zigs: corrupt packed field"
+  },
+  {
+    "input": "7b7c",
+    "accept": true
+  },
+  {
+    "input": "7b",
+    "accept": false,
+    "error": "corrupt field 15: unexpected EOF"
+  },
+  {
+    "input": "7c",
+    "accept": false,
+    "error": "corrupt field 15: proto: mismatching end group marker"
+  },
+  {
+    "input": "7d01000000",
+    "accept": true
+  },
+  {
+    "input": "7d0100",
+    "accept": false,
+    "error": "corrupt field 15: unexpected EOF"
+  },
+  {
+    "input": "7e01",
+    "accept": false,
+    "error": "corrupt field 15: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "7f01",
+    "accept": false,
+    "error": "corrupt field 15: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "800101",
+    "accept": true
+  },
+  {
+    "input": "800180",
+    "accept": false,
+    "error": "corrupt field 16: unexpected EOF"
+  },
+  {
+    "input": "81010100000000000000",
+    "accept": true
+  },
+  {
+    "input": "8101010000",
+    "accept": false,
+    "error": "corrupt field 16: unexpected EOF"
+  },
+  {
+    "input": "820100",
+    "accept": true
+  },
+  {
+    "input": "82010101",
+    "accept": false,
+    "error": "field Reals: corrupt float32"
+  },
+  {
+    "input": "820101",
+    "accept": false,
+    "error": "field Reals: corrupt packed field"
+  },
+  {
+    "input": "83018401",
+    "accept": true
+  },
+  {
+    "input": "8301",
+    "accept": false,
+    "error": "corrupt field 16: unexpected EOF"
+  },
+  {
+    "input": "8401",
+    "accept": false,
+    "error": "corrupt field 16: proto: mismatching end group marker"
+  },
+  {
+    "input": "850101000000",
+    "accept": true,
+    "known": "82010401000000"
+  },
+  {
+    "input": "85010100",
+    "accept": false,
+    "error": "field Reals: corrupt float32"
+  },
+  {
+    "input": "860101",
+    "accept": false,
+    "error": "corrupt field 16: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "870101",
+    "accept": false,
+    "error": "corrupt field 16: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "880101",
+    "accept": true
+  },
+  {
+    "input": "880180",
+    "accept": false,
+    "error": "corrupt field 17: unexpected EOF"
+  },
+  {
+    "input": "89010100000000000000",
+    "accept": true
+  },
+  {
+    "input": "8901010000",
+    "accept": false,
+    "error": "corrupt field 17: unexpected EOF"
+  },
+  {
+    "input": "8a0100",
+    "accept": true,
+    "known": "8a0100"
+  },
+  {
+    "input": "8a010101",
+    "accept": true,
+    "known": "8a010101"
+  },
+  {
+    "input": "8a0101",
+    "accept": false,
+    "error": "field Strs: corrupt string"
+  },
+  {
+    "input": "8b018c01",
+    "accept": true
+  },
+  {
+    "input": "8b01",
+    "accept": false,
+    "error": "corrupt field 17: unexpected EOF"
+  },
+  {
+    "input": "8c01",
+    "accept": false,
+    "error": "corrupt field 17: proto: mismatching end group marker"
+  },
+  {
+    "input": "8d0101000000",
+    "accept": true
+  },
+  {
+    "input": "8d010100",
+    "accept": false,
+    "error": "corrupt field 17: unexpected EOF"
+  },
+  {
+    "input": "8e0101",
+    "accept": false,
+    "error": "corrupt field 17: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "8f0101",
+    "accept": false,
+    "error": "corrupt field 17: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "900101",
+    "accept": true
+  },
+  {
+    "input": "900180",
+    "accept": false,
+    "error": "corrupt field 18: unexpected EOF"
+  },
+  {
+    "input": "91010100000000000000",
+    "accept": true
+  },
+  {
+    "input": "9101010000",
+    "accept": false,
+    "error": "corrupt field 18: unexpected EOF"
+  },
+  {
+    "input": "920100",
+    "accept": true,
+    "known": "9201040a001000"
+  },
+  {
+    "input": "92010101",
+    "accept": false,
+    "error": "field M: corrupt tag in map entry"
+  },
+  {
+    "input": "920101",
+    "accept": false,
+    "error": "field M: corrupt map entry"
+  },
+  {
+    "input": "93019401",
+    "accept": true
+  },
+  {
+    "input": "9301",
+    "accept": false,
+    "error": "corrupt field 18: unexpected EOF"
+  },
+  {
+    "input": "9401",
+    "accept": false,
+    "error": "corrupt field 18: proto: mismatching end group marker"
+  },
+  {
+    "input": "950101000000",
+    "accept": true
+  },
+  {
+    "input": "95010100",
+    "accept": false,
+    "error": "corrupt field 18: unexpected EOF"
+  },
+  {
+    "input": "960101",
+    "accept": false,
+    "error": "corrupt field 18: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "970101",
+    "accept": false,
+    "error": "corrupt field 18: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "980101",
+    "accept": true
+  },
+  {
+    "input": "980180",
+    "accept": false,
+    "error": "corrupt field 19: unexpected EOF"
+  },
+  {
+    "input": "99010100000000000000",
+    "accept": true
+  },
+  {
+    "input": "9901010000",
+    "accept": false,
+    "error": "corrupt field 19: unexpected EOF"
+  },
+  {
+    "input": "9a0100",
+    "accept": true,
+    "known": "9a010408001200"
+  },
+  {
+    "input": "9a010101",
+    "accept": false,
+    "error": "field MM: corrupt tag in map entry"
+  },
+  {
+    "input": "9a0101",
+    "accept": false,
+    "error": "field MM: corrupt map entry"
+  },
+  {
+    "input": "9b019c01",
+    "accept": true
+  },
+  {
+    "input": "9b01",
+    "accept": false,
+    "error": "corrupt field 19: unexpected EOF"
+  },
+  {
+    "input": "9c01",
+    "accept": false,
+    "error": "corrupt field 19: proto: mismatching end group marker"
+  },
+  {
+    "input": "9d0101000000",
+    "accept": true
+  },
+  {
+    "input": "9d010100",
+    "accept": false,
+    "error": "corrupt field 19: unexpected EOF"
+  },
+  {
+    "input": "9e0101",
+    "accept": false,
+    "error": "corrupt field 19: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "9f0101",
+    "accept": false,
+    "error": "corrupt field 19: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "a00101",
+    "accept": true
+  },
+  {
+    "input": "a00180",
+    "accept": false,
+    "error": "corrupt field 20: unexpected EOF"
+  },
+  {
+    "input": "a1010100000000000000",
+    "accept": true
+  },
+  {
+    "input": "a101010000",
+    "accept": false,
+    "error": "corrupt field 20: unexpected EOF"
+  },
+  {
+    "input": "a20100",
+    "accept": true,
+    "known": "a20100"
+  },
+  {
+    "input": "a2010101",
+    "accept": true,
+    "known": "a2010101"
+  },
+  {
+    "input": "a20101",
+    "accept": false,
+    "error": "field A: corrupt string"
+  },
+  {
+    "input": "a301a401",
+    "accept": true
+  },
+  {
+    "input": "a301",
+    "accept": false,
+    "error": "corrupt field 20: unexpected EOF"
+  },
+  {
+    "input": "a401",
+    "accept": false,
+    "error": "corrupt field 20: proto: mismatching end group marker"
+  },
+  {
+    "input": "a50101000000",
+    "accept": true
+  },
+  {
+    "input": "a5010100",
+    "accept": false,
+    "error": "corrupt field 20: unexpected EOF"
+  },
+  {
+    "input": "a60101",
+    "accept": false,
+    "error": "corrupt field 20: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "a70101",
+    "accept": false,
+    "error": "corrupt field 20: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "a80101",
+    "accept": true,
+    "known": "a80101"
+  },
+  {
+    "input": "a80180",
+    "accept": false,
+    "error": "field C: corrupt int"
+  },
+  {
+    "input": "a9010100000000000000",
+    "accept": true
+  },
+  {
+    "input": "a901010000",
+    "accept": false,
+    "error": "corrupt field 21: unexpected EOF"
+  },
+  {
+    "input": "aa0100",
+    "accept": true
+  },
+  {
+    "input": "aa010101",
+    "accept": true
+  },
+  {
+    "input": "aa0101",
+    "accept": false,
+    "error": "corrupt field 21: unexpected EOF"
+  },
+  {
+    "input": "ab01ac01",
+    "accept": true
+  },
+  {
+    "input": "ab01",
+    "accept": false,
+    "error": "corrupt field 21: unexpected EOF"
+  },
+  {
+    "input": "ac01",
+    "accept": false,
+    "error": "corrupt field 21: proto: mismatching end group marker"
+  },
+  {
+    "input": "ad0101000000",
+    "accept": true
+  },
+  {
+    "input": "ad010100",
+    "accept": false,
+    "error": "corrupt field 21: unexpected EOF"
+  },
+  {
+    "input": "ae0101",
+    "accept": false,
+    "error": "corrupt field 21: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "af0101",
+    "accept": false,
+    "error": "corrupt field 21: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "b00101",
+    "accept": true
+  },
+  {
+    "input": "b00180",
+    "accept": false,
+    "error": "corrupt field 22: unexpected EOF"
+  },
+  {
+    "input": "b1010100000000000000",
+    "accept": true
+  },
+  {
+    "input": "b101010000",
+    "accept": false,
+    "error": "corrupt field 22: unexpected EOF"
+  },
+  {
+    "input": "b20100",
+    "accept": true,
+    "known": "b20100"
+  },
+  {
+    "input": "b2010101",
+    "accept": false,
+    "error": "field D: corrupt tag"
+  },
+  {
+    "input": "b20101",
+    "accept": false,
+    "error": "field D: corrupt embedded message"
+  },
+  {
+    "input": "b301b401",
+    "accept": true
+  },
+  {
+    "input": "b301",
+    "accept": false,
+    "error": "corrupt field 22: unexpected EOF"
+  },
+  {
+    "input": "b401",
+    "accept": false,
+    "error": "corrupt field 22: proto: mismatching end group marker"
+  },
+  {
+    "input": "b50101000000",
+    "accept": true
+  },
+  {
+    "input": "b5010100",
+    "accept": false,
+    "error": "corrupt field 22: unexpected EOF"
+  },
+  {
+    "input": "b60101",
+    "accept": false,
+    "error": "corrupt field 22: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "b70101",
+    "accept": false,
+    "error": "corrupt field 22: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "b80101",
+    "accept": true,
+    "known": "ba010101"
+  },
+  {
+    "input": "b80180",
+    "accept": false,
+    "error": "field Flags: corrupt bool"
+  },
+  {
+    "input": "b9010100000000000000",
+    "accept": true
+  },
+  {
+    "input": "b901010000",
+    "accept": false,
+    "error": "corrupt field 23: unexpected EOF"
+  },
+  {
+    "input": "ba0100",
+    "accept": true
+  },
+  {
+    "input": "ba010101",
+    "accept": true,
+    "known": "ba010101"
+  },
+  {
+    "input": "ba0101",
+    "accept": false,
+    "error": "field Flags: corrupt packed field"
+  },
+  {
+    "input": "bb01bc01",
+    "accept": true
+  },
+  {
+    "input": "bb01",
+    "accept": false,
+    "error": "corrupt field 23: unexpected EOF"
+  },
+  {
+    "input": "bc01",
+    "accept": false,
+    "error": "corrupt field 23: proto: mismatching end group marker"
+  },
+  {
+    "input": "bd0101000000",
+    "accept": true
+  },
+  {
+    "input": "bd010100",
+    "accept": false,
+    "error": "corrupt field 23: unexpected EOF"
+  },
+  {
+    "input": "be0101",
+    "accept": false,
+    "error": "corrupt field 23: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "bf0101",
+    "accept": false,
+    "error": "corrupt field 23: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "c00101",
+    "accept": true,
+    "known": "c2010101"
+  },
+  {
+    "input": "c00180",
+    "accept": false,
+    "error": "field Negs: corrupt int"
+  },
+  {
+    "input": "c1010100000000000000",
+    "accept": true
+  },
+  {
+    "input": "c101010000",
+    "accept": false,
+    "error": "corrupt field 24: unexpected EOF"
+  },
+  {
+    "input": "c20100",
+    "accept": true
+  },
+  {
+    "input": "c2010101",
+    "accept": true,
+    "known": "c2010101"
+  },
+  {
+    "input": "c20101",
+    "accept": false,
+    "error": "field Negs: corrupt packed field"
+  },
+  {
+    "input": "c301c401",
+    "accept": true
+  },
+  {
+    "input": "c301",
+    "accept": false,
+    "error": "corrupt field 24: unexpected EOF"
+  },
+  {
+    "input": "c401",
+    "accept": false,
+    "error": "corrupt field 24: proto: mismatching end group marker"
+  },
+  {
+    "input": "c50101000000",
+    "accept": true
+  },
+  {
+    "input": "c5010100",
+    "accept": false,
+    "error": "corrupt field 24: unexpected EOF"
+  },
+  {
+    "input": "c60101",
+    "accept": false,
+    "error": "corrupt field 24: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "c70101",
+    "accept": false,
+    "error": "corrupt field 24: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "c80101",
+    "accept": true
+  },
+  {
+    "input": "c80180",
+    "accept": false,
+    "error": "corrupt field 25: unexpected EOF"
+  },
+  {
+    "input": "c9010100000000000000",
+    "accept": true
+  },
+  {
+    "input": "c901010000",
+    "accept": false,
+    "error": "corrupt field 25: unexpected EOF"
+  },
+  {
+    "input": "ca0100",
+    "accept": true,
+    "known": "ca010408001000"
+  },
+  {
+    "input": "ca010101",
+    "accept": false,
+    "error": "field BM: corrupt tag in map entry"
+  },
+  {
+    "input": "ca0101",
+    "accept": false,
+    "error": "field BM: corrupt map entry"
+  },
+  {
+    "input": "cb01cc01",
+    "accept": true
+  },
+  {
+    "input": "cb01",
+    "accept": false,
+    "error": "corrupt field 25: unexpected EOF"
+  },
+  {
+    "input": "cc01",
+    "accept": false,
+    "error": "corrupt field 25: proto: mismatching end group marker"
+  },
+  {
+    "input": "cd0101000000",
+    "accept": true
+  },
+  {
+    "input": "cd010100",
+    "accept": false,
+    "error": "corrupt field 25: unexpected EOF"
+  },
+  {
+    "input": "ce0101",
+    "accept": false,
+    "error": "corrupt field 25: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "cf0101",
+    "accept": false,
+    "error": "corrupt field 25: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "62020801",
+    "accept": true,
+    "known": "6200"
+  },
+  {
+    "input": "62020880",
+    "accept": false,
+    "error": "field Inner: corrupt field 1: unexpected EOF"
+  },
+  {
+    "input": "6209090100000000000000",
+    "accept": true,
+    "known": "6200"
+  },
+  {
+    "input": "620409010000",
+    "accept": false,
+    "error": "field Inner: corrupt field 1: unexpected EOF"
+  },
+  {
+    "input": "62020a00",
+    "accept": true,
+    "known": "6200"
+  },
+  {
+    "input": "62030a0101",
+    "accept": true,
+    "known": "62030a0101"
+  },
+  {
+    "input": "62020a01",
+    "accept": false,
+    "error": "field Inner: field Name: corrupt string"
+  },
+  {
+    "input": "62020b0c",
+    "accept": true,
+    "known": "6200"
+  },
+  {
+    "input": "62010b",
+    "accept": false,
+    "error": "field Inner: corrupt field 1: unexpected EOF"
+  },
+  {
+    "input": "62010c",
+    "accept": false,
+    "error": "field Inner: corrupt field 1: proto: mismatching end group marker"
+  },
+  {
+    "input": "62050d01000000",
+    "accept": true,
+    "known": "6200"
+  },
+  {
+    "input": "62030d0100",
+    "accept": false,
+    "error": "field Inner: corrupt field 1: unexpected EOF"
+  },
+  {
+    "input": "62020e01",
+    "accept": false,
+    "error": "field Inner: corrupt field 1: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "62020f01",
+    "accept": false,
+    "error": "field Inner: corrupt field 1: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "62021001",
+    "accept": true,
+    "known": "62021001"
+  },
+  {
+    "input": "62021080",
+    "accept": false,
+    "error": "field Inner: field N: corrupt int"
+  },
+  {
+    "input": "6209110100000000000000",
+    "accept": true,
+    "known": "6200"
+  },
+  {
+    "input": "620411010000",
+    "accept": false,
+    "error": "field Inner: corrupt field 2: unexpected EOF"
+  },
+  {
+    "input": "62021200",
+    "accept": true,
+    "known": "6200"
+  },
+  {
+    "input": "6203120101",
+    "accept": true,
+    "known": "6200"
+  },
+  {
+    "input": "62021201",
+    "accept": false,
+    "error": "field Inner: corrupt field 2: unexpected EOF"
+  },
+  {
+    "input": "62021314",
+    "accept": true,
+    "known": "6200"
+  },
+  {
+    "input": "620113",
+    "accept": false,
+    "error": "field Inner: corrupt field 2: unexpected EOF"
+  },
+  {
+    "input": "620114",
+    "accept": false,
+    "error": "field Inner: corrupt field 2: proto: mismatching end group marker"
+  },
+  {
+    "input": "62051501000000",
+    "accept": true,
+    "known": "6200"
+  },
+  {
+    "input": "6203150100",
+    "accept": false,
+    "error": "field Inner: corrupt field 2: unexpected EOF"
+  },
+  {
+    "input": "62021601",
+    "accept": false,
+    "error": "field Inner: corrupt field 2: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "62021701",
+    "accept": false,
+    "error": "field Inner: corrupt field 2: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "62021801",
+    "accept": true,
+    "known": "6200"
+  },
+  {
+    "input": "62021880",
+    "accept": false,
+    "error": "field Inner: corrupt field 3: unexpected EOF"
+  },
+  {
+    "input": "6209190100000000000000",
+    "accept": true,
+    "known": "6200"
+  },
+  {
+    "input": "620419010000",
+    "accept": false,
+    "error": "field Inner: corrupt field 3: unexpected EOF"
+  },
+  {
+    "input": "62021a00",
+    "accept": true,
+    "known": "6200"
+  },
+  {
+    "input": "62031a0101",
+    "accept": true,
+    "known": "6200"
+  },
+  {
+    "input": "62021a01",
+    "accept": false,
+    "error": "field Inner: corrupt field 3: unexpected EOF"
+  },
+  {
+    "input": "62021b1c",
+    "accept": true,
+    "known": "6200"
+  },
+  {
+    "input": "62011b",
+    "accept": false,
+    "error": "field Inner: corrupt field 3: unexpected EOF"
+  },
+  {
+    "input": "62011c",
+    "accept": false,
+    "error": "field Inner: corrupt field 3: proto: mismatching end group marker"
+  },
+  {
+    "input": "62051d01000000",
+    "accept": true,
+    "known": "6200"
+  },
+  {
+    "input": "62031d0100",
+    "accept": false,
+    "error": "field Inner: corrupt field 3: unexpected EOF"
+  },
+  {
+    "input": "62021e01",
+    "accept": false,
+    "error": "field Inner: corrupt field 3: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "62021f01",
+    "accept": false,
+    "error": "field Inner: corrupt field 3: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "6a020801",
+    "accept": true,
+    "known": "6a00"
+  },
+  {
+    "input": "6a020880",
+    "accept": false,
+    "error": "field List: corrupt field 1: unexpected EOF"
+  },
+  {
+    "input": "6a09090100000000000000",
+    "accept": true,
+    "known": "6a00"
+  },
+  {
+    "input": "6a0409010000",
+    "accept": false,
+    "error": "field List: corrupt field 1: unexpected EOF"
+  },
+  {
+    "input": "6a020a00",
+    "accept": true,
+    "known": "6a00"
+  },
+  {
+    "input": "6a030a0101",
+    "accept": true,
+    "known": "6a030a0101"
+  },
+  {
+    "input": "6a020a01",
+    "accept": false,
+    "error": "field List: field Name: corrupt string"
+  },
+  {
+    "input": "6a020b0c",
+    "accept": true,
+    "known": "6a00"
+  },
+  {
+    "input": "6a010b",
+    "accept": false,
+    "error": "field List: corrupt field 1: unexpected EOF"
+  },
+  {
+    "input": "6a010c",
+    "accept": false,
+    "error": "field List: corrupt field 1: proto: mismatching end group marker"
+  },
+  {
+    "input": "6a050d01000000",
+    "accept": true,
+    "known": "6a00"
+  },
+  {
+    "input": "6a030d0100",
+    "accept": false,
+    "error": "field List: corrupt field 1: unexpected EOF"
+  },
+  {
+    "input": "6a020e01",
+    "accept": false,
+    "error": "field List: corrupt field 1: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "6a020f01",
+    "accept": false,
+    "error": "field List: corrupt field 1: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "6a021001",
+    "accept": true,
+    "known": "6a021001"
+  },
+  {
+    "input": "6a021080",
+    "accept": false,
+    "error": "field List: field N: corrupt int"
+  },
+  {
+    "input": "6a09110100000000000000",
+    "accept": true,
+    "known": "6a00"
+  },
+  {
+    "input": "6a0411010000",
+    "accept": false,
+    "error": "field List: corrupt field 2: unexpected EOF"
+  },
+  {
+    "input": "6a021200",
+    "accept": true,
+    "known": "6a00"
+  },
+  {
+    "input": "6a03120101",
+    "accept": true,
+    "known": "6a00"
+  },
+  {
+    "input": "6a021201",
+    "accept": false,
+    "error": "field List: corrupt field 2: unexpected EOF"
+  },
+  {
+    "input": "6a021314",
+    "accept": true,
+    "known": "6a00"
+  },
+  {
+    "input": "6a0113",
+    "accept": false,
+    "error": "field List: corrupt field 2: unexpected EOF"
+  },
+  {
+    "input": "6a0114",
+    "accept": false,
+    "error": "field List: corrupt field 2: proto: mismatching end group marker"
+  },
+  {
+    "input": "6a051501000000",
+    "accept": true,
+    "known": "6a00"
+  },
+  {
+    "input": "6a03150100",
+    "accept": false,
+    "error": "field List: corrupt field 2: unexpected EOF"
+  },
+  {
+    "input": "6a021601",
+    "accept": false,
+    "error": "field List: corrupt field 2: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "6a021701",
+    "accept": false,
+    "error": "field List: corrupt field 2: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "6a021801",
+    "accept": true,
+    "known": "6a00"
+  },
+  {
+    "input": "6a021880",
+    "accept": false,
+    "error": "field List: corrupt field 3: unexpected EOF"
+  },
+  {
+    "input": "6a09190100000000000000",
+    "accept": true,
+    "known": "6a00"
+  },
+  {
+    "input": "6a0419010000",
+    "accept": false,
+    "error": "field List: corrupt field 3: unexpected EOF"
+  },
+  {
+    "input": "6a021a00",
+    "accept": true,
+    "known": "6a00"
+  },
+  {
+    "input": "6a031a0101",
+    "accept": true,
+    "known": "6a00"
+  },
+  {
+    "input": "6a021a01",
+    "accept": false,
+    "error": "field List: corrupt field 3: unexpected EOF"
+  },
+  {
+    "input": "6a021b1c",
+    "accept": true,
+    "known": "6a00"
+  },
+  {
+    "input": "6a011b",
+    "accept": false,
+    "error": "field List: corrupt field 3: unexpected EOF"
+  },
+  {
+    "input": "6a011c",
+    "accept": false,
+    "error": "field List: corrupt field 3: proto: mismatching end group marker"
+  },
+  {
+    "input": "6a051d01000000",
+    "accept": true,
+    "known": "6a00"
+  },
+  {
+    "input": "6a031d0100",
+    "accept": false,
+    "error": "field List: corrupt field 3: unexpected EOF"
+  },
+  {
+    "input": "6a021e01",
+    "accept": false,
+    "error": "field List: corrupt field 3: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "6a021f01",
+    "accept": false,
+    "error": "field List: corrupt field 3: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "9201020801",
+    "accept": true,
+    "known": "9201040a001000"
+  },
+  {
+    "input": "9201020880",
+    "accept": false,
+    "error": "field M: corrupt field 1 in map entry: unexpected EOF"
+  },
+  {
+    "input": "920109090100000000000000",
+    "accept": true,
+    "known": "9201040a001000"
+  },
+  {
+    "input": "92010409010000",
+    "accept": false,
+    "error": "field M: corrupt field 1 in map entry: unexpected EOF"
+  },
+  {
+    "input": "9201020a00",
+    "accept": true,
+    "known": "9201040a001000"
+  },
+  {
+    "input": "9201030a0101",
+    "accept": true,
+    "known": "9201050a01011000"
+  },
+  {
+    "input": "9201020a01",
+    "accept": false,
+    "error": "field M: map key: corrupt string"
+  },
+  {
+    "input": "9201020b0c",
+    "accept": true,
+    "known": "9201040a001000"
+  },
+  {
+    "input": "9201010b",
+    "accept": false,
+    "error": "field M: corrupt field 1 in map entry: unexpected EOF"
+  },
+  {
+    "input": "9201010c",
+    "accept": false,
+    "error": "field M: corrupt field 1 in map entry: proto: mismatching end group marker"
+  },
+  {
+    "input": "9201050d01000000",
+    "accept": true,
+    "known": "9201040a001000"
+  },
+  {
+    "input": "9201030d0100",
+    "accept": false,
+    "error": "field M: corrupt field 1 in map entry: unexpected EOF"
+  },
+  {
+    "input": "9201020e01",
+    "accept": false,
+    "error": "field M: corrupt field 1 in map entry: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "9201020f01",
+    "accept": false,
+    "error": "field M: corrupt field 1 in map entry: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "9201021001",
+    "accept": true,
+    "known": "9201040a001001"
+  },
+  {
+    "input": "9201021080",
+    "accept": false,
+    "error": "field M: map value: corrupt int"
+  },
+  {
+    "input": "920109110100000000000000",
+    "accept": true,
+    "known": "9201040a001000"
+  },
+  {
+    "input": "92010411010000",
+    "accept": false,
+    "error": "field M: corrupt field 2 in map entry: unexpected EOF"
+  },
+  {
+    "input": "9201021200",
+    "accept": true,
+    "known": "9201040a001000"
+  },
+  {
+    "input": "920103120101",
+    "accept": true,
+    "known": "9201040a001000"
+  },
+  {
+    "input": "9201021201",
+    "accept": false,
+    "error": "field M: corrupt field 2 in map entry: unexpected EOF"
+  },
+  {
+    "input": "9201021314",
+    "accept": true,
+    "known": "9201040a001000"
+  },
+  {
+    "input": "92010113",
+    "accept": false,
+    "error": "field M: corrupt field 2 in map entry: unexpected EOF"
+  },
+  {
+    "input": "92010114",
+    "accept": false,
+    "error": "field M: corrupt field 2 in map entry: proto: mismatching end group marker"
+  },
+  {
+    "input": "9201051501000000",
+    "accept": true,
+    "known": "9201040a001000"
+  },
+  {
+    "input": "920103150100",
+    "accept": false,
+    "error": "field M: corrupt field 2 in map entry: unexpected EOF"
+  },
+  {
+    "input": "9201021601",
+    "accept": false,
+    "error": "field M: corrupt field 2 in map entry: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "9201021701",
+    "accept": false,
+    "error": "field M: corrupt field 2 in map entry: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "9201021801",
+    "accept": true,
+    "known": "9201040a001000"
+  },
+  {
+    "input": "9201021880",
+    "accept": false,
+    "error": "field M: corrupt field 3 in map entry: unexpected EOF"
+  },
+  {
+    "input": "920109190100000000000000",
+    "accept": true,
+    "known": "9201040a001000"
+  },
+  {
+    "input": "92010419010000",
+    "accept": false,
+    "error": "field M: corrupt field 3 in map entry: unexpected EOF"
+  },
+  {
+    "input": "9201021a00",
+    "accept": true,
+    "known": "9201040a001000"
+  },
+  {
+    "input": "9201031a0101",
+    "accept": true,
+    "known": "9201040a001000"
+  },
+  {
+    "input": "9201021a01",
+    "accept": false,
+    "error": "field M: corrupt field 3 in map entry: unexpected EOF"
+  },
+  {
+    "input": "9201021b1c",
+    "accept": true,
+    "known": "9201040a001000"
+  },
+  {
+    "input": "9201011b",
+    "accept": false,
+    "error": "field M: corrupt field 3 in map entry: unexpected EOF"
+  },
+  {
+    "input": "9201011c",
+    "accept": false,
+    "error": "field M: corrupt field 3 in map entry: proto: mismatching end group marker"
+  },
+  {
+    "input": "9201051d01000000",
+    "accept": true,
+    "known": "9201040a001000"
+  },
+  {
+    "input": "9201031d0100",
+    "accept": false,
+    "error": "field M: corrupt field 3 in map entry: unexpected EOF"
+  },
+  {
+    "input": "9201021e01",
+    "accept": false,
+    "error": "field M: corrupt field 3 in map entry: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "9201021f01",
+    "accept": false,
+    "error": "field M: corrupt field 3 in map entry: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "9a01020801",
+    "accept": true,
+    "known": "9a010408011200"
+  },
+  {
+    "input": "9a01020880",
+    "accept": false,
+    "error": "field MM: map key: corrupt int"
+  },
+  {
+    "input": "9a0109090100000000000000",
+    "accept": true,
+    "known": "9a010408001200"
+  },
+  {
+    "input": "9a010409010000",
+    "accept": false,
+    "error": "field MM: corrupt field 1 in map entry: unexpected EOF"
+  },
+  {
+    "input": "9a01020a00",
+    "accept": true,
+    "known": "9a010408001200"
+  },
+  {
+    "input": "9a01030a0101",
+    "accept": true,
+    "known": "9a010408001200"
+  },
+  {
+    "input": "9a01020a01",
+    "accept": false,
+    "error": "field MM: corrupt field 1 in map entry: unexpected EOF"
+  },
+  {
+    "input": "9a01020b0c",
+    "accept": true,
+    "known": "9a010408001200"
+  },
+  {
+    "input": "9a01010b",
+    "accept": false,
+    "error": "field MM: corrupt field 1 in map entry: unexpected EOF"
+  },
+  {
+    "input": "9a01010c",
+    "accept": false,
+    "error": "field MM: corrupt field 1 in map entry: proto: mismatching end group marker"
+  },
+  {
+    "input": "9a01050d01000000",
+    "accept": true,
+    "known": "9a010408001200"
+  },
+  {
+    "input": "9a01030d0100",
+    "accept": false,
+    "error": "field MM: corrupt field 1 in map entry: unexpected EOF"
+  },
+  {
+    "input": "9a01020e01",
+    "accept": false,
+    "error": "field MM: corrupt field 1 in map entry: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "9a01020f01",
+    "accept": false,
+    "error": "field MM: corrupt field 1 in map entry: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "9a01021001",
+    "accept": true,
+    "known": "9a010408001200"
+  },
+  {
+    "input": "9a01021080",
+    "accept": false,
+    "error": "field MM: corrupt field 2 in map entry: unexpected EOF"
+  },
+  {
+    "input": "9a0109110100000000000000",
+    "accept": true,
+    "known": "9a010408001200"
+  },
+  {
+    "input": "9a010411010000",
+    "accept": false,
+    "error": "field MM: corrupt field 2 in map entry: unexpected EOF"
+  },
+  {
+    "input": "9a01021200",
+    "accept": true,
+    "known": "9a010408001200"
+  },
+  {
+    "input": "9a0103120101",
+    "accept": false,
+    "error": "field MM: map value: corrupt tag"
+  },
+  {
+    "input": "9a01021201",
+    "accept": false,
+    "error": "field MM: map value: corrupt embedded message"
+  },
+  {
+    "input": "9a01021314",
+    "accept": true,
+    "known": "9a010408001200"
+  },
+  {
+    "input": "9a010113",
+    "accept": false,
+    "error": "field MM: corrupt field 2 in map entry: unexpected EOF"
+  },
+  {
+    "input": "9a010114",
+    "accept": false,
+    "error": "field MM: corrupt field 2 in map entry: proto: mismatching end group marker"
+  },
+  {
+    "input": "9a01051501000000",
+    "accept": true,
+    "known": "9a010408001200"
+  },
+  {
+    "input": "9a0103150100",
+    "accept": false,
+    "error": "field MM: corrupt field 2 in map entry: unexpected EOF"
+  },
+  {
+    "input": "9a01021601",
+    "accept": false,
+    "error": "field MM: corrupt field 2 in map entry: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "9a01021701",
+    "accept": false,
+    "error": "field MM: corrupt field 2 in map entry: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "9a01021801",
+    "accept": true,
+    "known": "9a010408001200"
+  },
+  {
+    "input": "9a01021880",
+    "accept": false,
+    "error": "field MM: corrupt field 3 in map entry: unexpected EOF"
+  },
+  {
+    "input": "9a0109190100000000000000",
+    "accept": true,
+    "known": "9a010408001200"
+  },
+  {
+    "input": "9a010419010000",
+    "accept": false,
+    "error": "field MM: corrupt field 3 in map entry: unexpected EOF"
+  },
+  {
+    "input": "9a01021a00",
+    "accept": true,
+    "known": "9a010408001200"
+  },
+  {
+    "input": "9a01031a0101",
+    "accept": true,
+    "known": "9a010408001200"
+  },
+  {
+    "input": "9a01021a01",
+    "accept": false,
+    "error": "field MM: corrupt field 3 in map entry: unexpected EOF"
+  },
+  {
+    "input": "9a01021b1c",
+    "accept": true,
+    "known": "9a010408001200"
+  },
+  {
+    "input": "9a01011b",
+    "accept": false,
+    "error": "field MM: corrupt field 3 in map entry: unexpected EOF"
+  },
+  {
+    "input": "9a01011c",
+    "accept": false,
+    "error": "field MM: corrupt field 3 in map entry: proto: mismatching end group marker"
+  },
+  {
+    "input": "9a01051d01000000",
+    "accept": true,
+    "known": "9a010408001200"
+  },
+  {
+    "input": "9a01031d0100",
+    "accept": false,
+    "error": "field MM: corrupt field 3 in map entry: unexpected EOF"
+  },
+  {
+    "input": "9a01021e01",
+    "accept": false,
+    "error": "field MM: corrupt field 3 in map entry: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "9a01021f01",
+    "accept": false,
+    "error": "field MM: corrupt field 3 in map entry: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "b201020801",
+    "accept": true,
+    "known": "b20100"
+  },
+  {
+    "input": "b201020880",
+    "accept": false,
+    "error": "field D: corrupt field 1: unexpected EOF"
+  },
+  {
+    "input": "b20109090100000000000000",
+    "accept": true,
+    "known": "b20100"
+  },
+  {
+    "input": "b2010409010000",
+    "accept": false,
+    "error": "field D: corrupt field 1: unexpected EOF"
+  },
+  {
+    "input": "b201020a00",
+    "accept": true,
+    "known": "b20100"
+  },
+  {
+    "input": "b201030a0101",
+    "accept": true,
+    "known": "b201030a0101"
+  },
+  {
+    "input": "b201020a01",
+    "accept": false,
+    "error": "field D: field Name: corrupt string"
+  },
+  {
+    "input": "b201020b0c",
+    "accept": true,
+    "known": "b20100"
+  },
+  {
+    "input": "b201010b",
+    "accept": false,
+    "error": "field D: corrupt field 1: unexpected EOF"
+  },
+  {
+    "input": "b201010c",
+    "accept": false,
+    "error": "field D: corrupt field 1: proto: mismatching end group marker"
+  },
+  {
+    "input": "b201050d01000000",
+    "accept": true,
+    "known": "b20100"
+  },
+  {
+    "input": "b201030d0100",
+    "accept": false,
+    "error": "field D: corrupt field 1: unexpected EOF"
+  },
+  {
+    "input": "b201020e01",
+    "accept": false,
+    "error": "field D: corrupt field 1: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "b201020f01",
+    "accept": false,
+    "error": "field D: corrupt field 1: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "b201021001",
+    "accept": true,
+    "known": "b201021001"
+  },
+  {
+    "input": "b201021080",
+    "accept": false,
+    "error": "field D: field N: corrupt int"
+  },
+  {
+    "input": "b20109110100000000000000",
+    "accept": true,
+    "known": "b20100"
+  },
+  {
+    "input": "b2010411010000",
+    "accept": false,
+    "error": "field D: corrupt field 2: unexpected EOF"
+  },
+  {
+    "input": "b201021200",
+    "accept": true,
+    "known": "b20100"
+  },
+  {
+    "input": "b20103120101",
+    "accept": true,
+    "known": "b20100"
+  },
+  {
+    "input": "b201021201",
+    "accept": false,
+    "error": "field D: corrupt field 2: unexpected EOF"
+  },
+  {
+    "input": "b201021314",
+    "accept": true,
+    "known": "b20100"
+  },
+  {
+    "input": "b2010113",
+    "accept": false,
+    "error": "field D: corrupt field 2: unexpected EOF"
+  },
+  {
+    "input": "b2010114",
+    "accept": false,
+    "error": "field D: corrupt field 2: proto: mismatching end group marker"
+  },
+  {
+    "input": "b201051501000000",
+    "accept": true,
+    "known": "b20100"
+  },
+  {
+    "input": "b20103150100",
+    "accept": false,
+    "error": "field D: corrupt field 2: unexpected EOF"
+  },
+  {
+    "input": "b201021601",
+    "accept": false,
+    "error": "field D: corrupt field 2: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "b201021701",
+    "accept": false,
+    "error": "field D: corrupt field 2: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "b201021801",
+    "accept": true,
+    "known": "b20100"
+  },
+  {
+    "input": "b201021880",
+    "accept": false,
+    "error": "field D: corrupt field 3: unexpected EOF"
+  },
+  {
+    "input": "b20109190100000000000000",
+    "accept": true,
+    "known": "b20100"
+  },
+  {
+    "input": "b2010419010000",
+    "accept": false,
+    "error": "field D: corrupt field 3: unexpected EOF"
+  },
+  {
+    "input": "b201021a00",
+    "accept": true,
+    "known": "b20100"
+  },
+  {
+    "input": "b201031a0101",
+    "accept": true,
+    "known": "b20100"
+  },
+  {
+    "input": "b201021a01",
+    "accept": false,
+    "error": "field D: corrupt field 3: unexpected EOF"
+  },
+  {
+    "input": "b201021b1c",
+    "accept": true,
+    "known": "b20100"
+  },
+  {
+    "input": "b201011b",
+    "accept": false,
+    "error": "field D: corrupt field 3: unexpected EOF"
+  },
+  {
+    "input": "b201011c",
+    "accept": false,
+    "error": "field D: corrupt field 3: proto: mismatching end group marker"
+  },
+  {
+    "input": "b201051d01000000",
+    "accept": true,
+    "known": "b20100"
+  },
+  {
+    "input": "b201031d0100",
+    "accept": false,
+    "error": "field D: corrupt field 3: unexpected EOF"
+  },
+  {
+    "input": "b201021e01",
+    "accept": false,
+    "error": "field D: corrupt field 3: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "b201021f01",
+    "accept": false,
+    "error": "field D: corrupt field 3: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "ca01020801",
+    "accept": true,
+    "known": "ca010408011000"
+  },
+  {
+    "input": "ca01020880",
+    "accept": false,
+    "error": "field BM: map key: corrupt bool"
+  },
+  {
+    "input": "ca0109090100000000000000",
+    "accept": true,
+    "known": "ca010408001000"
+  },
+  {
+    "input": "ca010409010000",
+    "accept": false,
+    "error": "field BM: corrupt field 1 in map entry: unexpected EOF"
+  },
+  {
+    "input": "ca01020a00",
+    "accept": true,
+    "known": "ca010408001000"
+  },
+  {
+    "input": "ca01030a0101",
+    "accept": true,
+    "known": "ca010408001000"
+  },
+  {
+    "input": "ca01020a01",
+    "accept": false,
+    "error": "field BM: corrupt field 1 in map entry: unexpected EOF"
+  },
+  {
+    "input": "ca01020b0c",
+    "accept": true,
+    "known": "ca010408001000"
+  },
+  {
+    "input": "ca01010b",
+    "accept": false,
+    "error": "field BM: corrupt field 1 in map entry: unexpected EOF"
+  },
+  {
+    "input": "ca01010c",
+    "accept": false,
+    "error": "field BM: corrupt field 1 in map entry: proto: mismatching end group marker"
+  },
+  {
+    "input": "ca01050d01000000",
+    "accept": true,
+    "known": "ca010408001000"
+  },
+  {
+    "input": "ca01030d0100",
+    "accept": false,
+    "error": "field BM: corrupt field 1 in map entry: unexpected EOF"
+  },
+  {
+    "input": "ca01020e01",
+    "accept": false,
+    "error": "field BM: corrupt field 1 in map entry: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "ca01020f01",
+    "accept": false,
+    "error": "field BM: corrupt field 1 in map entry: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "ca01021001",
+    "accept": true,
+    "known": "ca010408001001"
+  },
+  {
+    "input": "ca01021080",
+    "accept": false,
+    "error": "field BM: map value: corrupt bool"
+  },
+  {
+    "input": "ca0109110100000000000000",
+    "accept": true,
+    "known": "ca010408001000"
+  },
+  {
+    "input": "ca010411010000",
+    "accept": false,
+    "error": "field BM: corrupt field 2 in map entry: unexpected EOF"
+  },
+  {
+    "input": "ca01021200",
+    "accept": true,
+    "known": "ca010408001000"
+  },
+  {
+    "input": "ca0103120101",
+    "accept": true,
+    "known": "ca010408001000"
+  },
+  {
+    "input": "ca01021201",
+    "accept": false,
+    "error": "field BM: corrupt field 2 in map entry: unexpected EOF"
+  },
+  {
+    "input": "ca01021314",
+    "accept": true,
+    "known": "ca010408001000"
+  },
+  {
+    "input": "ca010113",
+    "accept": false,
+    "error": "field BM: corrupt field 2 in map entry: unexpected EOF"
+  },
+  {
+    "input": "ca010114",
+    "accept": false,
+    "error": "field BM: corrupt field 2 in map entry: proto: mismatching end group marker"
+  },
+  {
+    "input": "ca01051501000000",
+    "accept": true,
+    "known": "ca010408001000"
+  },
+  {
+    "input": "ca0103150100",
+    "accept": false,
+    "error": "field BM: corrupt field 2 in map entry: unexpected EOF"
+  },
+  {
+    "input": "ca01021601",
+    "accept": false,
+    "error": "field BM: corrupt field 2 in map entry: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "ca01021701",
+    "accept": false,
+    "error": "field BM: corrupt field 2 in map entry: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "ca01021801",
+    "accept": true,
+    "known": "ca010408001000"
+  },
+  {
+    "input": "ca01021880",
+    "accept": false,
+    "error": "field BM: corrupt field 3 in map entry: unexpected EOF"
+  },
+  {
+    "input": "ca0109190100000000000000",
+    "accept": true,
+    "known": "ca010408001000"
+  },
+  {
+    "input": "ca010419010000",
+    "accept": false,
+    "error": "field BM: corrupt field 3 in map entry: unexpected EOF"
+  },
+  {
+    "input": "ca01021a00",
+    "accept": true,
+    "known": "ca010408001000"
+  },
+  {
+    "input": "ca01031a0101",
+    "accept": true,
+    "known": "ca010408001000"
+  },
+  {
+    "input": "ca01021a01",
+    "accept": false,
+    "error": "field BM: corrupt field 3 in map entry: unexpected EOF"
+  },
+  {
+    "input": "ca01021b1c",
+    "accept": true,
+    "known": "ca010408001000"
+  },
+  {
+    "input": "ca01011b",
+    "accept": false,
+    "error": "field BM: corrupt field 3 in map entry: unexpected EOF"
+  },
+  {
+    "input": "ca01011c",
+    "accept": false,
+    "error": "field BM: corrupt field 3 in map entry: proto: mismatching end group marker"
+  },
+  {
+    "input": "ca01051d01000000",
+    "accept": true,
+    "known": "ca010408001000"
+  },
+  {
+    "input": "ca01031d0100",
+    "accept": false,
+    "error": "field BM: corrupt field 3 in map entry: unexpected EOF"
+  },
+  {
+    "input": "ca01021e01",
+    "accept": false,
+    "error": "field BM: corrupt field 3 in map entry: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "ca01021f01",
+    "accept": false,
+    "error": "field BM: corrupt field 3 in map entry: proto: cannot parse reserved wire type"
+  },
+  {
+    "input": "0a01610801",
+    "accept": true,
+    "known": "0a0161"
+  },
+  {
+    "input": "10071501000000",
+    "accept": true,
+    "known": "1007"
+  },
+  {
+    "input": "7201017001",
+    "accept": true,
+    "known": "72020101"
+  },
+  {
+    "input": "70017501000000",
+    "accept": true,
+    "known": "720101"
+  }
+]
