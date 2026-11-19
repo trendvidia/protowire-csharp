@@ -15,4 +15,10 @@ Copyright (c) 2026 TrendVidia, LLC.
     <ProjectReference Include="..\..\src\Protowire.Pb\Protowire.Pb.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="testdata\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
