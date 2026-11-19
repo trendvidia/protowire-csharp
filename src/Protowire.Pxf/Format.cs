@@ -164,7 +164,14 @@ public static class Format
                     .Append(" {").Append(Encoding.UTF8.GetString(d.Body)).Append('}');
                 break;
             case ProtoShape.Source:
-                sb.Append(" \"\"\"").Append(Encoding.UTF8.GetString(d.Body)).Append("\"\"\"");
+                // The delimiters go on lines of their own, as protowire-go
+                // writes them since its #303. Reading strips the line break
+                // after the opening """ and drops the last line when it holds
+                // only whitespace, so the body reads back byte for byte;
+                // written on the delimiters' lines instead, a body ending in
+                // '"' would close the string early and a whitespace-only last
+                // line would be dropped.
+                sb.Append(" \"\"\"\n").Append(Encoding.UTF8.GetString(d.Body)).Append("\n\"\"\"");
                 break;
             case ProtoShape.Descriptor:
                 sb.Append(" b\"").Append(Convert.ToBase64String(d.Body)).Append('"');

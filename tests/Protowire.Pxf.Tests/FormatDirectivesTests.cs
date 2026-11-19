@@ -98,12 +98,48 @@ public class FormatDirectivesTests
     [Theory]
     [InlineData("@proto { string id = 1; }\n@dataset (id)\n(\"a\")\n", "")]
     [InlineData("@proto a.v1.R { string id = 1; }\n@dataset a.v1.R (id)\n(\"a\")\n", "")]
-    [InlineData("@proto \"\"\"syntax = \"proto3\"; message R { string id = 1; }\"\"\"\n@dataset R (id)\n(\"a\")\n", "")]
+    // The triple quotes go on lines of their own (protowire-go#303).
+    [InlineData("@proto \"\"\"syntax = \"proto3\"; message R { string id = 1; }\"\"\"\n@dataset R (id)\n(\"a\")\n",
+        "@proto \"\"\"\nsyntax = \"proto3\"; message R { string id = 1; }\n\"\"\"\n@dataset R (id)\n(\"a\")\n")]
     // @type moves to the front: it binds no @proto, so this changes nothing.
     [InlineData("@proto b\"CgA=\"\n@type a.v1.M\n\nx = 1\n", "@type a.v1.M\n@proto b\"CgA=\"\n\nx = 1\n")]
     public void ProtoShapes(string src, string want)
     {
         Assert.Equal(want == "" ? src : want, FormatRoundTrip(src));
+    }
+
+    /// <summary>
+    /// A triple-quoted @proto is written with its delimiters on lines of their
+    /// own, and its body reads back byte for byte. Ports protowire-go's
+    /// <c>TestFormatDocument_ProtoSourceLayout</c> (protowire-go#303).
+    /// </summary>
+    [Fact]
+    public void ProtoSourceLayoutKeepsLineBreaks()
+    {
+        // protowire-go#303's document: the line breaks around the body stay.
+        const string Src = "@proto \"\"\"\n  syntax = \"proto3\";\n  package fmt.v1;\n  message Doc { string name = 1; }\n\"\"\"\n@type fmt.v1.Doc\n";
+        Assert.Equal(
+            "@type fmt.v1.Doc\n@proto \"\"\"\n  syntax = \"proto3\";\n  package fmt.v1;\n  message Doc { string name = 1; }\n\"\"\"\n",
+            FormatRoundTrip(Src));
+    }
+
+    [Theory]
+    // Written on the closing delimiter's line, the last quote would open the
+    // closing """ early, and the output would not parse.
+    [InlineData("@proto \"\"\"\n  syntax = \"proto3\";\n  import \"google/protobuf/empty.proto\"\n  \"\"\"\n",
+        "syntax = \"proto3\";\nimport \"google/protobuf/empty.proto\"")]
+    // Written on the closing delimiter's line, a last line of only whitespace
+    // would be taken for the delimiter's indent and dropped.
+    [InlineData("@proto \"\"\"syntax = \"proto3\";\n  \n\"\"\"\n", "syntax = \"proto3\";\n  ")]
+    [InlineData("@proto \"\"\"\n\nsyntax = \"proto3\";\"\"\"\n", "\nsyntax = \"proto3\";")]
+    [InlineData("@proto \"\"\"syntax = \"proto3\";\n\n\"\"\"\n", "syntax = \"proto3\";\n")]
+    [InlineData("@proto \"\"\"\"\"\"\n", "")]
+    public void ProtoSourceBodyReadsBack(string src, string body)
+    {
+        var doc = Parser.Parse(src);
+        Assert.Single(doc.Protos);
+        Assert.Equal(body, Encoding.UTF8.GetString(doc.Protos[0].Body));
+        Assert.Equal("@proto \"\"\"\n" + body + "\n\"\"\"\n", FormatRoundTrip(src));
     }
 
     /// <summary>
