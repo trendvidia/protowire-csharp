@@ -85,6 +85,13 @@ public sealed class Parser
 
     public static Document Parse(string input) => Parse(input, PxfLimits.Default);
 
+    /// <summary>
+    /// Refuses a @proto source body written as a simple-quoted string, in
+    /// protowire-go's words (#117).
+    /// </summary>
+    internal const string ProtoSourceNotTriple =
+        "@proto source body must be a triple-quoted string (\"\"\"...\"\"\")";
+
     internal const string DatasetBesideEntries =
         "@dataset directive cannot coexist with top-level field entries; the document's payload is the @dataset rows (draft §3.4.4)";
 
@@ -444,7 +451,15 @@ public sealed class Parser
                 }
             case TokenKind.STRING:
                 {
-                    // Lexer already applied triple-quote dedent and unescaped.
+                    // Source: @proto """<proto-source>""". The grammar admits
+                    // only the triple-quoted form (proto_source_body =
+                    // triple_string), and a simple-quoted body could carry
+                    // """, which no formatter can write back (#117).
+                    if (!_lex.TripleAt(_current.Pos))
+                    {
+                        throw new PxfException(_current.Pos, ProtoSourceNotTriple);
+                    }
+                    // Lexer already applied triple-quote dedent.
                     byte[] bytes = System.Text.Encoding.UTF8.GetBytes(_current.Value);
                     int endOffset = _lex.Base + _lex.Pos;
                     Advance();
