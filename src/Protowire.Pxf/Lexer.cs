@@ -84,6 +84,17 @@ internal class Lexer
     /// </summary>
     internal string Prec { get; private set; } = "";
 
+    /// <summary>
+    /// Whether the token at <paramref name="pos"/>, a STRING, was written
+    /// triple-quoted. The token's value cannot tell: both forms lex to
+    /// STRING. Mirrors <c>tripleAt</c> in protowire-go's lexer.
+    /// </summary>
+    internal bool TripleAt(Position pos)
+    {
+        int i = pos.Offset - _base;
+        return i >= 0 && i + 3 <= _input.Length && string.CompareOrdinal(_input, i, "\"\"\"", 0, 3) == 0;
+    }
+
     /// <summary>The raw input the lexer is scanning.</summary>
     internal string Input => _input;
 
