@@ -374,6 +374,60 @@ public class DirectiveTests
         Assert.Contains("expected '{', dotted identifier", ex.Message);
     }
 
+    // A source body must be triple-quoted: the grammar's proto_source_body is
+    // a triple_string. A simple-quoted body could carry """ through its
+    // escapes, and no formatter can write that back (#117). The message is
+    // protowire-go's (go#311).
+    [Theory]
+    [InlineData("@proto \"syntax = \\\"proto3\\\";\"", "1:8")]
+    [InlineData("@proto \"syntax = \\\"proto3\\\"; // a \\\"\\\"\\\" b\"", "1:8")]
+    [InlineData("@proto \"\"", "1:8")]
+    [InlineData("@proto\n\"syntax\"", "2:1")]
+    [InlineData("@type a.v1.M\n@proto \"syntax\"", "2:8")]
+    public void Proto_Source_MustBeTripleQuoted(string doc, string at)
+    {
+        string want = $"{at}: @proto source body must be a triple-quoted string (\"\"\"...\"\"\")";
+
+        var e = Assert.Throws<PxfException>(() => Parser.Parse(doc));
+        Assert.Equal(want, e.Message);
+
+        // Unmarshal reads directives on its own path.
+        e = Assert.Throws<PxfException>(() =>
+            new Decoder { DiscardUnknown = true }.Unmarshal(doc + "\nx = 1\n", new Google.Protobuf.WellKnownTypes.Empty()));
+        Assert.Equal(want, e.Message);
+
+        // So does a dataset stream's header, through Parse. A @type beside a
+        // @dataset is refused too, but only after the @proto.
+        e = Assert.Throws<PxfException>(() => DatasetReader.Create(
+            new MemoryStream(System.Text.Encoding.UTF8.GetBytes(doc + "\n@dataset T (a)\n(1)\n"))).Next());
+        Assert.Equal(want, e.Message);
+    }
+
+    // The triple-quoted form still reads, on the same line, the next line,
+    // or across lines; so does the bytes (descriptor) form, which the
+    // grammar admits as proto_descr_body.
+    [Theory]
+    [InlineData("@proto \"\"\"syntax = \"proto3\";\"\"\"\n", ProtoShape.Source, "syntax = \"proto3\";")]
+    [InlineData("@proto\n\"\"\"syntax = \"proto3\";\"\"\"\n", ProtoShape.Source, "syntax = \"proto3\";")]
+    [InlineData("@proto \"\"\"\nsyntax = \"proto3\";\n\"\"\"\n", ProtoShape.Source, "syntax = \"proto3\";")]
+    [InlineData("@type a.v1.M\n@proto \"\"\"syntax = \"proto3\";\"\"\"\n", ProtoShape.Source, "syntax = \"proto3\";")]
+    [InlineData("@proto b\"\"\n", ProtoShape.Descriptor, "")]
+    [InlineData("@proto b\"aGk=\"\n", ProtoShape.Descriptor, "hi")]
+    public void Proto_TripleQuotedAndBytesBodies_StillRead(string doc, ProtoShape shape, string body)
+    {
+        var p = Assert.Single(Parser.Parse(doc).Protos);
+        Assert.Equal(shape, p.Shape);
+        Assert.Equal(body, System.Text.Encoding.UTF8.GetString(p.Body));
+
+        new Decoder { DiscardUnknown = true }.Unmarshal(doc + "x = 1\n", new Google.Protobuf.WellKnownTypes.Empty());
+
+        if (doc.StartsWith("@type")) return; // a @type beside a @dataset is refused
+        var reader = DatasetReader.Create(
+            new MemoryStream(System.Text.Encoding.UTF8.GetBytes(doc + "@dataset T (a)\n(1)\n")));
+        Assert.NotNull(reader.Next());
+        Assert.Null(reader.Next());
+    }
+
     [Fact]
     public void Proto_AnonymousBeforeDataset()
     {

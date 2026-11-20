@@ -415,6 +415,10 @@ public partial class Decoder
                 }
             case TokenKind.STRING:
                 {
+                    if (!_lex.TripleAt(_current.Pos))
+                    {
+                        throw new PxfException(_current.Pos, Parser.ProtoSourceNotTriple);
+                    }
                     var bytes = System.Text.Encoding.UTF8.GetBytes(_current.Value);
                     Advance();
                     return new ProtoDirective
