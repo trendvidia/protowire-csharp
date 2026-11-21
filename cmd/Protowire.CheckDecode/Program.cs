@@ -8,7 +8,7 @@
 //
 // Contract:
 //
-//     check-decode --format <pxf|pxf-pb|pb|pb-render|pb-text|sbe|envelope> \
+//     check-decode --format <pxf|pxf-pb|pxf-fmt|pb|pb-render|pb-text|sbe|envelope> \
 //                  --schema <fully.qualified.MessageType> \
 //                  --proto  <path-to-adversarial.proto> \
 //                  --input  <path> \
@@ -17,6 +17,11 @@
 //     Exit 0 -> input was accepted (decode succeeded)
 //     Exit 1 -> input was rejected (clean error, "reject: <msg>" to stderr)
 //     Other  -> bug in the decoder (uncaught exception, OOM, ...)
+//
+// pb-text and pxf-pb also write their output on stdout, for the text gate and
+// the write gate (protowire/scripts/cross_text_check.sh and
+// cross_write_check.sh). pxf-fmt writes the formatted document on stdout, for
+// the format gate (cross_fmt_check.sh); it needs no --schema or --proto.
 //
 // Mirrors `protowire-go/scripts/check_decode/main.go`.
 //
@@ -77,7 +82,9 @@ internal static class CheckDecode
             }
         }
 
-        if (string.IsNullOrEmpty(format) || string.IsNullOrEmpty(schema) || string.IsNullOrEmpty(input))
+        // Formatting reads no schema, so pxf-fmt alone may leave --schema out.
+        if (string.IsNullOrEmpty(format) || (string.IsNullOrEmpty(schema) && format != "pxf-fmt")
+            || string.IsNullOrEmpty(input))
         {
             Console.Error.WriteLine("usage: check-decode --format ... --schema ... --input ... [--proto ...] [--limit NAME=VALUE]");
             return 2;
@@ -85,7 +92,7 @@ internal static class CheckDecode
 
         try
         {
-            DoRun(format!, schema!, input!, limits);
+            DoRun(format!, schema ?? "", input!, limits);
             return 0;
         }
         catch (Exception e) when (IsRejection(e))
@@ -123,6 +130,9 @@ internal static class CheckDecode
                 return;
             case "pxf-pb":
                 PxfPb(input, schema, limits);
+                return;
+            case "pxf-fmt":
+                PxfFmt(input);
                 return;
             case "pb":
                 PbDecode(input, schema, limits);
@@ -185,6 +195,21 @@ internal static class CheckDecode
         SortMaps(msg);
         using var stdout = Console.OpenStandardOutput();
         stdout.Write(msg.ToByteArray());
+    }
+
+    // pxf-fmt, for the format gate (protowire/scripts/cross_fmt_check.sh,
+    // protowire#584): the formatted document on stdout. Formatting works on the
+    // parsed document, not a message, so it keeps comments, directives and
+    // dataset rows and needs no schema. A document that does not parse is a
+    // rejection. The input is decoded as strict UTF-8 with any BOM kept, so the
+    // parser sees the bytes protowire-go's does; the output is UTF-8 bytes, as
+    // pb-text writes them.
+    private static void PxfFmt(string input)
+    {
+        var text = new System.Text.UTF8Encoding(false, true).GetString(File.ReadAllBytes(input));
+        var formatted = Format.FormatDocument(Parser.Parse(text));
+        using var stdout = Console.OpenStandardOutput();
+        stdout.Write(new System.Text.UTF8Encoding(false).GetBytes(formatted));
     }
 
     private static void SortMaps(IMessage msg)
