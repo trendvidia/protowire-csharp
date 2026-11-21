@@ -274,9 +274,23 @@ internal static class CheckDecode
     private static void PbRender(string input, string schema)
     {
         var bytes = File.ReadAllBytes(input);
+        var desc = Generated(schema);
+        CheckWire(desc, bytes, StockRecursionLimit);
         var stream = CodedInputStream.CreateWithLimits(new MemoryStream(bytes), bytes.Length, StockRecursionLimit);
-        var msg = Generated(schema).Parser.ParseFrom(stream);
+        var msg = desc.Parser.ParseFrom(stream);
         new Encoder().Marshal(msg);
+    }
+
+    // Google.Protobuf's limit when none is given, which pb-text parses with.
+    private const int StockDefaultRecursionLimit = 100;
+
+    // The stock reader takes a map entry holding wire type 6 or 7, which
+    // protobuf-go refuses (#120), so pb-render and pb-text refuse what
+    // protobuf-go refuses before it reads the bytes.
+    private static void CheckWire(MessageDescriptor desc, byte[] bytes, int recursionLimit)
+    {
+        string? err = WireCheck.Check(desc, bytes, recursionLimit);
+        if (err != null) throw new InvalidOperationException(err);
     }
 
     private static void PbDecode(string input, string schema, Dictionary<string, int> limits)
@@ -295,9 +309,11 @@ internal static class CheckDecode
     private static void PbText(string input, string schema)
     {
         var desc = TextMessage(schema);
+        var bytes = File.ReadAllBytes(input);
+        CheckWire(desc, bytes, StockDefaultRecursionLimit);
         // Bytes rather than text: the gate compares them, and Console would
         // translate the line ends on Windows.
-        var text = new Encoder().Marshal(desc.Parser.ParseFrom(File.ReadAllBytes(input)));
+        var text = new Encoder().Marshal(desc.Parser.ParseFrom(bytes));
         using var stdout = Console.OpenStandardOutput();
         stdout.Write(new System.Text.UTF8Encoding(false).GetBytes(text));
     }

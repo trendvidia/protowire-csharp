@@ -12,9 +12,18 @@ Copyright (c) 2026 TrendVidia, LLC.
     <ProjectReference Include="..\Protowire.Pb\Protowire.Pb.csproj" />
   </ItemGroup>
 
+  <!-- WireCheck skips a field as protowire.ConsumeFieldValue does (#120).
+       Compiled in rather than made visible: a Protowire.Pb of another
+       version would not have the same internals. -->
+  <ItemGroup>
+    <Compile Include="..\Protowire.Pb\Wire.cs" Link="Wire.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="Protowire.Pxf.Tests" />
     <InternalsVisibleTo Include="Protowire.Conformance" />
+    <!-- check-decode runs WireCheck in front of the stock parser. -->
+    <InternalsVisibleTo Include="check-decode" />
   </ItemGroup>
 
 </Project>

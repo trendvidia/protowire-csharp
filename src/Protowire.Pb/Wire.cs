@@ -7,7 +7,8 @@ namespace Protowire.Pb;
 /// error codes and texts, so a field read as unknown is refused exactly where,
 /// and in the words, protowire-go refuses it (trendvidia/protowire#614).
 /// Google.Protobuf's <c>SkipLastField</c> is not that skip: it consumes
-/// nothing for wire type 6 or 7, inside a group too.
+/// nothing for wire type 6 or 7, inside a group too. Protowire.Pxf compiles
+/// this file too, for <c>WireCheck</c> (#120).
 /// </summary>
 internal static class Wire
 {
@@ -16,7 +17,7 @@ internal static class Wire
     // protowire.DefaultRecursionLimit: how deep groups nest in a skipped value.
     private const int RecursionLimit = 10000;
 
-    private const int ErrTruncated = -1, ErrFieldNumber = -2, ErrOverflow = -3,
+    internal const int ErrTruncated = -1, ErrFieldNumber = -2, ErrOverflow = -3,
         ErrReserved = -4, ErrEndGroup = -5, ErrRecursionDepth = -6;
 
     /// <summary>protowire.ParseError's text for a negative length.</summary>
@@ -91,7 +92,7 @@ internal static class Wire
 
     // protowire.ConsumeTag: a field number below 1, or past an int32, is
     // refused.
-    private static int ConsumeTag(ReadOnlySpan<byte> b, out long num, out int typ)
+    internal static int ConsumeTag(ReadOnlySpan<byte> b, out long num, out int typ)
     {
         num = 0;
         typ = 0;
@@ -105,7 +106,7 @@ internal static class Wire
 
     // protowire.ConsumeVarint: at most ten bytes, and the tenth may only hold
     // the top bit.
-    private static int ConsumeVarint(ReadOnlySpan<byte> b, out ulong v)
+    internal static int ConsumeVarint(ReadOnlySpan<byte> b, out ulong v)
     {
         v = 0;
         for (int i = 0; i < 10; i++)

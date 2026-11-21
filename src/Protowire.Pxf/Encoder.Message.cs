@@ -448,19 +448,8 @@ public partial class Encoder
         var desc = Registry.Find(url[(url.LastIndexOf('/') + 1)..]);
         if (desc == null) return false;
 
-        IMessage inner;
-        try
-        {
-            // The parser's own recursion limit is 100 whatever this
-            // encoder's is; under a raised MaxNestingDepth a deeper value
-            // still fits a body, so it parses to that limit instead.
-            using var stream = new MemoryStream(value.ToByteArray(), writable: false);
-            inner = desc.Parser.ParseFrom(CodedInputStream.CreateWithLimits(stream, int.MaxValue, MaxNestingDepth));
-        }
-        catch (InvalidProtocolBufferException)
-        {
-            return false;
-        }
+        var inner = UnpackAny(desc, value, MaxNestingDepth);
+        if (inner == null) return false;
 
         var outer = _sb;
         _sb = new StringBuilder();
@@ -491,5 +480,30 @@ public partial class Encoder
         WriteIndent(level);
         _sb.Append("}\n");
         return true;
+    }
+
+    /// <summary>
+    /// An Any's value read as <paramref name="desc"/>, or null if protobuf-go
+    /// would not read it. Google.Protobuf accepts a map entry holding wire
+    /// type 6 or 7, so the bytes are checked first (#120). Such a value was
+    /// not written as a body before the check either, since a body is written
+    /// only when it reads back as the same bytes. The check means the stock
+    /// parser no longer decides what is readable.
+    /// </summary>
+    internal static IMessage? UnpackAny(MessageDescriptor desc, ByteString value, int maxDepth)
+    {
+        if (WireCheck.Check(desc, value.Span, maxDepth) != null) return null;
+        try
+        {
+            // The parser's own recursion limit is 100 whatever this
+            // encoder's is; under a raised MaxNestingDepth a deeper value
+            // still fits a body, so it parses to that limit instead.
+            using var stream = new MemoryStream(value.ToByteArray(), writable: false);
+            return desc.Parser.ParseFrom(CodedInputStream.CreateWithLimits(stream, int.MaxValue, maxDepth));
+        }
+        catch (InvalidProtocolBufferException)
+        {
+            return null;
+        }
     }
 }
