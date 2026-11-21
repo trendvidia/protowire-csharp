@@ -34,7 +34,9 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: tool/go_oracle/go.mod
-          cache-dependency-path: tool/go_oracle/go.sum
+          cache-dependency-path: |
+            tool/go_oracle/go.sum
+            tool/wire_type_oracle/go.sum
 
       - name: Move to protowire-go main
         if: github.event_name == 'schedule'
@@ -46,6 +48,14 @@ jobs:
       - name: Run the reference
         working-directory: tool/go_oracle
         run: go run . -root ../.. -out "$RUNNER_TEMP/oracle.json"
+
+      # tests/Protowire.Pb.Tests reads protobuf-go's answers from this table
+      # (#116); it must be what tool/wire_type_oracle writes.
+      - name: Regenerate the wire-type table
+        working-directory: tool/wire_type_oracle
+        run: |
+          go run . -out ../../tests/Protowire.Pb.Tests/testdata/wire-types.json
+          git diff --exit-code -- ../../tests/Protowire.Pb.Tests/testdata/wire-types.json
 
       - name: Compare
         env:

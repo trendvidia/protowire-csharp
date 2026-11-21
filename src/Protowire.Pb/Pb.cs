@@ -65,8 +65,7 @@ public static class Pb
         }
         var type = v.GetType();
         var info = GetStructInfo(type);
-        var input = new CodedInputStream(data);
-        UnmarshalStruct(input, v, info, 0, limits);
+        UnmarshalStruct(data, v, info, 0, limits);
     }
 
     private static StructInfo GetStructInfo(Type type)
@@ -315,31 +314,93 @@ public static class Pb
         return false;
     }
 
-    private static void UnmarshalStruct(CodedInputStream input, object v, StructInfo info, int depth, PbLimits limits)
+    private static void UnmarshalStruct(byte[] data, object v, StructInfo info, int depth, PbLimits limits)
     {
+        var input = new CodedInputStream(data);
         uint tag;
         while ((tag = input.ReadTag()) != 0)
         {
             var fieldNum = WireFormat.GetTagFieldNumber(tag);
-            if (info.ByNumber.TryGetValue(fieldNum, out var field))
+            if (!info.ByNumber.TryGetValue(fieldNum, out var field) || !field.Wire.Accepts(WireFormat.GetTagWireType(tag)))
             {
-                if (!string.IsNullOrEmpty(field.Oneof))
+                // An unknown field, or a known one whose wire type does not
+                // match its type, which protobuf treats as unknown.
+                input = SkipField(data, input, tag, "");
+                continue;
+            }
+            if (!string.IsNullOrEmpty(field.Oneof))
+            {
+                foreach (var other in info.Fields.Where(f => f.Oneof == field.Oneof && f != field))
                 {
-                    foreach (var other in info.Fields.Where(f => f.Oneof == field.Oneof && f != field))
-                    {
-                        other.SetValue(v, null); // Clear other fields in the same oneof
-                    }
+                    other.SetValue(v, null); // Clear other fields in the same oneof
                 }
-                var currentVal = field.GetValue(v);
-                var newVal = UnmarshalField(input, tag, field.Type, currentVal, field.ZigZag, depth, limits);
-                field.SetValue(v, newVal);
             }
-            else
-            {
-                input.SkipLastField();
-            }
+            var currentVal = field.GetValue(v);
+            var newVal = UnmarshalField(input, tag, field.Type, currentVal, field.ZigZag, depth, limits);
+            field.SetValue(v, newVal);
         }
     }
+
+    // Skips the value of the field whose tag was just read from input, a
+    // stream over the whole of data, and returns a stream over what follows.
+    // It refuses wire types 6 and 7, a stray end-group and a value cut short,
+    // as protobuf does, in protowire-go's words (protowire#614).
+    private static CodedInputStream SkipField(byte[] data, CodedInputStream input, uint tag, string where)
+    {
+        int num = WireFormat.GetTagFieldNumber(tag);
+        int at = (int)input.Position;
+        int n = Wire.ConsumeFieldValue(num, (int)WireFormat.GetTagWireType(tag), data.AsSpan(at));
+        if (n < 0)
+        {
+            throw new InvalidOperationException($"corrupt field {num}{where}: {Wire.ParseError(n)}");
+        }
+        return new CodedInputStream(data, at + n, data.Length - at - n);
+    }
+
+    /// <summary>
+    /// The wire types a field is read from: the one its type is written with
+    /// and, for a repeated scalar, the packed (length-delimited) form. A tag
+    /// with any other wire type is not that field's value, so it is skipped as
+    /// protobuf skips an unknown field (draft -01 § PB Binary Encoding,
+    /// protowire#614).
+    /// </summary>
+    private readonly record struct WireTypes(WireFormat.WireType Type, bool Packed)
+    {
+        public bool Accepts(WireFormat.WireType t) => t == Type || (Packed && t == WireFormat.WireType.LengthDelimited);
+    }
+
+    // Mirrors UnmarshalField's dispatch on the type.
+    private static WireTypes WireTypesOf(Type type)
+    {
+        var t = Nullable.GetUnderlyingType(type) ?? type;
+        if (!IsScalar(t) && !typeof(System.Collections.IDictionary).IsAssignableFrom(t)
+            && typeof(System.Collections.IList).IsAssignableFrom(t))
+        {
+            var itemType = t.IsArray ? t.GetElementType()! : t.GetGenericArguments()[0];
+            return new WireTypes(ScalarWireType(itemType), IsPackable(itemType));
+        }
+        return new WireTypes(ScalarWireType(t), false);
+    }
+
+    // The wire type a value of this type is written with. A string, bytes,
+    // big number, map entry or message is length-delimited.
+    private static WireFormat.WireType ScalarWireType(Type type)
+    {
+        var t = Nullable.GetUnderlyingType(type) ?? type;
+        if (t == typeof(bool) || t == typeof(int) || t == typeof(long) || t == typeof(uint) || t == typeof(ulong) || t.IsEnum)
+        {
+            return WireFormat.WireType.Varint;
+        }
+        if (t == typeof(float)) return WireFormat.WireType.Fixed32;
+        if (t == typeof(double)) return WireFormat.WireType.Fixed64;
+        return WireFormat.WireType.LengthDelimited;
+    }
+
+    // The types UnmarshalField reads before it looks for a map or a list.
+    private static bool IsScalar(Type t) =>
+        t == typeof(bool) || t == typeof(int) || t == typeof(long) || t == typeof(uint) || t == typeof(ulong)
+        || t == typeof(float) || t == typeof(double) || t == typeof(string) || t == typeof(byte[])
+        || t == typeof(ByteString) || t == typeof(BigInteger) || t == typeof(Decimal) || t == typeof(BigFloat) || t.IsEnum;
 
     private static object? UnmarshalField(CodedInputStream input, uint tag, Type type, object? currentVal, bool zigzag, int depth, PbLimits limits)
     {
@@ -373,16 +434,19 @@ public static class Pb
             }
             var entryData = input.ReadBytes().ToByteArray();
             var entryInput = new CodedInputStream(entryData);
+            var keyWire = WireTypesOf(keyType);
+            var valWire = WireTypesOf(valType);
             object? key = null, val = null;
             uint etag;
             while ((etag = entryInput.ReadTag()) != 0)
             {
                 var enumNum = WireFormat.GetTagFieldNumber(etag);
+                var etyp = WireFormat.GetTagWireType(etag);
                 // HARDENING.md § Recursion: a map entry is one descent, so a
                 // message value sits two below the map field's parent.
-                if (enumNum == 1) key = UnmarshalField(entryInput, etag, keyType, null, zigzag, depth + 1, limits);
-                else if (enumNum == 2) val = UnmarshalField(entryInput, etag, valType, null, zigzag, depth + 1, limits);
-                else entryInput.SkipLastField();
+                if (enumNum == 1 && keyWire.Accepts(etyp)) key = UnmarshalField(entryInput, etag, keyType, null, zigzag, depth + 1, limits);
+                else if (enumNum == 2 && valWire.Accepts(etyp)) val = UnmarshalField(entryInput, etag, valType, null, zigzag, depth + 1, limits);
+                else entryInput = SkipField(entryData, entryInput, etag, " in map entry");
             }
             // Protobuf: a field missing from a map entry is its type's
             // default, so an entry is never dropped and a value never null.
@@ -426,8 +490,7 @@ public static class Pb
         }
         var nestedData = input.ReadBytes().ToByteArray();
         var nestedVal = Activator.CreateInstance(type)!;
-        var nestedInput = new CodedInputStream(nestedData);
-        UnmarshalStruct(nestedInput, nestedVal, GetStructInfo(type), depth + 1, limits);
+        UnmarshalStruct(nestedData, nestedVal, GetStructInfo(type), depth + 1, limits);
         return nestedVal;
     }
 
@@ -488,11 +551,12 @@ public static class Pb
         uint tag;
         while ((tag = input.ReadTag()) != 0)
         {
-            switch (WireFormat.GetTagFieldNumber(tag))
+            // A field whose wire type does not match is skipped as unknown.
+            switch (WireFormat.GetTagFieldNumber(tag), WireFormat.GetTagWireType(tag))
             {
-                case 1: absBytes = input.ReadBytes().ToByteArray(); break;
-                case 2: negative = input.ReadBool(); break;
-                default: input.SkipLastField(); break;
+                case (1, WireFormat.WireType.LengthDelimited): absBytes = input.ReadBytes().ToByteArray(); break;
+                case (2, WireFormat.WireType.Varint): negative = input.ReadBool(); break;
+                default: input = SkipField(data, input, tag, " in BigInt"); break;
             }
         }
         if (absBytes == null) return BigInteger.Zero;
@@ -597,12 +661,13 @@ public static class Pb
         uint tag;
         while ((tag = input.ReadTag()) != 0)
         {
-            switch (WireFormat.GetTagFieldNumber(tag))
+            // A field whose wire type does not match is skipped as unknown.
+            switch (WireFormat.GetTagFieldNumber(tag), WireFormat.GetTagWireType(tag))
             {
-                case 1: dec.Unscaled = new BigInteger(input.ReadBytes().ToByteArray(), isUnsigned: true, isBigEndian: true); break;
-                case 2: dec.Scale = input.ReadInt32(); break;
-                case 3: dec.Negative = input.ReadBool(); break;
-                default: input.SkipLastField(); break;
+                case (1, WireFormat.WireType.LengthDelimited): dec.Unscaled = new BigInteger(input.ReadBytes().ToByteArray(), isUnsigned: true, isBigEndian: true); break;
+                case (2, WireFormat.WireType.Varint): dec.Scale = input.ReadInt32(); break;
+                case (3, WireFormat.WireType.Varint): dec.Negative = input.ReadBool(); break;
+                default: input = SkipField(data, input, tag, " in Decimal"); break;
             }
         }
         // Rendering costs work proportional to the scale, four bytes whoever
@@ -689,13 +754,14 @@ public static class Pb
         uint tag;
         while ((tag = input.ReadTag()) != 0)
         {
-            switch (WireFormat.GetTagFieldNumber(tag))
+            // A field whose wire type does not match is skipped as unknown.
+            switch (WireFormat.GetTagFieldNumber(tag), WireFormat.GetTagWireType(tag))
             {
-                case 1: bf.Mantissa = new BigInteger(input.ReadBytes().ToByteArray(), isUnsigned: true, isBigEndian: true); break;
-                case 2: bf.Exponent = input.ReadInt32(); break;
-                case 3: bf.Precision = input.ReadUInt32(); break;
-                case 4: bf.Negative = input.ReadBool(); break;
-                default: input.SkipLastField(); break;
+                case (1, WireFormat.WireType.LengthDelimited): bf.Mantissa = new BigInteger(input.ReadBytes().ToByteArray(), isUnsigned: true, isBigEndian: true); break;
+                case (2, WireFormat.WireType.Varint): bf.Exponent = input.ReadInt32(); break;
+                case (3, WireFormat.WireType.Varint): bf.Precision = input.ReadUInt32(); break;
+                case (4, WireFormat.WireType.Varint): bf.Negative = input.ReadBool(); break;
+                default: input = SkipField(data, input, tag, " in BigFloat"); break;
             }
         }
         // The value's binary exponent, not the wire field, which shifts with
@@ -729,6 +795,7 @@ public static class Pb
         private readonly Action<object, object?> _setter;
 
         public Type Type { get; }
+        public WireTypes Wire { get; }
         public int Tag { get; }
         public bool ZigZag { get; }
         public string? Oneof { get; }
@@ -736,6 +803,7 @@ public static class Pb
         public FieldInfoData(PropertyInfo prop, int tag, bool zigzag, string? oneof)
         {
             Type = prop.PropertyType; Tag = tag; ZigZag = zigzag; Oneof = oneof;
+            Wire = WireTypesOf(Type);
             _getter = CreateGetter(prop);
             _setter = CreateSetter(prop);
         }
@@ -743,6 +811,7 @@ public static class Pb
         public FieldInfoData(FieldInfo field, int tag, bool zigzag, string? oneof)
         {
             Type = field.FieldType; Tag = tag; ZigZag = zigzag; Oneof = oneof;
+            Wire = WireTypesOf(Type);
             _getter = CreateGetter(field);
             _setter = CreateSetter(field);
         }
